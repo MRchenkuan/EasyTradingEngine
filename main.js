@@ -3,8 +3,7 @@ import {base_url, api_key, api_secret,pass_phrase} from './src/config.security.j
 import express from 'express'
 import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
-import { getPrices, dataset, toTrickTimeMark } from './src/tools.js'
-import { debug } from 'console'
+import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday } from './src/tools.js'
 // const ws_connection_pool={}
 
 // const ws_private = new WebSocket(base_url+'/ws/v5/private');
@@ -15,8 +14,8 @@ import { debug } from 'console'
 const gate = 0.05;
 const bar_type = '1H';
 const price_type = 'close'
-const once_limit = 300;
-const candle_limit = 300;
+const once_limit = 240;
+const candle_limit = 240;
 const assetIds = ['TRUMP-USDT','SOL-USDT','BTC-USDT', 'ETH-USDT' ]
 // const assetIds = ['TRUMP-USDT','BTC-USDT' ]
 const themes = ['#abb2b9','#ad85e9','#f5b041','#85c1e9'  ]
@@ -27,13 +26,14 @@ const params = {
   once_limit,
   candle_limit,
   // from_when: Date.now(),
-  // from_when: new Date(2025,0,31,0,0,0).getTime(),
+  // from_when: new Date(2025,1,15,14,0,0).getTime(),
   // to_when:new Date(2025,1,14,20,30,0).getTime(),
 }
 
 const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it, params)));
 const refer_kline = klines[0];
 const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
+
 const scaled_prices = klines.map((it,id)=>{
   const {prices, ts} = it;
   if(id==0) return dataset(prices);

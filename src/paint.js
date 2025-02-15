@@ -1,5 +1,6 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
+import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
 
 const width = 1800, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -49,10 +50,14 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
         ;((yData1, yData2)=>{
           klines.map((it, id)=>{
             const {prices, ts} = it;
+            const keys = formatTimestamp(getTsOfStartOfToday());
+            const index = labels.indexOf(keys);
+            const start_price = prices[prices.length - index -1] || prices[prices.length - 1];
+            console.log(keys, start_price)
             const price= prices[0],color=themes[id],assetId = assetIds[id];
             ctx.font = '16px Arial';
             ctx.fillStyle = color;
-            ctx.fillText(`[${assetId}]: ${price}`, width*0.8, height*0.2+(id+1)*20);
+            ctx.fillText(`[${assetId}]: ${price}(${(100*(price-start_price)/start_price).toFixed(2)}%)`, width*0.8, height*0.15+(id+1)*20);
           })
 
           const lables = yData2.map((it,id)=>id);
@@ -64,8 +69,8 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
             const y2 = yScale.getPixelForValue(yData2[i]);
             const diff_rate = Math.abs((yData2[i] - yData1[i])/Math.min(yData2[i],yData1[i]))
             if(i===lables.length-1){
-              ctx.font = '24px Arial';
-              ctx.fillText(`当前: ${(diff_rate*100).toFixed(2)}%`, width*0.8, height*0.2);
+              ctx.font = '22px Arial';
+              ctx.fillText(`最新偏差值: ${(diff_rate*100).toFixed(2)}%`, width*0.8, height*0.15 - 5);
             }
 
             profit.push(diff_rate)

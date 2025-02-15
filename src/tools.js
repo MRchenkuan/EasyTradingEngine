@@ -87,3 +87,9 @@ export function dataset(data){
   // return data.map((it,id)=>({x:id, y:it}))
   return data.slice().reverse()
 }
+
+export function getTsOfStartOfToday(){
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return startOfDay.getTime();
+}
