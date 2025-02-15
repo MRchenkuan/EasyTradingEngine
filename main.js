@@ -1,5 +1,4 @@
 import WebSocket from 'ws'
-import crypto from 'crypto'
 import {base_url, api_key, api_secret,pass_phrase} from './src/config.security.js'
 import express from 'express'
 import { findBestFitLine } from './src/regression.js'

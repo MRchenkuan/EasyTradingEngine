@@ -1,4 +1,5 @@
 import { marketCandles } from './api.js'
+import crypto from 'crypto'
 
 // 生成签名的函数
 export function generateSignature(timestamp, method, requestPath, body, secretKey) {
