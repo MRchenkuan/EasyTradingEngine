@@ -16,6 +16,8 @@
     "chartjs-node-canvas": "^4.1.6",
     "crypto": "^1.0.1",
     "express": "^4.21.2",
+    "mathjs": "^14.2.1",
+    "regression": "^2.0.1",
     "ws": "^8.18.0"
   }
 }

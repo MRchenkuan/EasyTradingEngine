@@ -1,9 +1,10 @@
 import WebSocket from 'ws'
-import {base_url, api_key, api_secret,pass_phrase} from './src/config.security.js'
 import express from 'express'
-import { findBestFitLine } from './src/regression.js'
+import { calculateHedgeRatio, findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday } from './src/tools.js'
+import { calculateReturns } from './src/mathmatic.js'
+import { writeKeyValuePair } from './src/recordBeta.js'
 // const ws_connection_pool={}
 
 // const ws_private = new WebSocket(base_url+'/ws/v5/private');
@@ -11,14 +12,17 @@ import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfTod
 // storeConnection('ws_business', ws_business);
 // storeConnection('ws_private', ws_private);
 
-const gate = 0.05;
-const bar_type = '1H';
+const gate = 0.02;
+const bar_type = '1m';
 const price_type = 'close'
-const once_limit = 240;
-const candle_limit = 240;
-const assetIds = ['TRUMP-USDT','SOL-USDT','BTC-USDT', 'ETH-USDT' ]
-// const assetIds = ['TRUMP-USDT','BTC-USDT' ]
-const themes = ['#abb2b9','#ad85e9','#f5b041','#85c1e9'  ]
+const once_limit = 300;
+const candle_limit = 2400;
+const assets = [
+  {id: 'TRUMP-USDT', theme:'#abb2b9'},
+  {id: 'SOL-USDT', theme:'#ad85e9'},
+  {id: 'BTC-USDT', theme:'#f5b041'},
+  // {id: 'ETH-USDT', theme:'#85c1e9'},
+]
 
 const params = {
   bar_type,
@@ -26,11 +30,15 @@ const params = {
   once_limit,
   candle_limit,
   // from_when: Date.now(),
-  // from_when: new Date(2025,1,15,14,0,0).getTime(),
-  // to_when:new Date(2025,1,14,20,30,0).getTime(),
+  // from_when: new Date(2025,1,14,19,0,0).getTime(),
+  to_when:new Date(2025,1,10,0,0,0).getTime(),
 }
 
+const assetIds = assets.map(it=>it.id);
+const themes = assets.map(it=>it.theme);
+
 const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it, params)));
+
 const refer_kline = klines[0];
 const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
 
@@ -38,8 +46,14 @@ const scaled_prices = klines.map((it,id)=>{
   const {prices, ts} = it;
   if(id==0) return dataset(prices);
   const {a, b} = findBestFitLine(prices, refer_kline.prices);
-  console.log("拟合的多项式系数:", assetIds[id],{a, b});
-  return dataset(prices.map(it=>it*a+b));
+  writeKeyValuePair(formatTimestamp(Date.now()),a)
+  // const {a,b } = { a: 0.45, b: -68.5 }
+  console.log("拟合的多项式系数:", assetIds[id], {a, b});
+  return dataset(prices.map(it=>a*it+b));
+
+
+  // const {a, b} = {a:1,b:0};
+  // return calculateReturns(dataset(prices.map(it=>it*a+b)))
 })
 
 paint(assetIds, scaled_prices, themes, x_label, gate, klines)
@@ -115,6 +129,7 @@ paint(assetIds, scaled_prices, themes, x_label, gate, klines)
 // function storeConnection(conn_id, ws){
 //   ws_connection_pool[conn_id] = ws;
 // }
+
 
 
 

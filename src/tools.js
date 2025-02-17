@@ -84,8 +84,8 @@ export async function getPrices(assetId, {
 
 
 export function dataset(data){
-  // return data.map((it,id)=>({x:id, y:it}))
-  return data.slice().reverse()
+  // return calculateReturns(data.slice().reverse()).map(it=>it*100)
+  return data.slice().reverse();
 }
 
 export function getTsOfStartOfToday(){

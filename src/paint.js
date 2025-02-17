@@ -1,6 +1,8 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
+import { calculateCorrelationMatrix } from './mathmatic.js';
+import { readLastNKeyValues } from './recordBeta.js';
 
 const width = 1800, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -12,8 +14,7 @@ const styles = {
   tension: 0.2  // 设置曲线平滑度 (0 为折线)
 }
 
-export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
-  
+export function paint(assetIds, scaled_prices, themes, labels, gate, klines){  
   // 计算差值并添加注释
   const configuration = {
     // type: 'scatter',
@@ -37,7 +38,12 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
         legend: { labels: { color: 'black' } }
       },
       layout: {
-        padding: 60
+        padding: {
+          top: 120,
+          bottom: 60,
+          left: 60,
+          right:60
+        }
       },
     },
     plugins:[{
@@ -45,7 +51,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
         const ctx = chart.ctx;
         const xScale = chart.scales.x;
         const yScale = chart.scales.y;
-
+        drawTable(ctx, calculateCorrelationMatrix(klines.map(it=>it.prices)), assetIds, themes);
         let prev_diff_rate = 0;
         ;((yData1, yData2)=>{
           klines.map((it, id)=>{
@@ -57,7 +63,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
             const price= prices[0],color=themes[id],assetId = assetIds[id];
             ctx.font = '16px Arial';
             ctx.fillStyle = color;
-            ctx.fillText(`[${assetId}]: ${price}(${(100*(price-start_price)/start_price).toFixed(2)}%)`, width*0.8, height*0.15+(id+1)*20);
+            ctx.fillText(`[${assetId}]: ${price}(${(100*(price-start_price)/start_price).toFixed(2)}%)`, width*0.8, height*0.05+(id+1)*20);
           })
 
           const lables = yData2.map((it,id)=>id);
@@ -70,7 +76,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
             const diff_rate = Math.abs((yData2[i] - yData1[i])/Math.min(yData2[i],yData1[i]))
             if(i===lables.length-1){
               ctx.font = '22px Arial';
-              ctx.fillText(`最新偏差值: ${(diff_rate*100).toFixed(2)}%`, width*0.8, height*0.15 - 5);
+              ctx.fillText(`最新偏差值: ${(diff_rate*100).toFixed(2)}%`, width*0.8, height*0.05 - 5);
             }
 
             profit.push(diff_rate)
@@ -108,6 +114,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines){
           }
 
           paintProfit(profit,labels);
+          paintBetaValue();
         })(scaled_prices[0], scaled_prices[1]);
       }
     }]
@@ -129,7 +136,7 @@ function paintProfit (profit,labels){
     data: {
         labels,
         datasets: [{
-          label: '背离距离',
+          label: '套利空间',
           data: profit.map(it=>it*100),
           borderColor: '#ad85e9',
           pointBackgroundColor:'#ad85e9',
@@ -147,7 +154,7 @@ function paintProfit (profit,labels){
         legend: { labels: { color: 'black' } }
       },
       layout: {
-        padding: 60
+        padding: 40
       },
     },
   };
@@ -157,4 +164,81 @@ function paintProfit (profit,labels){
     fs.writeFileSync('./chart/distance.jpg', image);
     console.log('图片已生成: distance.jpg');
   })();
+}
+
+// 打印实时对冲比例
+function paintBetaValue (profit,labels){
+  const data = readLastNKeyValues(1000);
+  // 计算差值并添加注释
+  const configuration = {
+    // type: 'scatter',
+    type:'line',
+    data: {
+        labels:Object.keys(data),
+        datasets: [{
+          label: 'β值',
+          data: Object.values(data),
+          borderColor: '#ad85e9',
+          pointBackgroundColor:'#ad85e9',
+          borderWidth: 1.2,
+          fill: false,  // 不填充颜色
+          pointRadius: 1.2, // 设置点的大小
+          tension: 0.2  // 设置曲线平滑度 (0 为折线)
+        }
+      ]
+    },
+    options: {
+      responsive: true, // 确保响应式布局
+      maintainAspectRatio: false, // 允许自定义宽高比例
+      plugins: {
+        legend: { labels: { color: 'black' } }
+      },
+      layout: {
+        padding: 40
+      },
+    },
+  };
+
+  (async () => {
+    const image = await chartJSNodeCanvas.renderToBuffer(configuration);
+    fs.writeFileSync('./chart/β.jpg', image);
+    console.log('图片已生成: β.jpg');
+  })();
+}
+
+
+
+function drawTable(ctx, data, headers, themes) {
+  const left = width*0.01;
+  const top = height*0.01
+  const cellWidth = 80; // 单元格宽度
+  const cellHeight = 20; // 单元格高度
+  const padding = 5; // 单元格内边距
+  ctx.fillStyle = '#808b96';
+  ctx.font = '18px Arial';
+  ctx.fillText('-- ρ --', left+padding, top+cellHeight / 2 + 5);
+  // 绘制表头文本
+  ctx.fillStyle = 'black';
+  ctx.font = '12px Arial';
+  headers.forEach((header, index) => {
+    ctx.fillStyle = themes[index];
+    ctx.fillText(header, (index + 1) * cellWidth + padding+left, top+cellHeight / 2 + 5);
+  });
+
+  // 绘制数据单元格
+  data.forEach((row, rowIndex) => {
+    const yOffset = (rowIndex + 1) * cellHeight;
+    
+    // 绘制首列文本
+    ctx.fillStyle = 'black';
+    ctx.font = '12px Arial';
+    ctx.fillStyle = themes[rowIndex];
+    ctx.fillText(headers[rowIndex], padding+left, yOffset + top+cellHeight / 2 + 5);
+
+    // 绘制数据单元格内容
+    row.forEach((cell, colIndex) => {
+      ctx.fillStyle = '#808b96';
+      ctx.fillText(cell, (colIndex + 1) * cellWidth + padding + left, yOffset + top + cellHeight / 2 + 5);
+    });
+  });
 }
