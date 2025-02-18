@@ -12,16 +12,16 @@ import { writeKeyValuePair } from './src/recordBeta.js'
 // storeConnection('ws_business', ws_business);
 // storeConnection('ws_private', ws_private);
 
-const gate = 0.02;
+const gate = 10.02;
 const bar_type = '1m';
 const price_type = 'close'
 const once_limit = 300;
-const candle_limit = 2400;
+const candle_limit = 2000;
 const assets = [
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  // {id: 'BTC-USDT', theme:'#f5b041'},
-  // {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'BTC-USDT', theme:'#f5b041'},
+  {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {
@@ -31,7 +31,7 @@ const params = {
   candle_limit,
   // from_when: Date.now(),
   // from_when: new Date(2025,1,14,19,0,0).getTime(),
-  to_when:new Date(2025,1,10,0,0,0).getTime(),
+  to_when:new Date(2025,0,10,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
