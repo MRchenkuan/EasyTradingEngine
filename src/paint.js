@@ -59,15 +59,12 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
           const index = labels.indexOf(keys);
           const start_price = prices[prices.length - index -1] || prices[prices.length - 1];
           const price= prices[0];
-          const rate = `${(100*(price-start_price)/start_price).toFixed(2)}%`
+          const rate = (price-start_price)/start_price;
           return [beta_arr[i_info].toFixed(6), price, rate]
         })
         drawInfoTable(ctx, info_data, assetIds, ['β(对冲比)','价格','涨跌幅'], themes);
         let prev_diff_rate = 0;
         ;((yData1, yData2)=>{
-          klines.map((it, id)=>{
-            
-          })
 
           const lables = yData2.map((it,id)=>id);
           const profit = [];
@@ -101,7 +98,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
             ctx.beginPath();
             ctx.moveTo(x, y1);
             ctx.lineTo(x, y2);
-            const color = yData1[i]>yData2[i]?'green':'red'
+            const color = yData1[i]>yData2[i]?'#229954':'#e74c3c'
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
             ctx.stroke();
@@ -110,10 +107,17 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
             ctx.fillStyle = color;
             ctx.font = '12px Arial';
             ctx.fillText((diff_rate*100).toFixed(2)+"%", x + 5, (y1 + y2) / 2);
-            ctx.fillText(Math.max(yData2[i], yData1[i]).toFixed(2), x -10, Math.min(y1, y2)-20);
-            ctx.fillText(Math.min(yData2[i], yData1[i]).toFixed(2), x -10, Math.max(y1, y2)+20);
+
+            if(yData2[i] < yData1[i]){
+              ctx.fillText(klines[0].prices.slice().reverse()[i].toFixed(2), x -10, Math.min(y1, y2)-20);
+              ctx.fillText(klines[1].prices.slice().reverse()[i].toFixed(2), x -10, Math.max(y1, y2)+20);
+            } else {
+              ctx.fillText(klines[0].prices.slice().reverse()[i].toFixed(2), x -10, Math.max(y1, y2)+20);
+              ctx.fillText(klines[1].prices.slice().reverse()[i].toFixed(2), x -10, Math.min(y1, y2)-20);
+            }
+            
             // 重置虚线样式（恢复为实线）
-            ctx.setLineDash([]); 
+            ctx.setLineDash([]);
           }
 
           paintProfit(profit,labels);
@@ -269,14 +273,17 @@ function drawInfoTable(ctx, data, first_col, headers, themes) {
     ctx.fillStyle = themes[rowIndex];
     ctx.fillText(first_col[rowIndex], padding+left, yOffset + top+cellHeight / 2 + 5);
     // 绘制数据单元格内容
-    row.forEach((cell, colIndex) => {
-      ctx.fillStyle = themes[rowIndex];
+    row.forEach((cell, colIndex) => {      
+      if(colIndex == row.length - 1){
+        ctx.fillStyle = cell>0?'#229954':cell===0?'#212f3c':'#e74c3c';
+        cell = `${(100*cell).toFixed(2)}%`;
+      } else {
+        ctx.fillStyle = themes[rowIndex];
+      }
       ctx.fillText(cell, (colIndex + 1) * cellWidth + padding + left, yOffset + top + cellHeight / 2 + 5);
     });
   });
 }
-
-
 
 
 // 打印拟合权重

@@ -41,7 +41,7 @@ function skew(x) {
 function fitStockRelationship(stockA, stockB) {
 
 
-    const {A,B} = cleanElements(stockA, stockB, 20)
+    const {A,B} = cleanElements(stockA, stockB, 15)
 
     if (A.length !== B.length || A.length === 0) {
         throw new Error("Input arrays must have the same non-zero length");
