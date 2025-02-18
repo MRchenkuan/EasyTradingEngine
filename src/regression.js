@@ -39,27 +39,23 @@ function skew(x) {
 }
 
 function fitStockRelationship(stockA, stockB) {
-    let {a} = fitOLS(stockA,stockB);
-    const distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);
-    const normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
-    paintRegressionWeight(normalize_distance)
 
-    stockA = filterOutsideElements(stockA, distances);
-    stockB = filterOutsideElements(stockB, distances);
 
-    if (stockA.length !== stockB.length || stockA.length === 0) {
+    const {A,B} = cleanElements(stockA, stockB, 20)
+
+    if (A.length !== B.length || A.length === 0) {
         throw new Error("Input arrays must have the same non-zero length");
     }
 
     let sumWAB = 0, sumWAA = 0;
-    const n = stockA.length;
+    const n = A.length;
 
     for (let i = 0; i < n; i++) {
-        sumWAB += stockA[i] * stockB[i];
-        sumWAA += stockA[i] * stockA[i];
+        sumWAB += A[i] * B[i];
+        sumWAA += A[i] * A[i];
     }
 
-    a = sumWAB / sumWAA;
+    const a = sumWAB / sumWAA;
 
     return { a,b:0 };
   }
@@ -95,4 +91,19 @@ function filterOutsideElements(data,distances){
     const saved_arr = filterOutliersIndices(distances);
     console.log('saved ',saved_arr.length)
     return data.filter((_, index) => saved_arr.includes(index))
+}
+
+
+function cleanElements(stockA, stockB, iterater=1){
+
+    while(iterater-->0){
+        let {a} = fitOLS(stockA,stockB);
+        let distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);
+        let normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
+        paintRegressionWeight(normalize_distance)
+        stockA = filterOutsideElements(stockA, distances);
+        stockB = filterOutsideElements(stockB, distances);
+    }
+    
+    return {A:stockA, B:stockB}
 }

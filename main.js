@@ -21,7 +21,7 @@ const assets = [
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
   // {id: 'BTC-USDT', theme:'#f5b041'},
-  {id: 'ETH-USDT', theme:'#85c1e9'},
+  // {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {
