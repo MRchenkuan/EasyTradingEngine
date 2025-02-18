@@ -20,8 +20,8 @@ const candle_limit = 2400;
 const assets = [
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  // {id: 'BTC-USDT', theme:'#f5b041'},
-  // {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'BTC-USDT', theme:'#f5b041'},
+  {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {
@@ -42,12 +42,14 @@ const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it,
 const refer_kline = klines[0];
 const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
 
+const beta_arr=[1];
 const scaled_prices = klines.map((it,id)=>{
   const {prices, ts} = it;
   if(id==0) return dataset(prices);
   const {a, b} = findBestFitLine(prices, refer_kline.prices);
   writeKeyValuePair(formatTimestamp(Date.now()),a)
   console.log("拟合的多项式系数:", assetIds[id], {a, b});
+  beta_arr.push(a);
   return dataset(prices.map(it=>a*it+b));
 
 
@@ -55,7 +57,7 @@ const scaled_prices = klines.map((it,id)=>{
   // return calculateReturns(dataset(prices.map(it=>it*a+b)))
 })
 
-paint(assetIds, scaled_prices, themes, x_label, gate, klines)
+paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr)
 
 // const {prices:price_a, ts:ts_a} = await getPrices(assetIdA, params);
 // const {prices:price_b, ts:ts_b} = await getPrices(assetIdB, params);

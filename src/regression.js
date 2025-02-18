@@ -86,10 +86,9 @@ function filterOutliersIndices(arr, threshold = 1.5) {
 }
 
 
-function filterOutsideElements(data,distances){
-    console.log('length ',data.length)
+function filterOutsideElements(data, distances){
     const saved_arr = filterOutliersIndices(distances);
-    console.log('saved ',saved_arr.length)
+    console.log(`剔除离群值${data.length},剩余:${saved_arr.length}`)
     return data.filter((_, index) => saved_arr.includes(index))
 }
 
