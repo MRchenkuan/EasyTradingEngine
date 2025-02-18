@@ -1,6 +1,6 @@
 import WebSocket from 'ws'
 import express from 'express'
-import { calculateHedgeRatio, findBestFitLine } from './src/regression.js'
+import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
@@ -20,8 +20,8 @@ const candle_limit = 2400;
 const assets = [
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  {id: 'BTC-USDT', theme:'#f5b041'},
-  // {id: 'ETH-USDT', theme:'#85c1e9'},
+  // {id: 'BTC-USDT', theme:'#f5b041'},
+  {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {
@@ -47,7 +47,6 @@ const scaled_prices = klines.map((it,id)=>{
   if(id==0) return dataset(prices);
   const {a, b} = findBestFitLine(prices, refer_kline.prices);
   writeKeyValuePair(formatTimestamp(Date.now()),a)
-  // const {a,b } = { a: 0.45, b: -68.5 }
   console.log("拟合的多项式系数:", assetIds[id], {a, b});
   return dataset(prices.map(it=>a*it+b));
 

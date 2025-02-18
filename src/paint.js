@@ -242,3 +242,46 @@ function drawTable(ctx, data, headers, themes) {
     });
   });
 }
+
+
+
+
+// 打印拟合权重
+export function paintRegressionWeight (weights){
+  const data = readLastNKeyValues(1000);
+  // 计算差值并添加注释
+  const configuration = {
+    // type: 'scatter',
+    type:'line',
+    data: {
+        labels:weights.map((it,id)=>id),
+        datasets: [{
+          label: '拟合权重',
+          data: weights.slice().reverse(),
+          borderColor: '#ad85e9',
+          pointBackgroundColor:'#ad85e9',
+          borderWidth: 1.2,
+          fill: false,  // 不填充颜色
+          pointRadius: 1.2, // 设置点的大小
+          tension: 0.2  // 设置曲线平滑度 (0 为折线)
+        }
+      ]
+    },
+    options: {
+      responsive: true, // 确保响应式布局
+      maintainAspectRatio: false, // 允许自定义宽高比例
+      plugins: {
+        legend: { labels: { color: 'black' } }
+      },
+      layout: {
+        padding: 40
+      },
+    },
+  };
+
+  (async () => {
+    const image = await chartJSNodeCanvas.renderToBuffer(configuration);
+    fs.writeFileSync('./chart/weights.jpg', image);
+    console.log('图片已生成: β.jpg');
+  })();
+}

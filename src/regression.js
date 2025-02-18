@@ -1,66 +1,98 @@
 import * as math from 'mathjs'
+import {std} from 'mathjs'
+import { paintRegressionWeight } from './paint.js';
+
 
 
 // 找到最佳拟合参数
 export function findBestFitLine(A,B) {
-    return adaptiveWeightedLinearRegression(A, B)
+    // return fitOLS(A, B)
+    return fitStockRelationship(A,B)
+    // return  {a:0.06545 ,b:0}
 }
 
-function adaptiveWeightedLinearRegression(x, y) {
-    if (x.length !== y.length || x.length === 0) {
+
+
+// 基础线性回归
+function fitOLS(stockA, stockB){
+    if (stockA.length !== stockB.length || stockA.length === 0) {
+        throw new Error("Input arrays must have the same non-zero length");
+    }
+    
+    let sumAB = 0, sumAA = 0;
+    const n = stockA.length;
+    
+    for (let i = 0; i < n; i++) {
+        sumAB += stockA[i] * stockB[i];
+        sumAA += stockA[i] * stockA[i];
+    }
+    
+    // 计算 OLS 估计的斜率 a
+    const a = sumAB / sumAA;
+    return {a, b:0}
+}
+
+
+function skew(x) {
+    return x
+    // return 1-Math.abs(x);
+}
+
+function fitStockRelationship(stockA, stockB) {
+    let {a} = fitOLS(stockA,stockB);
+    const distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);
+    const normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
+    paintRegressionWeight(normalize_distance)
+
+    stockA = filterOutsideElements(stockA, distances);
+    stockB = filterOutsideElements(stockB, distances);
+
+    if (stockA.length !== stockB.length || stockA.length === 0) {
         throw new Error("Input arrays must have the same non-zero length");
     }
 
-    const n = x.length;
-    
-    // 第一次回归，获取初步拟合结果
-    const { a: a_init, b: b_init } = ordinaryLeastSquares(x, y);
+    let sumWAB = 0, sumWAA = 0;
+    const n = stockA.length;
 
-    // 计算误差并定义权重：误差小的点权重大
-    const epsilon = 1e-6; // 防止除零
-    let weights = y.map((yi, i) => 1 / (Math.abs(yi - (a_init * x[i] + b_init)) + epsilon));
+    for (let i = 0; i < n; i++) {
+        sumWAB += stockA[i] * stockB[i];
+        sumWAA += stockA[i] * stockA[i];
+    }
 
-    // 重新计算加权最小二乘法回归
-    return weightedLeastSquares(x, y, weights);
+    a = sumWAB / sumWAA;
+
+    return { a,b:0 };
+  }
+
+
+  // 归一化数组
+  function normalizeArrayToRange(arr, a = -1, b = 1) {
+    const min = Math.min(...arr);
+    const max = Math.max(...arr);
+
+    if (min === max) {
+        return arr.map(() => a); // 如果所有值相同，返回全为 a 的数组
+    }
+
+    return arr.map(x => a + (x - min) * (b - a) / (max - min));
 }
 
 
-// 计算普通最小二乘法（OLS）
-function ordinaryLeastSquares(x, y) {
-    const n = x.length;
-    const sumX = math.sum(x);
-    const sumY = math.sum(y);
-    const sumXX = math.sum(x.map(xi => xi * xi));
-    const sumXY = math.sum(x.map((xi, i) => xi * y[i]));
+// 查找数组中ZScore2以内的元素
+function filterOutliersIndices(arr, threshold = 1.5) {
+    const mean = arr.reduce((sum, val) => sum + val, 0) / arr.length;
+    const std = Math.sqrt(arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length);
 
-    const denominator = n * sumXX - sumX * sumX;
-    if (denominator === 0) {
-        throw new Error("Denominator is zero, cannot compute regression");
-    }
-
-    const a = (n * sumXY - sumX * sumY) / denominator;
-    const b = (sumY * sumXX - sumX * sumXY) / denominator;
-    
-    return { a, b };
+    return arr
+        .map((val, index) => ({ index, zScore: (val - mean) / std }))
+        .filter(item => Math.abs(item.zScore) < threshold)
+        .map(item => item.index);
 }
 
 
-
-// 计算加权最小二乘法（WLS）
-function weightedLeastSquares(x, y, weights) {
-    const sumW = math.sum(weights);
-    const sumWX = math.sum(weights.map((w, i) => w * x[i]));
-    const sumWY = math.sum(weights.map((w, i) => w * y[i]));
-    const sumWXX = math.sum(weights.map((w, i) => w * x[i] * x[i]));
-    const sumWXY = math.sum(weights.map((w, i) => w * x[i] * y[i]));
-
-    const denominator = sumW * sumWXX - sumWX * sumWX;
-    if (denominator === 0) {
-        throw new Error("Denominator is zero, cannot compute regression");
-    }
-
-    const a = (sumW * sumWXY - sumWX * sumWY) / denominator;
-    const b = (sumWY * sumWXX - sumWX * sumWXY) / denominator;
-
-    return { a, b };
+function filterOutsideElements(data,distances){
+    console.log('length ',data.length)
+    const saved_arr = filterOutliersIndices(distances);
+    console.log('saved ',saved_arr.length)
+    return data.filter((_, index) => saved_arr.includes(index))
 }
