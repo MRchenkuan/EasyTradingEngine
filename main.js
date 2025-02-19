@@ -44,21 +44,26 @@ const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it,
 printKlines(klines);
 
 function printKlines(klines){
-  const refer_kline = klines[0];
-  const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
-
-  const beta_arr=[1];
-  const scaled_prices = klines.map((it,id)=>{
-    const {prices, ts} = it;
-    if(id==0) return dataset(prices);
-    const {a, b} = findBestFitLine(prices, refer_kline.prices);
-    writeKeyValuePair(formatTimestamp(Date.now()),a)
-    console.log(`[${formatTimestamp(ts[0])}]拟合的多项式系数:`, {a, b});
-    beta_arr.push(a);
-    return dataset(prices.map(it=>a*it+b));
-  })
-
-  paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr)
+  try{
+    const refer_kline = klines[0];
+    const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
+  
+    const beta_arr=[1];
+    const scaled_prices = klines.map((it,id)=>{
+      const {prices, ts} = it;
+      if(id==0) return dataset(prices);
+      const {a, b} = findBestFitLine(prices, refer_kline.prices);
+      if(id==1) writeKeyValuePair(formatTimestamp(Date.now()),a)
+      console.log(`[${formatTimestamp(ts[0])}]拟合的多项式系数:`, {a, b});
+      beta_arr.push(a);
+      return dataset(prices.map(it=>a*it+b));
+    })
+  
+    paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr)
+  }catch(e){
+    console.log(e);
+    console.log(klines)
+  }
 }
 
 

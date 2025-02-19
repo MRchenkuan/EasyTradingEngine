@@ -3,9 +3,8 @@ import fs from 'fs';
 import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
 import { readLastNKeyValues } from './recordBeta.js';
-import { debug } from 'console';
 
-const width = 1800, height = 800;
+const width = 2200, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
 
 const styles = {
@@ -77,29 +76,50 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
             const diff_rate = Math.abs((yData2[i] - yData1[i])/Math.min(yData2[i],yData1[i]))
             if(i===lables.length-1){
               ctx.font = '22px Arial';
-              ctx.fillText(`最新偏差值: ${(diff_rate*100).toFixed(2)}%`, width*0.8, height*0.05 - 5);
+              ctx.fillText(`最新偏差值: ${(diff_rate*100).toFixed(2)}%`, width*0.85, 20);
             }
 
             profit.push(diff_rate)
 
+            // 交易信号生成
             if(diff_rate < gate){
-              prev_diff_rate = diff_rate;
+              //没有达到门限
+              if(prev_diff_rate){
+                // 有前次门限
+                if(diff_rate<=0.005){
+                  // 如果当前距离足够小，则认为已经收敛，重置门限，重新开仓
+                  prev_diff_rate=0;
+                }
+              }
               continue
+            } else {
+              // 达到门限
+              if(prev_diff_rate){
+                // 再次达到门限，超上次 n 倍
+                if(diff_rate > prev_diff_rate*1.5){
+                  prev_diff_rate = diff_rate;
+                }else{
+                  // 没超则过
+                  continue                  
+                }
+              }else{
+                // 首次达到门限
+                prev_diff_rate = diff_rate
+              }
             }
 
-            if(diff_rate <= prev_diff_rate*1.25){
-              prev_diff_rate = diff_rate;
-              continue
-            }
+            
 
-            prev_diff_rate = diff_rate;
+
+            prev_diff_rate = diff_rate
+
 
             ctx.setLineDash([5, 3]);
             // 绘制竖线
             ctx.beginPath();
             ctx.moveTo(x, y1);
             ctx.lineTo(x, y2);
-            const color = yData1[i]>yData2[i]?'#229954':'#e74c3c'
+            const color = yData1[i]>yData2[i]?'green':'red'
             ctx.strokeStyle = color;
             ctx.lineWidth = 1;
             ctx.stroke();

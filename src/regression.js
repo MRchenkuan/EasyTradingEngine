@@ -88,18 +88,16 @@ function filterOutliersIndices(arr, threshold = 1.5) {
 
 function filterOutsideElements(data, distances){
     const saved_arr = filterOutliersIndices(distances);
-    // console.log(`剔除离群值${data.length},剩余:${saved_arr.length}`)
     return data.filter((_, index) => saved_arr.includes(index))
 }
 
 
 function cleanElements(stockA, stockB, iterater=1){
-
     while(iterater-->0){
         let {a} = fitOLS(stockA,stockB);
         let distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);
-        let normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
-        paintRegressionWeight(normalize_distance)
+        // let normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
+        // paintRegressionWeight(normalize_distance)
         stockA = filterOutsideElements(stockA, distances);
         stockB = filterOutsideElements(stockB, distances);
     }
