@@ -15,14 +15,14 @@ export function findBestFitLine(A,B) {
 
 // 基础线性回归
 function fitOLS(stockA, stockB){
-    if (stockA.length !== stockB.length || stockA.length === 0) {
-        throw new Error("Input arrays must have the same non-zero length");
+    const minLength = Math.min(stockA.length, stockB.length); // 取两个数组的最小长度
+    if (minLength === 0) {
+        throw new Error("Input arrays must have at least one element");
     }
     
     let sumAB = 0, sumAA = 0;
-    const n = stockA.length;
     
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; i < minLength; i++) {
         sumAB += stockA[i] * stockB[i];
         sumAA += stockA[i] * stockA[i];
     }
@@ -88,7 +88,7 @@ function filterOutliersIndices(arr, threshold = 1.5) {
 
 function filterOutsideElements(data, distances){
     const saved_arr = filterOutliersIndices(distances);
-    console.log(`剔除离群值${data.length},剩余:${saved_arr.length}`)
+    // console.log(`剔除离群值${data.length},剩余:${saved_arr.length}`)
     return data.filter((_, index) => saved_arr.includes(index))
 }
 

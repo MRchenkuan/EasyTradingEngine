@@ -3,6 +3,7 @@ import fs from 'fs';
 import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
 import { readLastNKeyValues } from './recordBeta.js';
+import { debug } from 'console';
 
 const width = 1800, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -130,7 +131,6 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
   (async () => {
     const image = await chartJSNodeCanvas.renderToBuffer(configuration);
     fs.writeFileSync('./chart/candle_chart.jpg', image);
-    console.log('图片已生成: candle_chart.jpg');
   })();
 }
 
@@ -169,7 +169,6 @@ function paintProfit (profit,labels){
   (async () => {
     const image = await chartJSNodeCanvas.renderToBuffer(configuration);
     fs.writeFileSync('./chart/distance.jpg', image);
-    console.log('图片已生成: distance.jpg');
   })();
 }
 
@@ -209,7 +208,6 @@ function paintBetaValue (profit,labels){
   (async () => {
     const image = await chartJSNodeCanvas.renderToBuffer(configuration);
     fs.writeFileSync('./chart/β.jpg', image);
-    console.log('图片已生成: β.jpg');
   })();
 }
 
@@ -321,6 +319,5 @@ export function paintRegressionWeight (weights){
   (async () => {
     const image = await chartJSNodeCanvas.renderToBuffer(configuration);
     fs.writeFileSync('./chart/weights.jpg', image);
-    console.log('图片已生成: β.jpg');
   })();
 }

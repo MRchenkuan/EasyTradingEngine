@@ -1,4 +1,5 @@
 config.security.js
 node_modules
 .vscode
-./chart
+chart
+β.json

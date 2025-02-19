@@ -93,3 +93,35 @@ export function getTsOfStartOfToday(){
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   return startOfDay.getTime();
 }
+
+
+export function throttleAsync(fn, delay) {
+  let isRunning = false; // 是否正在执行
+  let lastArgs = null;   // 最新的参数
+  let timeout = null;    // 定时器
+
+  async function invoke() {
+      if (!lastArgs) return; // 没有待处理的调用，直接返回
+      isRunning = true;
+      await fn(...lastArgs); // 执行异步函数
+      lastArgs = null;       // 清空参数，避免重复执行
+      timeout = setTimeout(() => {
+          isRunning = false;
+          if (lastArgs) invoke(); // 如果有新的调用请求，执行它
+      }, delay);
+  }
+
+  return (...args) => {
+      lastArgs = args; // 记录最新参数
+      if (!isRunning) invoke(); // 仅当没有正在运行的任务时才调用
+  };
+}
+
+
+export function getLastWholeMinute(now, m=1, s=30) {
+
+  now.setMinutes(now.getMinutes() - m); // 减去 1 分钟
+  now.setSeconds(now.getSeconds() - s); // 再减去 30 秒
+
+  return now.getTime();
+}

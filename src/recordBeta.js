@@ -21,7 +21,6 @@ export function writeKeyValuePair(key, value) {
 
         // 写入文件
         fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-        console.log(`Key "${key}" has been written to file.`);
     } catch (error) {
         console.error('Error writing key-value pair:', error);
     }
