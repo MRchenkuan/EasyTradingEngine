@@ -2,7 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
-import { readLastNKeyValues } from './recordBeta.js';
+import { readLastNKeyValues } from './recordTools.js';
 
 const width = 2200, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });

@@ -4,7 +4,7 @@ import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { writeKeyValuePair } from './src/recordBeta.js'
+import { writeKeyValuePair } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
 
@@ -23,8 +23,8 @@ const candle_limit = 1500;
 const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
-  {id: 'BTC-USDT', theme:'#f5b041'},
-  {id: 'ETH-USDT', theme:'#85c1e9'},
+  // {id: 'BTC-USDT', theme:'#f5b041'},
+  // {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {

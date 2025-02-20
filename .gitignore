@@ -1,4 +1,5 @@
 config.security.js
+config.security.mimic.js
 node_modules
 .vscode
 chart

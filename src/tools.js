@@ -10,6 +10,13 @@ export function generateSignature(timestamp, method, requestPath, body, secretKe
   return hmac.digest('base64');
 }
 
+// 生成hash
+export function hashString(input,length=8) {
+  const hash = crypto.createHash('sha256');
+  hash.update(input);
+  const fullHash = hash.digest('hex');
+  return fullHash.substring(0, length); // 截取前16位
+}
 
 
 export function safeParseFloat(str) {
@@ -38,6 +45,25 @@ export function formatTimestamp(timestamp) {
   return `${month}-${day} ${hours}:${minutes}`;
 }
 
+
+/**
+ * 
+ * @returns {Object} parsedData - An object containing the extracted order data fields.
+ * @returns {string} parsedData.clOrdId -用户自定义订单ID
+ * @returns {string} parsedData.orderId - 系统订单ID
+ * @returns {string} parsedData.tag - A tag or label associated with the order.
+ * @returns {number} parsedData.ts - The timestamp of the order event.
+ * @returns {string} parsedData.sCode - 订单下单是否成功，0表示成功
+ * @returns {string} parsedData.sMsg - The status message of the 
+ */
+export function parseOrderData({ordId,clOrdId,ts,sCode}){
+  return {
+    ordId,
+    clOrdId,
+    ts,
+    sCode,
+  }
+}
 export function parseCandleData(data){
   return {
     ts: data[0],
