@@ -4,7 +4,7 @@ import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { writeKeyValuePair } from './src/recordTools.js'
+import { writeBetaValue } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
 
@@ -18,13 +18,13 @@ const dkp={}
 const gate = 0.02;
 const bar_type = '1m';
 const price_type = 'close'
-const once_limit = 300;
+const once_limit = 200;
 const candle_limit = 1500;
 const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
-  // {id: 'BTC-USDT', theme:'#f5b041'},
-  // {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'BTC-USDT', theme:'#f5b041'},
+  {id: 'ETH-USDT', theme:'#85c1e9'},
 ]
 
 const params = {
@@ -53,7 +53,7 @@ function printKlines(klines){
       const {prices, ts} = it;
       if(id==0) return dataset(prices);
       const {a, b} = findBestFitLine(prices, refer_kline.prices);
-      if(id==1) writeKeyValuePair(formatTimestamp(Date.now()),a)
+      if(id==1) writeBetaValue(formatTimestamp(Date.now()),a)
       console.log(`[${formatTimestamp(ts[0])}]拟合的多项式系数:`, {a, b});
       beta_arr.push(a);
       return dataset(prices.map(it=>a*it+b));

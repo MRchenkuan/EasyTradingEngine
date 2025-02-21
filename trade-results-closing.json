@@ -1,33 +1,42 @@
-{
-  "c96a06c7": {
-    "tradeId": "c96a06c7",
+[
+  {
+    "tradeId": "7ea5d1e0",
+    "beta": 10.498230040985334,
     "side": "closing",
-    "profit": 0,
+    "profit": 0.168532719699999,
     "orders": [
-      {
-        "instId": "BTC-USDT",
-        "tdMode": "cash",
-        "side": "sell",
-        "ordType": "market",
-        "clOrdId": "0c79596b",
-        "sz": "9.999607566",
-        "tgtCcy": "quote_ccy",
-        "ordId": "2266767107106717696",
-        "ts": "1740057324103",
-        "sCode": "0"
-      },
       {
         "instId": "ETH-USDT",
         "tdMode": "cash",
         "side": "buy",
         "ordType": "market",
-        "clOrdId": "c0ec54d2",
-        "sz": "10.000125520000001",
-        "tgtCcy": "quote_ccy",
-        "ordId": "2266767107106717698",
-        "ts": "1740057324103",
-        "sCode": "0"
+        "clOrdId": "321c6c4e",
+        "sz": "0.003539",
+        "tgtCcy": "base_ccy",
+        "ordId": "2269971241024806912",
+        "ts": "1740152814735",
+        "sCode": "0",
+        "avgPx": "2729.21",
+        "accFillSz": "0.003539",
+        "fee": "-0.000003539",
+        "feeCcy": "ETH"
+      },
+      {
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "c1af972c",
+        "sz": "0.00010086",
+        "tgtCcy": "base_ccy",
+        "ordId": "2269971241024806913",
+        "ts": "1740152814735",
+        "sCode": "0",
+        "avgPx": "97826",
+        "accFillSz": "0.00010086",
+        "fee": "-0.00986673036",
+        "feeCcy": "USDT"
       }
     ]
   }
-}
+]

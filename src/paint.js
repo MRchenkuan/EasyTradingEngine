@@ -2,7 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
-import { readLastNKeyValues } from './recordTools.js';
+import { getLastTransactions, readLastNBeta } from './recordTools.js';
 
 const width = 2200, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -107,40 +107,16 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
                 prev_diff_rate = diff_rate
               }
             }
-
-            
-
-
             prev_diff_rate = diff_rate
-
-
-            ctx.setLineDash([5, 3]);
-            // 绘制竖线
-            ctx.beginPath();
-            ctx.moveTo(x, y1);
-            ctx.lineTo(x, y2);
-            const color = yData1[i]>yData2[i]?'green':'red'
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 1;
-            ctx.stroke();
-
-            // 绘制差值文本
-            ctx.fillStyle = color;
-            ctx.font = '12px Arial';
-            ctx.fillText((diff_rate*100).toFixed(2)+"%", x + 5, (y1 + y2) / 2);
-
-            if(yData2[i] < yData1[i]){
-              ctx.fillText(klines[0].prices.slice().reverse()[i].toFixed(2), x -10, Math.min(y1, y2)-20);
-              ctx.fillText(klines[1].prices.slice().reverse()[i].toFixed(2), x -10, Math.max(y1, y2)+20);
-            } else {
-              ctx.fillText(klines[0].prices.slice().reverse()[i].toFixed(2), x -10, Math.max(y1, y2)+20);
-              ctx.fillText(klines[1].prices.slice().reverse()[i].toFixed(2), x -10, Math.min(y1, y2)-20);
-            }
             
-            // 重置虚线样式（恢复为实线）
-            ctx.setLineDash([]);
+            const start = [x, Math.min(y1, y2), klines[0].prices.slice().reverse()[i].toFixed(2)];
+            const end = [x, Math.max(y1, y2), klines[1].prices.slice().reverse()[i].toFixed(2)];
+            paintLine(ctx, start, end, (diff_rate*100).toFixed(2)+"%", yData1[i]>yData2[i]?'green':'red')
           }
 
+          const beta_map = {};
+          assetIds.map((assid, index) => beta_map[assid] = beta_arr[index]);
+          paintTransactions(ctx, xScale, yScale, beta_map);
           paintProfit(profit,labels);
           paintBetaValue();
         })(scaled_prices[0], scaled_prices[1]);
@@ -154,6 +130,105 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
   })();
 }
 
+
+function paintTransactions(ctx, xScale, yScale, beta_map){
+  // 读取所有的开仓信息,并打印
+  const opening = getLastTransactions(100, 'opening');
+  const closing = getLastTransactions(100, 'closing');
+
+  const side_symbol = {
+    'buy': "+",
+    'sell': '-'
+  }
+
+  // 读取所有开仓信息并打印
+  opening.map(({orders})=>{
+    const {ts:ts1, avgPx:px1, instId: instId1, sz:sz1, side: side1} = orders[0]
+    const {ts:ts2, avgPx:px2, instId: instId2, sz:sz2, side: side2} = orders[1]
+
+    const ts_label_1 = formatTimestamp(ts1);
+    const ts_label_2 = formatTimestamp(ts2);
+
+    // const index = labels.indexOf(keys);
+
+    const x1 = xScale.getPixelForValue(ts_label_1);
+    const x2 = xScale.getPixelForValue(ts_label_2);
+
+    const beta1 = beta_map[instId1]
+    const beta2 = beta_map[instId2]
+
+    const spx1 = px1*beta1;
+    const spx2 = px2*beta2;
+
+    const y1 = yScale.getPixelForValue(spx1);
+    const y2 = yScale.getPixelForValue(spx2);
+    const diff_rate = Math.abs((spx2 - spx1)/Math.min(spx2, spx1));
+    
+    const v1 = `(${side_symbol[side1]}${sz1})/${px1}`;
+    const v2 = `(${side_symbol[side2]}${sz2})/${px2}`;
+    const tag = `${(diff_rate*100).toFixed(2)}%`
+    paintLine(ctx,[x1,y1,v1], [x2,y2,v2], tag,'#b03a2e',1)
+  })
+
+  // 读取所有平仓信息并打印
+  closing.map(({ orders, profit })=>{
+    const {ts:ts1, avgPx:px1, instId: instId1, sz:sz1, side: side1} = orders[0]
+    const {ts:ts2, avgPx:px2, instId: instId2, sz:sz2, side: side2} = orders[1]
+
+    const ts_label_1 = formatTimestamp(ts1);
+    const ts_label_2 = formatTimestamp(ts2);
+
+    const x1 = xScale.getPixelForValue(ts_label_1);
+    const x2 = xScale.getPixelForValue(ts_label_2);
+
+    const beta1 = beta_map[instId1]
+    const beta2 = beta_map[instId2]
+
+    const spx1 = px1*beta1;
+    const spx2 = px2*beta2;
+
+    const y1 = yScale.getPixelForValue(spx1);
+    const y2 = yScale.getPixelForValue(spx2);
+    const diff_rate = Math.abs((spx2 - spx1)/Math.min(spx2, spx1));
+
+    const v1 = `(${side_symbol[side1]}${(sz1*px1).toFixed(2)})/${px1}`;
+    const v2 = `(${side_symbol[side2]}${(sz2*px2).toFixed(2)})/${px2}`;
+    const tag = `(${profit.toFixed(2)})${(diff_rate*100).toFixed(2)}%`
+
+    paintLine(ctx,[x1,y1,v1], [x2,y2,v2], tag,'#2874a6')
+
+  })
+
+}
+
+function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color, side){
+  ctx.setLineDash([5, 3]);
+  // 绘制竖线
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+
+  const offset = (x)=> side?x+20:x
+
+  // 绘制差值文本
+  ctx.fillStyle = color;
+  ctx.font = '12px Arial';
+
+  const {width:w_t} = ctx.measureText(text);
+  const {width:w_v1} = ctx.measureText(v1);
+  const {width:w_v2} = ctx.measureText(v2);
+
+  ctx.fillText(`${text}`, (x1+x2) / 2 - w_t/2, Math.min(y1,y2) - 35);
+  // 绘制上边沿
+  ctx.fillText(v1, (x1+x2) / 2 - w_v1/2, y1 - 20);
+  // 绘制下边沿
+  ctx.fillText(v2, (x1+x2) / 2 - w_v2/2, y2 + 20);
+  // 重置虚线样式（恢复为实线）
+  ctx.setLineDash([]);
+}
 
 function paintProfit (profit,labels){
   // 计算差值并添加注释
@@ -194,7 +269,7 @@ function paintProfit (profit,labels){
 
 // 打印实时对冲比例
 function paintBetaValue (profit,labels){
-  const data = readLastNKeyValues(1000);
+  const data = readLastNBeta(1000);
   // 计算差值并添加注释
   const configuration = {
     // type: 'scatter',
