@@ -16,10 +16,10 @@ const dkp={}
 // storeConnection('ws_private', ws_private);
 
 const gate = 10.03;
-const bar_type = '5m';
+const bar_type = '1H';
 const price_type = 'close'
 const once_limit = 300;
-const candle_limit =1800;
+const candle_limit =1500;
 const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
@@ -104,6 +104,13 @@ ws_business.on('open', () => {
 
 
 ws_business.on('message', (message) => {
+
+
+
+  /**
+   * todo 问题出在label 身上，第一次渲染没问题因为是http一次性请求
+   * 当ws获取数据后，导致label在2.24 01-01位置重复了，因此获取的x坐标为 NaN
+   */
   const {arg={}, data} = JSON.parse(message.toString())
   const {channel, instId} = arg;
   if(channel.indexOf('candle')===0){

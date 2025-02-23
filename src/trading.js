@@ -201,9 +201,9 @@ function processOrderDetail(orderDetail){
 }
 
 
-const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
+// const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // const tradeId = await open_positions('SOL-USDT','BTC-USDT',10)
-// const tradeId = await open_positions('SOL-USDT','ETH-USDT',200)
+const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
 // const tradeId = await open_positions('ETH-USDT','BTC-USDT',200)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
 // const tradeId = await open_positions_limit('BTC-USDT', 'ETH-USDT',91000, 3500, 20)
@@ -212,4 +212,4 @@ const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // },1000)
 
 
-// close_position("bc4fcd25")
+// close_position("e11d7323")

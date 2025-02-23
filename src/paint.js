@@ -79,7 +79,8 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
         // 开平仓信息绘制
         const beta_map = {};
         assetIds.map((assid, index) => beta_map[assid] = beta_arr[index]);
-        paintTransactions(chart, beta_map, bar_type);
+        // 为了避免标签重叠先搞个位置收集器
+        paintTransactions(chart, beta_map, bar_type, labels);
 
         // 实时利润绘制
         paintProfit(profit, labels, assetIds, themes);
@@ -173,8 +174,7 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, graph){
   return profit;
 }
 
-
-function paintTransactions(chart, betaMap, bar_type) {
+function paintTransactions(chart, betaMap, bar_type, labels) {
   const ctx = chart.ctx;
   const xScale = chart.scales.x;
   const yScale = chart.scales.y;
@@ -184,45 +184,69 @@ function paintTransactions(chart, betaMap, bar_type) {
   const SIDE_SYMBOL = { buy: "+", sell: '-' };
 
   // 通用处理函数
-  const processTransaction = (transaction, type, color) => {
-    transaction.forEach(({ orders, profit }) => {
-      const [order1, order2] = orders;
-      const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1 } = order1;
-      const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2 } = order2;
+  const processTransaction = (transaction, type) => {
+    
+    const collisionAvoidance = createCollisionAvoidance();
 
+    transaction.forEach(({ orders, profit, closed, side: transaction_side }) => {
+      const [order1, order2] = orders;
+      const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1 } = order1;
+      const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2 } = order2;
+
+      let color = {
+        'opening':OPEN_COLOR,
+        'closing':CLOSE_COLOR,
+      }[transaction_side];
+      
+      if(closed){
+        color = "#ff000090"
+      }
+
+      debugger
       // 转换时间戳和计算坐标
-      const x1 = xScale.getPixelForValue(formatTimestamp(ts1, bar_type));
-      const x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
+      const label_1 = formatTimestamp(ts1, bar_type);
+      const label_2 = formatTimestamp(ts2, bar_type);
+      if(!labels.includes(label_1) || !labels.includes(label_2)){
+        console.warn('开平仓记号已经超出图标的绘制范围',label_1,label_2)
+        return;
+      }
+      let x1 = xScale.getPixelForValue(formatTimestamp(ts1, bar_type));
+      let x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
       
       // 计算标准化价格
       const spx1 = px1 * betaMap[instId1];
       const spx2 = px2 * betaMap[instId2];
       
       // 获取Y轴坐标
-      const y1 = yScale.getPixelForValue(spx1);
-      const y2 = yScale.getPixelForValue(spx2);
+      let y1 = yScale.getPixelForValue(spx1);
+      let y2 = yScale.getPixelForValue(spx2);
 
       // 计算价差比率
       const diffRate = Math.abs((spx2 - spx1) / Math.min(spx2, spx1));
       
-      // 生成标签内容
-      const valueFormatter = type === 'opening' 
-        ? (sz, side) => `${SIDE_SYMBOL[side]}${sz}`
-        : (sz, side) => `${SIDE_SYMBOL[side]}${(sz * px1).toFixed(2)}`;
+      // 将价格单位都转为USDT
+      const format2USDT = (sz, price,tgtCcy) => {
+        if(tgtCcy==='base_ccy') return (sz * price).toFixed(2);
+        if(tgtCcy==='quote_ccy') return sz;
+        throw("未知货币单位: ",tgtCcy)
+      }
 
-      const v1 = `(${valueFormatter(sz1, side1)})/${px1}`;
-      const v2 = `(${valueFormatter(sz2, side2)})/${px2}`;
+      // 生成标签内容
+      const valueFormatter = (sz, side, price, tgtCcy) => `${SIDE_SYMBOL[side]}${(format2USDT(sz, price, tgtCcy))}`;
+
+      const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${px1}`;
+      const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${px2}`;
 
       // 生成标签文本
       const rateTag = `${(diffRate * 100).toFixed(2)}%`;
       const tag = type === 'opening' 
-        ? `${rateTag} 开仓` 
+        ? `${rateTag} 开仓${closed?"(已平)":""}` 
         : `(${profit.toFixed(2)})${rateTag} 平仓`;
-
+      
       // 绘制连接线
-      spx1>spx2
-      ? paintLine(ctx, [x1, y1, v1], [x2, y2, v2], tag, color)
-      : paintLine(ctx, [x2, y2, v2], [x1, y1, v1], tag, color)
+      ;spx1>spx2
+      ? paintLine(ctx, [x1, y1, v1], [x2, y2, v2], tag, color, collisionAvoidance)
+      : paintLine(ctx, [x2, y2, v2], [x1, y1, v1], tag, color, collisionAvoidance)
 
     });
   };
@@ -233,7 +257,7 @@ function paintTransactions(chart, betaMap, bar_type) {
 }
 
 
-function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color){
+function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color,collisionAvoidance){
   ctx.setLineDash([5, 3]);
   // 绘制竖线
   ctx.beginPath();
@@ -258,13 +282,16 @@ function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color){
   const {width:w_v1} = ctx.measureText(v1);
   const {width:w_v2} = ctx.measureText(v2);
 
-  debugger
+  // 防止重叠，转换坐标
+  ;({x:x1, y:y1} = collisionAvoidance(x1 - w_v1 / 2, y1 - 20, w_v1, 25));
+  ;({x:x2, y:y2} = collisionAvoidance(x2 - w_v2 / 2, y2 + 20, w_v2, 10));
 
-  ctx.fillText(`${text}`, (x1+x2) / 2 - w_t/2, Math.min(y1,y2) - 55);
+  // 绘制标签
+  ctx.fillText(`${text}`, x1+(w_v1-w_t)/2,  Math.min(y1, y2) - 12);
   // 绘制上边沿
-  ctx.fillText(v1, (x1+x2) / 2 - w_v1/2, y1 - 40);
+  ctx.fillText(v1, x1, y1);
   // 绘制下边沿
-  ctx.fillText(v2, (x1+x2) / 2 - w_v2/2, y2 + 40);
+  ctx.fillText(v2, x2, y2);
   // 重置虚线样式（恢复为实线）
   ctx.setLineDash([]);
 }
@@ -464,4 +491,72 @@ export function paintRegressionWeight (weights){
 
 function simpAssetName(name){
   return name.split('-')[0]
+}
+
+
+
+function createCollisionAvoidance() {
+  const placed = []; // 存储已放置的标签信息
+
+  // 检测两个矩形是否重叠
+  function checkOverlap(rect1, rect2) {
+    return (
+      rect1.x < rect2.x + rect2.w &&
+      rect1.x + rect1.w > rect2.x &&
+      rect1.y < rect2.y + rect2.h &&
+      rect1.y + rect1.h > rect2.y
+    );
+  }
+
+  // 计算排斥力方向
+  function calculateForce(current, target) {
+    const dx = current.x + current.w/2 - (target.x + target.w/2);
+    const dy = current.y + current.h/2 - (target.y + target.h/2);
+    const distance = Math.sqrt(dx*dx + dy*dy) || 1; // 避免除零
+    return { dx: dx/distance, dy: dy/distance };
+  }
+
+  return (x, y, w, h) => {
+    let current = { x, y, w, h };
+    const maxIterations = 100;    // 最大迭代次数
+    const forceFactor = 0.2;      // 力反馈系数
+    let iterations = 0;
+
+    while (iterations++ < maxIterations) {
+      let totalDx = 0;
+      let totalDy = 0;
+      let hasCollision = false;
+
+      // 检查与所有已放置标签的碰撞
+      for (const placedLabel of placed) {
+        if (!checkOverlap(current, placedLabel)) continue;
+
+        hasCollision = true;
+        // 计算重叠区域
+        const overlapX = Math.min(current.x + w, placedLabel.x + placedLabel.w) 
+                       - Math.max(current.x, placedLabel.x);
+        const overlapY = Math.min(current.y + h, placedLabel.y + placedLabel.h)
+                       - Math.max(current.y, placedLabel.y);
+        
+        // 计算排斥力方向
+        const { dx, dy } = calculateForce(current, placedLabel);
+        
+        // 根据重叠量计算力度
+        const force = Math.sqrt(overlapX * overlapX + overlapY * overlapY);
+        totalDx += dx * force * forceFactor;
+        totalDy += dy * force * forceFactor;
+      }
+
+      // 无碰撞时退出循环
+      if (!hasCollision) break;
+
+      // 应用力反馈调整位置
+      current.x += totalDx;
+      current.y += totalDy;
+    }
+
+    // 记录最终位置
+    placed.push({ ...current });
+    return { x: current.x, y: current.y };
+  };
 }
