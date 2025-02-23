@@ -34,15 +34,31 @@ export function toTrickTimeMark(data){
   return data.map(it=>formatTimestamp(it))
 }
 
-export function formatTimestamp(timestamp) {
+export function formatTimestamp(timestamp, bar = '1m') {
   const date = new Date(parseInt(timestamp));
-  // 获取月、日、小时和分钟
-  const month = String(date.getMonth() + 1).padStart(2, '0');  // 获取月份（0-11），加1得到1-12
-  const day = String(date.getDate()).padStart(2, '0');          // 获取日期
-  const hours = String(date.getHours()).padStart(2, '0');       // 获取小时
-  const minutes = String(date.getMinutes()).padStart(2, '0');   // 获取分钟
-  // 格式化为 MM-DD HH:mm
-  return `${month}-${day} ${hours}:${minutes}`;
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+
+  const s = s => ("s"+'0'+s).slice(-2);
+  
+  switch (bar) {
+    case '1m':
+      return `${month}-${s(day)} ${s(hours)}:${s(minutes)}`; // 分钟级显示完整时间
+    case '3m':
+      return `${month}-${s(day)} ${s(hours)}:${s(minutes - minutes%3)}`; // 分钟级显示完整时间
+    case '5m':
+      return `${month}-${s(day)} ${s(hours)}:${s(minutes - minutes%5)}`; // 分钟级显示完整时间
+    case '15m':
+      return `${month}-${s(day)} ${s(hours)}:${s(minutes - minutes%15)}`; // 分钟级显示完整时间
+    case '1H':
+      return `${month}-${s(day)} ${s(hours)}:00`;         // 小时级显示整点
+    case '1D':
+      return `${month}-${s(day)} 00:00`;                    // 日级仅显示日期
+    default:
+      return `${month}-${s(day)} ${s(hours)}:${s(minutes)}`; // 默认按分钟级处理
+  }
 }
 
 
@@ -150,4 +166,39 @@ export function getLastWholeMinute(now, m=1, s=30) {
   now.setSeconds(now.getSeconds() - s); // 再减去 30 秒
 
   return now.getTime();
+}
+
+
+
+/**
+ * 颜色合成
+ * @param {*} color1 
+ * @param {*} color2 
+ * @returns 
+ */
+export function blendColors(color1, color2, ratio = 0.5) {
+  // 处理十六进制颜色字符串
+  const parseHex = hex => {
+    hex = hex.replace(/^#/, '');
+    if (hex.length === 3) {
+      hex = hex.split('').map(c => c + c).join('');
+    }
+    return hex.match(/.{2}/g).map(v => parseInt(v, 16));
+  };
+
+  // 确保颜色值有效
+  const [r1, g1, b1] = parseHex(color1);
+  const [r2, g2, b2] = parseHex(color2);
+
+  // 混合计算（线性插值）
+  const blend = (c1, c2) => Math.round(c1 * (1 - ratio) + c2 * ratio);
+
+  // 生成新颜色
+  const nr = blend(r1, r2);
+  const ng = blend(g1, g2);
+  const nb = blend(b1, b2);
+
+  // 转回十六进制
+  const toHex = n => n.toString(16).padStart(2, '0');
+  return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
 }

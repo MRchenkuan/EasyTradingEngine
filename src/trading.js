@@ -3,8 +3,25 @@ import { readLastBeta, readOpeningTransactions, recordClosingTransactions, recor
 import { hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
+
+
+// 订单执行器（通用下单逻辑）
+async function executeOrders(orderList) {
+  const {data=[]} = await batchOrders(orderList)
+  let result = mergeOrder2Result([...orderList, ...data])
+  let orderDetails = await Promise.all(result.map(async order=>{
+    const {data=[]} = await getOrderInfo(order.instId, order.ordId)
+    return data[0];
+  }));
+  // 处理和过滤下订单数据
+  orderDetails = processOrderDetail(orderDetails)
+  debugger
+  console.log('下单完成..',orderDetails)
+  return mergeOrder2Result([...result, ...orderDetails,])
+}
+
 /**
- * 开仓
+ * 市价开仓
  * @param {*} long 
  * @param {*} short 
  * @param {*} size 
@@ -17,28 +34,36 @@ export async function open_positions(long, short, size){
   const order_short = createOrder_market(short, size, 0)
 
   // 下单
-  const {data=[]} = await batchOrders([ order_long, order_short ])
-
-  let result = data.map(order=>{
-    return parseOrderData(order);
-  })
-
-  result = Object.values(mergeOrder2Result([order_long,order_short, ...result]))
-
-  let orderDetail = await Promise.all(result.map(async order=>{
-    const {data=[]} = await getOrderInfo(order.instId, order.ordId)
-    return data[0]
-  }));
-  // 处理和过滤下订单数据
-  orderDetail = processOrderDetail(orderDetail)
-
-  result = mergeOrder2Result([...result, ...orderDetail,])
-  console.log('开仓结果',result)
-
+  const result = await executeOrders([order_long, order_short])
   // 有任何报错都撤单
   // TODO 撤单
   // 成功则记录订单信息
-  recordOpeningTransactions(tradeId, Object.values(result), beta)
+  recordOpeningTransactions(tradeId, result, beta)
+  // 10秒后如果都未成交则撤单
+  // TODO 超时撤单
+  return tradeId;
+}
+
+
+/**
+ * 限价开仓
+ * @param {*} long 
+ * @param {*} short 
+ * @param {*} size 
+ * @returns 
+ */
+export async function open_positions_limit(long, short, price_long, price_short, size){
+  const tradeId = hashString(generateCounterBasedId());
+  const beta = readLastBeta();
+  const order_long = createOrder_limit(long, price_long, size, 1)
+  const order_short = createOrder_limit(short, price_short, size, 0)
+
+  // 下单
+  const result = await executeOrders([order_long, order_short])
+  // 有任何报错都撤单
+  // TODO 撤单
+  // 成功则记录订单信息
+  recordOpeningTransactions(tradeId, result, beta)
   // 10秒后如果都未成交则撤单
   // TODO 超时撤单
   return tradeId;
@@ -71,26 +96,10 @@ export async function close_position(tradeId){
   })
 
   console.log('平仓...', orders_info)
-  const {data=[]} = await batchOrders(orders_info)
-  let result = data.map(order=>{
-    return parseOrderData(order);
-  })
-  result = Object.values(mergeOrder2Result([...orders_info, ...result]))
-
-
-  let orderDetail = await Promise.all(result.map(async order=>{
-    const {data=[]} = await getOrderInfo(order.instId, order.ordId)
-    return data[0]
-  }));
-
-  // 过滤一遍数据
-  orderDetail = processOrderDetail(orderDetail)
-
-  
-  result = mergeOrder2Result([...result, ...orderDetail])
+  const result = await executeOrders(orders_info)
 
   // 计算利润
-  const profit = calcProfit([...opening_orders, ...Object.values(result)]);
+  const profit = calcProfit([...opening_orders, ...result]);
 
   // 更新订单记录
   updateTransaction(tradeId, 'opening', {"closed":true,"profit":profit})
@@ -99,14 +108,14 @@ export async function close_position(tradeId){
   // 有任何报错都撤单
   // TODO 撤单
   // 成功则记录订单信息
-  recordClosingTransactions(tradeId, profit, Object.values(result), beta)
+  recordClosingTransactions(tradeId, profit, result, beta)
   // 10秒后如果都未成交则撤单
   // TODO 超时撤单
   return 
 }
 
 
-function creaetOrder_limit(instId,price, size, side){
+function createOrder_limit(instId, price, size, side){
   return {
     instId,
     // "tdMode":side>0 ?"cash": 'isolated', // isolated
@@ -114,8 +123,8 @@ function creaetOrder_limit(instId,price, size, side){
     "side":side>0?"buy":"sell",
     "ordType":"limit",
     "px":price+"",
+    "sz":size/price+"",
     "clOrdId":hashString(`${instId}${side}${price}${size}${Date.now()}`),
-    "sz":size/price+""
   }
 }
 
@@ -138,7 +147,7 @@ function mergeOrder2Result(arr){
   arr.map(it=>{
     map[it.clOrdId] = {...(map[it.clOrdId]||{}),...it};
   })
-  return map
+  return Object.values(map);
 }
 
 function calcProfit(orders){
@@ -166,30 +175,41 @@ function calcProfit(orders){
     }
     fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
   })
-  console.log(`计算盈利:总卖单${sell}, 总买单${cost}, 总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
+  console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
   return sell - cost + fee_usdt;
 }
+
+
+
 
 // 标准化订单参数
 function processOrderDetail(orderDetail){
   return orderDetail.map(order=>{
-    const {clOrdId,avgPx,ordId,sz,accFillSz, fee,feeCcy} = order;
-    return {clOrdId,avgPx,ordId,sz,accFillSz, fee,feeCcy}
+    const {instId,clOrdId,avgPx,px, ordId,sz,accFillSz, fee,feeCcy} = order;
+    return {
+      instId,
+      clOrdId,
+      px,// 委托均价
+      avgPx, // 成交均价
+      ordId,
+      sz,// 委托份数
+      accFillSz,// 成交份数
+      fee,// 费用
+      feeCcy,
+    }
   })
 }
 
 
-
-
-
-
-// const tradeId = await open_positions('ETH-USDT','SOL-USDT',100)
-// const tradeId = await open_positions('SOL-USDT','ETH-USDT',10)
-// const tradeId = await open_positions('ETH-USDT','BTC-USDT',10)
-// const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',20)
+const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
+// const tradeId = await open_positions('SOL-USDT','BTC-USDT',10)
+// const tradeId = await open_positions('SOL-USDT','ETH-USDT',200)
+// const tradeId = await open_positions('ETH-USDT','BTC-USDT',200)
+// const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
+// const tradeId = await open_positions_limit('BTC-USDT', 'ETH-USDT',91000, 3500, 20)
 // setTimeout(()=>{
 //   close_position(tradeId)
 // },1000)
 
 
-close_position("7ea5d1e0")
+// close_position("bc4fcd25")

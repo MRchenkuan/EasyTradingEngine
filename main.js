@@ -15,16 +15,17 @@ const dkp={}
 
 // storeConnection('ws_private', ws_private);
 
-const gate = 0.02;
-const bar_type = '1m';
+const gate = 10.03;
+const bar_type = '5m';
 const price_type = 'close'
-const once_limit = 200;
-const candle_limit = 1500;
+const once_limit = 300;
+const candle_limit =1800;
 const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
-  {id: 'BTC-USDT', theme:'#f5b041'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'BTC-USDT', theme:'#f0b27a'},
+  // {id: 'OKB-USDT', theme:'#85dde9'},
 ]
 
 const params = {
@@ -33,7 +34,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,8,0,0,0).getTime(),
+  to_when:new Date(2025,1,17,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
@@ -59,7 +60,7 @@ function printKlines(klines){
       return dataset(prices.map(it=>a*it+b));
     })
   
-    paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr)
+    paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr, bar_type)
   }catch(e){
     console.log(e);
     console.log(klines)
@@ -82,6 +83,9 @@ const refreshKlineGraph = throttleAsync((dkp)=>{
     klines_dynamic[id].ts = ts_arr.concat(kline.ts)
     klines_dynamic[id].id = instId;
   })
+
+  // 交易信号判断和处理
+
   if(klines_dynamic.every(it=>it) && klines_dynamic.length>=assets.length){
     printKlines(klines_dynamic);
   }
