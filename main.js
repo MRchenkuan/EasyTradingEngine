@@ -4,7 +4,7 @@ import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { writeBetaValue } from './src/recordTools.js'
+import { getLastTransactions, readOpeningTransactions, updateTransaction, writeBetaValue } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
 
@@ -15,8 +15,8 @@ const dkp={}
 
 // storeConnection('ws_private', ws_private);
 
-const gate = 10.03;
-const bar_type = '1H';
+const gate = 10.04;
+const bar_type = '5m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =1500;
@@ -69,7 +69,7 @@ function printKlines(klines){
 
 
 const refreshKlineGraph = throttleAsync((dkp)=>{
-  const klines_dynamic = [];
+  let klines_dynamic = [];
   assets.map((asset, id)=>{
     const instId = asset.id;
     if(!dkp[instId]) return;
@@ -82,9 +82,42 @@ const refreshKlineGraph = throttleAsync((dkp)=>{
     klines_dynamic[id].prices = price_arr.concat(kline.prices)
     klines_dynamic[id].ts = ts_arr.concat(kline.ts)
     klines_dynamic[id].id = instId;
+    klines_dynamic[id] = duplicateRemoval(klines_dynamic[id]);
   })
 
+
   // 交易信号判断和处理
+  const opening_transactions = getLastTransactions(100,'opening');
+
+  opening_transactions.map(({tradeId, closed, orders, beta})=>{
+    if(!closed){
+
+      let fee_usdt = 0,cost = 0,sell=0;
+      orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
+        const asset = klines_dynamic.find(it=>it&&it.id === instId);
+        if(!asset) return;
+        const realtime_price = asset.prices[0];
+        // 单位 false:本币; true:usdt
+        const unit_fgt = tgtCcy === 'base_ccy'?false:true;
+        const unit_fee = feeCcy === 'USDT'?true:false;
+
+        if(side==='buy'){
+          cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+          // 实时估算
+          sell += realtime_price * accFillSz
+        }
+
+        if(side==='sell'){
+          sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+          // 实时估算
+          cost += realtime_price * accFillSz
+        }
+        fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
+      })
+      const profit =  sell - cost + fee_usdt;
+      updateTransaction(tradeId,'opening',{profit});
+    }
+  });
 
   if(klines_dynamic.every(it=>it) && klines_dynamic.length>=assets.length){
     printKlines(klines_dynamic);
@@ -105,12 +138,6 @@ ws_business.on('open', () => {
 
 ws_business.on('message', (message) => {
 
-
-
-  /**
-   * todo 问题出在label 身上，第一次渲染没问题因为是http一次性请求
-   * 当ws获取数据后，导致label在2.24 01-01位置重复了，因此获取的x坐标为 NaN
-   */
   const {arg={}, data} = JSON.parse(message.toString())
   const {channel, instId} = arg;
   if(channel.indexOf('candle')===0){
@@ -147,3 +174,19 @@ function storeConnection(conn_id, ws){
   ws_connection_pool[conn_id] = ws;
 }
 
+
+function duplicateRemoval(klines_dynamic){
+    // 对合并后的K线数据去重
+    const unque_ts = {};
+    const dump_ts=[]
+    klines_dynamic.ts.map((it,id)=>{
+      if(unque_ts[it]){
+        dump_ts.push(id);
+      }
+      unque_ts[it] = 1;
+    })
+    const {ts, prices} = klines_dynamic;
+    klines_dynamic.ts = ts.filter((it, index) => !dump_ts.includes(index));
+    klines_dynamic.prices = prices.filter((it, index) => !dump_ts.includes(index));
+    return klines_dynamic;
+}

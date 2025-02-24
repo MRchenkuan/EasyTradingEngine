@@ -50,6 +50,8 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
     plugins:[{
       afterDraw: function(chart) {
         const ctx = chart.ctx;
+        const collisionAvoidance = createCollisionAvoidance();
+
         drawTable(ctx, calculateCorrelationMatrix(klines.map(it=>it.prices)), assetIds, themes);
         const info_data = assetIds.map((assetId, i_info)=>{
           // 价格
@@ -72,7 +74,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
             profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i], scaled_prices[j], gate, klines, {
               key: `${s(assetIds[i])}:${s(assetIds[j])}`,
               index: k++,
-            });
+            }, collisionAvoidance);
           }
         }
 
@@ -80,7 +82,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
         const beta_map = {};
         assetIds.map((assid, index) => beta_map[assid] = beta_arr[index]);
         // 为了避免标签重叠先搞个位置收集器
-        paintTransactions(chart, beta_map, bar_type, labels);
+        paintTransactions(chart, beta_map, bar_type, labels, collisionAvoidance);
 
         // 实时利润绘制
         paintProfit(profit, labels, assetIds, themes);
@@ -108,7 +110,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
  * @param {*} graph 
  * @returns 
  */
-function paintTradingSignal(chart, yData1, yData2, gate, klines, graph){
+function paintTradingSignal(chart, yData1, yData2, gate, klines, graph, collisionAvoidance){
   const ctx = chart.ctx;
   const xScale = chart.scales.x;
   const yScale = chart.scales.y;
@@ -162,19 +164,20 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, graph){
       const end = [x, y2, klines[1].prices.slice().reverse()[i].toFixed(2)];
       const v = (diff_rate*100).toFixed(2)+"%";
       y1<y2
-      ? paintLine(ctx, start, end, v, '#607d8b')
-      : paintLine(ctx, end, start, v, '#607d8b')
+      ? paintLine(ctx, start, end, v, null,'#607d8b', collisionAvoidance)
+      : paintLine(ctx, end, start, v, null,'#607d8b', collisionAvoidance)
     } catch(e){
       console.warn(e);
       console.log('klines.prices',klines[0].prices)
       console.log('klines.prices',klines[1].prices)
+      console.log('klines[0].prices.slice().reverse()[i]',klines[0].prices.slice().reverse()[i])
       console.log('i',i)
     }
   }
   return profit;
 }
 
-function paintTransactions(chart, betaMap, bar_type, labels) {
+function paintTransactions(chart, betaMap, bar_type, labels, collisionAvoidance) {
   const ctx = chart.ctx;
   const xScale = chart.scales.x;
   const yScale = chart.scales.y;
@@ -186,12 +189,13 @@ function paintTransactions(chart, betaMap, bar_type, labels) {
   // 通用处理函数
   const processTransaction = (transaction, type) => {
     
-    const collisionAvoidance = createCollisionAvoidance();
-
     transaction.forEach(({ orders, profit, closed, side: transaction_side }) => {
       const [order1, order2] = orders;
       const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1 } = order1;
       const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2 } = order2;
+
+      //已平仓的不展示
+      if(type==='opening' && closed) return 
 
       let color = {
         'opening':OPEN_COLOR,
@@ -202,7 +206,6 @@ function paintTransactions(chart, betaMap, bar_type, labels) {
         color = "#ff000090"
       }
 
-      debugger
       // 转换时间戳和计算坐标
       const label_1 = formatTimestamp(ts1, bar_type);
       const label_2 = formatTimestamp(ts2, bar_type);
@@ -239,14 +242,17 @@ function paintTransactions(chart, betaMap, bar_type, labels) {
 
       // 生成标签文本
       const rateTag = `${(diffRate * 100).toFixed(2)}%`;
+      profit = profit || 0;
+      const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
       const tag = type === 'opening' 
         ? `${rateTag} 开仓${closed?"(已平)":""}` 
-        : `(${profit.toFixed(2)})${rateTag} 平仓`;
+        : `${rateTag} 平仓`;
+      const tag2 = type === 'opening' ? `${profit_text}$`:`${profit_text}$`
       
       // 绘制连接线
       ;spx1>spx2
-      ? paintLine(ctx, [x1, y1, v1], [x2, y2, v2], tag, color, collisionAvoidance)
-      : paintLine(ctx, [x2, y2, v2], [x1, y1, v1], tag, color, collisionAvoidance)
+      ? paintLine(ctx, [x1, y1, v1], [x2, y2, v2], tag, tag2, color, collisionAvoidance)
+      : paintLine(ctx, [x2, y2, v2], [x1, y1, v1], tag, tag2, color, collisionAvoidance)
 
     });
   };
@@ -257,7 +263,7 @@ function paintTransactions(chart, betaMap, bar_type, labels) {
 }
 
 
-function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color,collisionAvoidance){
+function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, text2, color, collisionAvoidance){
   ctx.setLineDash([5, 3]);
   // 绘制竖线
   ctx.beginPath();
@@ -283,10 +289,14 @@ function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, color,collisionAvoidanc
   const {width:w_v2} = ctx.measureText(v2);
 
   // 防止重叠，转换坐标
-  ;({x:x1, y:y1} = collisionAvoidance(x1 - w_v1 / 2, y1 - 20, w_v1, 25));
+  ;({x:x1, y:y1} = collisionAvoidance(x1 - w_v1 / 2, y1 - 20, w_v1, 40));
   ;({x:x2, y:y2} = collisionAvoidance(x2 - w_v2 / 2, y2 + 20, w_v2, 10));
 
   // 绘制标签
+  if(text2) {
+    const w_t2 = ctx.measureText(text2).width
+    ctx.fillText(`${text2}`, x1+(w_v1-w_t2)/2,  Math.min(y1, y2) - 24)
+  }
   ctx.fillText(`${text}`, x1+(w_v1-w_t)/2,  Math.min(y1, y2) - 12);
   // 绘制上边沿
   ctx.fillText(v1, x1, y1);
