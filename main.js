@@ -4,7 +4,7 @@ import { findBestFitLine } from './src/regression.js'
 import { paint } from './src/paint.js'
 import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { getLastTransactions, readOpeningTransactions, updateTransaction, writeBetaValue } from './src/recordTools.js'
+import { getLastTransactions, readOpeningTransactions, recordPrice, updateTransaction, writeBetaValue } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
 
@@ -16,7 +16,7 @@ const dkp={}
 // storeConnection('ws_private', ws_private);
 
 const gate = 10.04;
-const bar_type = '5m';
+const bar_type = '15m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =1500;
@@ -142,7 +142,9 @@ ws_business.on('message', (message) => {
   const {channel, instId} = arg;
   if(channel.indexOf('candle')===0){
     if(data){
+      // debugger
       const {open, close,ts} = parseCandleData(data[0])
+      recordPrice(instId, close)
       dkp[instId] ??= { };
       dkp[instId][formatTimestamp(ts)] = {price:close, ts};
       refreshKlineGraph(dkp);
@@ -190,3 +192,5 @@ function duplicateRemoval(klines_dynamic){
     klines_dynamic.prices = prices.filter((it, index) => !dump_ts.includes(index));
     return klines_dynamic;
 }
+
+

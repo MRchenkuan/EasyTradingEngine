@@ -7,6 +7,8 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const filePath_beta = path.join(__dirname, '../β.json');
 const filePath_trade_results_opening = path.join(__dirname, '../trade-results-opening.json');
 const filePath_trade_results_closing = path.join(__dirname, '../trade-results-closing.json');
+const filePath_trade_results_makert_maker = path.join(__dirname, '../trade-market-maker.json');
+const filePath_price = path.join(__dirname, '../price.json');
 
 
 export function getLastTransactions(last_n,type){
@@ -203,4 +205,68 @@ export function readLastBeta() {
       console.error('Error reading file:', error);
       return {};
   }
+}
+
+
+
+
+export function recordPrice(assetId, price) {
+    try {
+        // 读取现有内容
+        let data = {};
+        if (fs.existsSync(filePath_price)) {
+            const content = fs.readFileSync(filePath_price, 'utf-8');
+            data = JSON.parse(content);
+        }
+        data[assetId] = price;
+        // 写入文件
+        fs.writeFileSync(filePath_price, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (error) {
+        console.error('价格记录错误:', error);
+    }
+}
+
+export function readPrice(assetId) {
+    try {
+        if (!fs.existsSync(filePath_price)) {
+            console.log('File does not exist.');
+            return null;
+        }
+        // 读取文件内容
+        const content = fs.readFileSync(filePath_price, 'utf-8');
+        const data = JSON.parse(content);
+        return data[assetId]
+    } catch (error) {
+        console.error('订单读取错误:', error);
+        return null;
+    }
+  }
+
+
+
+
+export function recordMarketMakerTransactions(tradeId, orders) {
+    try {
+        // 读取现有内容
+        let data = [];
+        if (fs.existsSync(filePath_trade_results_makert_maker)) {
+            const content = fs.readFileSync(filePath_trade_results_makert_maker, 'utf-8');
+            data = JSON.parse(content);
+            if (!Array.isArray(data)) data = [];
+        }
+
+        const index = data.findIndex(item => item.tradeId === tradeId);
+        const record = {
+            tradeId, orders
+        };
+        if(index<0) {
+            data.push(record);
+        } else {
+            data[index]=record;
+        }
+        // 写入文件
+        fs.writeFileSync(filePath_trade_results_makert_maker, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (error) {
+        console.error('订单记录错误:', error);
+    }
 }

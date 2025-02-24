@@ -3,7 +3,7 @@
     "tradeId": "7bb45218",
     "beta": 10.63737444546109,
     "side": "opening",
-    "closed": false,
+    "closed": true,
     "orders": [
       {
         "instId": "BTC-USDT",
@@ -44,13 +44,13 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": -3.0469046136940143
+    "profit": 0.1389217695600008
   },
   {
     "tradeId": "b6e769b6",
     "beta": 10.63635151084345,
     "side": "opening",
-    "closed": false,
+    "closed": true,
     "orders": [
       {
         "instId": "BTC-USDT",
@@ -91,7 +91,7 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": -1.5466349776000707
+    "profit": 1.5509802836099942
   },
   {
     "tradeId": "e89cfd76",
@@ -138,7 +138,7 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": -12.591563560349998
+    "profit": -14.681898250349905
   },
   {
     "tradeId": "e11d7323",
@@ -232,7 +232,7 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": -7.355367775259984
+    "profit": -9.575630955259944
   },
   {
     "tradeId": "ba05d748",
@@ -326,7 +326,7 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": -1.591047505099925
+    "profit": -5.162432545099921
   },
   {
     "tradeId": "0289229e",
@@ -373,7 +373,7 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": 0.46510525386005674
+    "profit": -3.3923244261400525
   },
   {
     "tradeId": "368c57bd",
@@ -420,6 +420,6 @@
         "feeCcy": "USDT"
       }
     ],
-    "profit": 0.7866451281600153
+    "profit": -0.4615526918399577
   }
 ]

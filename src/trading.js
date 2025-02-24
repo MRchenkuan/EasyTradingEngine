@@ -1,12 +1,12 @@
 import { batchOrders, getOrderInfo } from "./api.js"
-import { readLastBeta, readOpeningTransactions, recordClosingTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
+import { readLastBeta, readOpeningTransactions, readPrice, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
 import { hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
 
 
 // 订单执行器（通用下单逻辑）
-async function executeOrders(orderList) {
+export async function executeOrders(orderList) {
   const {data=[]} = await batchOrders(orderList)
   let result = mergeOrder2Result([...orderList, ...data])
   let orderDetails = await Promise.all(result.map(async order=>{
@@ -15,7 +15,6 @@ async function executeOrders(orderList) {
   }));
   // 处理和过滤下订单数据
   orderDetails = processOrderDetail(orderDetails)
-  debugger
   console.log('下单完成..',orderDetails)
   return mergeOrder2Result([...result, ...orderDetails,])
 }
@@ -122,13 +121,14 @@ function createOrder_limit(instId, price, size, side){
     "tdMode":side>0 ?"cash": 'cash', // isolated
     "side":side>0?"buy":"sell",
     "ordType":"limit",
+    "clOrdId":hashString(`${instId}${side}${size}${Date.now()}`),
     "px":price+"",
     "sz":size/price+"",
     "clOrdId":hashString(`${instId}${side}${price}${size}${Date.now()}`),
   }
 }
 
-function createOrder_market(instId, size, side, is_base_ccy){
+export function createOrder_market(instId, size, side, is_base_ccy){
   return {
     instId,
     // "tdMode":side>0 ?"cash": 'isolated', // isolated
@@ -161,20 +161,33 @@ function calcProfit(orders){
       fee,// 平台收取的手续费，为负数 //卖的手续费为USTD, 买的为本币
       tgtCcy,//
       feeCcy,
+      ordType
     } = order
     
-    // 单位 false:本币; true:usdt
-    const unit_fgt = tgtCcy === 'base_ccy'?false:true;
     const unit_fee = feeCcy === 'USDT'?true:false;
+    // debugger
+    if(ordType==='limit'){
 
-    if(side==='buy'){
-      cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-    }
-    if(side==='sell'){
-      sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+      if(side==='buy'){
+        cost += parseFloat(accFillSz * avgPx);
+      }
+      if(side==='sell'){
+        sell += parseFloat(accFillSz * avgPx);
+      }
+    } else {
+      // 单位 false:本币; true:usdt
+      const unit_fgt = tgtCcy === 'base_ccy'?false:true;
+
+      if(side==='buy'){
+        cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+      }
+      if(side==='sell'){
+        sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+      }
     }
     fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
   })
+  // console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
   console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
   return sell - cost + fee_usdt;
 }
@@ -185,7 +198,7 @@ function calcProfit(orders){
 // 标准化订单参数
 function processOrderDetail(orderDetail){
   return orderDetail.map(order=>{
-    const {instId,clOrdId,avgPx,px, ordId,sz,accFillSz, fee,feeCcy} = order;
+    const {instId, clOrdId,avgPx,px, ordId,sz,accFillSz, fee,feeCcy, tgtCcy, state} = order;
     return {
       instId,
       clOrdId,
@@ -196,14 +209,63 @@ function processOrderDetail(orderDetail){
       accFillSz,// 成交份数
       fee,// 费用
       feeCcy,
+      tgtCcy,
+      state, // canceled：撤单成功 live：等待成交 partially_filled：部分成交 filled：完全成交 mmp_canceled：做市商保护机制导致的自动撤单
     }
   })
 }
 
 
+export async function marketMaker(assetId, price, size, dir){
+  const tradeId = hashString(generateCounterBasedId());
+  let p1= 0,p2=0
+  if(dir>0){
+    p2=price*1.003;
+    p1=price*1;
+  }
+  if(dir<0){
+    p2=price*1;
+    p1=price*0.997;
+  }
+
+  if(dir==0){
+    p2=price*1.003;
+    p1=price*0.997;
+  }
+
+  const order_short = createOrder_limit(assetId, p2, size, 0)
+  const order_long = createOrder_limit(assetId, p1, size, 1)
+
+  // 下单
+  let result = await executeOrders([order_long, order_short])
+  result = mergeOrder2Result([order_short, order_long, ...result])
+  recordMarketMakerTransactions(tradeId, result)
+  let order_details = await fetchOrders(result);
+  order_details = mergeOrder2Result([...result,...order_details])
+  recordMarketMakerTransactions(tradeId, order_details)
+  const profit = calcProfit(order_details);
+  return profit;
+}
+
+
+async function fetchOrders(orders){
+  let orderDetails = await Promise.all(orders.map(async order=>{
+    const {data=[]} = await getOrderInfo(order.instId, order.ordId)
+    return data[0];
+  }));
+  if(orderDetails.every(order=>order.state ==='filled')){
+    return orderDetails;
+  } else {
+    await new Promise(resove=>setTimeout(resove, 3000));
+    return await fetchOrders(orders);
+  }
+}
+
+
+
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // const tradeId = await open_positions('SOL-USDT','BTC-USDT',10)
-const tradeId = await open_positions('SOL-USDT','ETH-USDT',100)
+// const tradeId = await open_positions('SOL-USDT','ETH-USDT',100)
 // const tradeId = await open_positions('ETH-USDT','BTC-USDT',200)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
 // const tradeId = await open_positions_limit('BTC-USDT', 'ETH-USDT',91000, 3500, 20)
@@ -212,4 +274,6 @@ const tradeId = await open_positions('SOL-USDT','ETH-USDT',100)
 // },1000)
 
 
-// close_position("e11d7323")
+// close_position("7bb45218")
+
+// const profit = await marketMaker('ETH-USDT', readPrice('ETH-USDT'), 10, -1)
