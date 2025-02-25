@@ -44,5 +44,53 @@
         "feeCcy": "SOL"
       }
     ]
+  },
+  {
+    "tradeId": "5f5271c0",
+    "beta": 562.6265897237113,
+    "side": "closing",
+    "profit": 2.657574412960156,
+    "orders": [
+      {
+        "instId": "SOL-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "4eabcc83",
+        "sz": "2.124194",
+        "tgtCcy": "base_ccy",
+        "ordId": "2280743823504228352",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740473862711",
+        "px": "",
+        "avgPx": "137.83",
+        "accFillSz": "2.124194",
+        "fee": "-0.29277765902",
+        "feeCcy": "USDT",
+        "state": "filled"
+      },
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "a8b5db06",
+        "sz": "0.120395",
+        "tgtCcy": "base_ccy",
+        "ordId": "2280743823537782784",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740473862712",
+        "px": "",
+        "avgPx": "2399.92",
+        "accFillSz": "0.120395",
+        "fee": "-0.000120395",
+        "feeCcy": "ETH",
+        "state": "filled"
+      }
+    ]
   }
 ]

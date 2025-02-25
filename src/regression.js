@@ -1,6 +1,5 @@
 import * as math from 'mathjs'
 import {std} from 'mathjs'
-import { paintRegressionWeight } from './paint.js';
 
 
 

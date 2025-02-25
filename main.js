@@ -15,17 +15,17 @@ const dkp={}
 
 // storeConnection('ws_private', ws_private);
 
-const gate = 10.04;
+const gate = 10.1;
 const bar_type = '15m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =1500;
 const assets = [
+  {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
-  {id: 'BTC-USDT', theme:'#f0b27a'},
-  // {id: 'OKB-USDT', theme:'#85dde9'},
+  {id: 'OKB-USDT', theme:'#85dde9'},
 ]
 
 const params = {
@@ -34,7 +34,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,17,0,0,0).getTime(),
+  to_when:new Date(2025,1,18,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
@@ -142,12 +142,12 @@ ws_business.on('message', (message) => {
   const {channel, instId} = arg;
   if(channel.indexOf('candle')===0){
     if(data){
-      // debugger
       const {open, close,ts} = parseCandleData(data[0])
       recordPrice(instId, close)
       dkp[instId] ??= { };
       dkp[instId][formatTimestamp(ts)] = {price:close, ts};
       refreshKlineGraph(dkp);
+      
     }
   }
 });

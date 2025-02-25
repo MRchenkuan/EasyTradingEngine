@@ -202,3 +202,45 @@ export function blendColors(color1, color2, ratio = 0.5) {
   const toHex = n => n.toString(16).padStart(2, '0');
   return `#${toHex(nr)}${toHex(ng)}${toHex(nb)}`;
 }
+
+
+
+export function calcProfit(orders){
+  let fee_usdt = 0,cost = 0,sell=0
+  orders.map(order=>{
+    const {
+      side,// 方向  sell buy
+      sz,// 交易了多少金额
+      accFillSz,// 交易了多少数量
+      avgPx,// 交易的平均价格
+      fee,// 平台收取的手续费，为负数 //卖的手续费为USTD, 买的为本币
+      tgtCcy,//
+      feeCcy,
+      ordType
+    } = order
+    
+    const unit_fee = feeCcy === 'USDT'?true:false;
+    if(ordType==='limit'){
+
+      if(side==='buy'){
+        cost += parseFloat(accFillSz * avgPx);
+      }
+      if(side==='sell'){
+        sell += parseFloat(accFillSz * avgPx);
+      }
+    } else {
+      // 单位 false:本币; true:usdt
+      const unit_fgt = tgtCcy === 'base_ccy'?false:true;
+
+      if(side==='buy'){
+        cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+      }
+      if(side==='sell'){
+        sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+      }
+    }
+    fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
+  })
+  console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
+  return sell - cost + fee_usdt;
+}

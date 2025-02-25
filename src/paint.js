@@ -11,7 +11,7 @@ const font_style = "Monaco, Menlo, Consolas, monospace";
 const styles = {
   borderWidth: 1,
   fill: false,  // 不填充颜色
-  pointRadius: 1, // 设置点的大小
+  pointRadius: 0.5, // 设置点的大小
   tension: 0.2  // 设置曲线平滑度 (0 为折线)
 }
 
@@ -50,6 +50,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
     plugins:[{
       afterDraw: function(chart) {
         const ctx = chart.ctx;
+        // 为了避免标签重叠先搞个位置收集器
         const collisionAvoidance = createCollisionAvoidance();
 
         drawTable(ctx, calculateCorrelationMatrix(klines.map(it=>it.prices)), assetIds, themes);
@@ -66,22 +67,22 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
         // 信息表格绘制
         drawInfoTable(ctx, info_data, assetIds, ['β(对冲比)','价格','涨跌幅'], themes);
         const s = simpAssetName;
-        // 交易信号绘制
+        // // 交易信号绘制
         const profit = {};
         let k=0
         for (let i = 0; i < scaled_prices.length - 1; i++) {
           for (let j = i + 1; j < scaled_prices.length; j++) {
-            profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i], scaled_prices[j], gate, klines, {
-              key: `${s(assetIds[i])}:${s(assetIds[j])}`,
-              index: k++,
-            }, collisionAvoidance);
+            profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i], scaled_prices[j], gate, klines, collisionAvoidance);
           }
         }
 
+        // 绘制实时利润空间表格
+        drawProfitTable(chart, assetIds, themes, profit);
+
+        // ctx.fillText(`${graph.key}: ${(diff_rate*100).toFixed(2)}%`, width*0.8, 20+20*graph.index);
         // 开平仓信息绘制
         const beta_map = {};
         assetIds.map((assid, index) => beta_map[assid] = beta_arr[index]);
-        // 为了避免标签重叠先搞个位置收集器
         paintTransactions(chart, beta_map, bar_type, labels, collisionAvoidance);
 
         // 实时利润绘制
@@ -100,6 +101,55 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
 }
 
 
+function drawProfitTable(chart, assetIds, themes, data) {
+  const ctx= chart.ctx;
+  const headers = assetIds;
+  data = assetIds.map(astId1=>{
+    return assetIds.map(astId2=>{
+      const series = data[`${astId1}:${astId2}`]||data[`${astId2}:${astId1}`]
+      if(series){
+        return series.slice(-1) || 0;
+      } else {
+        return 0
+      }
+    })
+  })
+
+
+  const left = width*0.75;
+  const top = height*0.01
+  const cellWidth = 80; // 单元格宽度
+  const cellHeight = 20; // 单元格高度
+  const padding = 5; // 单元格内边距
+  ctx.fillStyle = '#808b96';
+  ctx.font = '14px '+font_style;
+  ctx.fillText('利润空间', left+padding, top+cellHeight / 2 + 5);
+  // 绘制表头文本
+  ctx.fillStyle = 'black';
+  ctx.font = '12px '+font_style;
+  headers.forEach((header, index) => {
+    ctx.fillStyle = themes[index];
+    ctx.fillText(simpAssetName(header), (index + 1) * cellWidth + padding+left, top+cellHeight / 2 + 5);
+  });
+
+  // 绘制数据单元格
+  data.forEach((row, rowIndex) => {
+    const yOffset = (rowIndex + 1) * cellHeight;
+    
+    // 绘制首列文本
+    ctx.fillStyle = 'black';
+    ctx.font = '12px '+font_style;
+    ctx.fillStyle = themes[rowIndex];
+    ctx.fillText(simpAssetName(headers[rowIndex]), padding+left, yOffset + top+cellHeight / 2 + 5);
+
+    // 绘制数据单元格内容
+    row.forEach((cell, colIndex) => {
+      ctx.fillStyle = cell > 0 ? (cell==Math.max(...row)?"red":"green") : '#808b96';
+      ctx.fillText((cell*100).toFixed(2)+"%", (colIndex + 1) * cellWidth + padding + left, yOffset + top + cellHeight / 2 + 5);
+    });
+  });
+}
+
 /**
  * 打印开平仓信号
  * @param {*} chart 
@@ -110,7 +160,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
  * @param {*} graph 
  * @returns 
  */
-function paintTradingSignal(chart, yData1, yData2, gate, klines, graph, collisionAvoidance){
+function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoidance){
   const ctx = chart.ctx;
   const xScale = chart.scales.x;
   const yScale = chart.scales.y;
@@ -125,10 +175,10 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, graph, collisio
     const y1 = yScale.getPixelForValue(yData1[i]);
     const y2 = yScale.getPixelForValue(yData2[i]);
     const diff_rate = Math.abs((yData2[i] - yData1[i])/Math.min(yData2[i],yData1[i]))
-    if(i===lables.length-1){
-      ctx.font = '16px '+font_style;
-      ctx.fillText(`${graph.key}: ${(diff_rate*100).toFixed(2)}%`, width*0.8, 20+20*graph.index);
-    }
+    // if(i===lables.length-1){
+    //   ctx.font = '16px '+font_style;
+    //   ctx.fillText(`${graph.key}: ${(diff_rate*100).toFixed(2)}%`, width*0.8, 20+20*graph.index);
+    // }
 
     profit.push(diff_rate)
     // 交易信号生成
@@ -160,12 +210,12 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, graph, collisio
     }
     prev_diff_rate = diff_rate
     try{   
-      const start = [x, y1, klines[0].prices.slice().reverse()[i].toFixed(2)];
-      const end = [x, y2, klines[1].prices.slice().reverse()[i].toFixed(2)];
       const v = (diff_rate*100).toFixed(2)+"%";
-      y1<y2
-      ? paintLine(ctx, start, end, v, null,'#607d8b', collisionAvoidance)
-      : paintLine(ctx, end, start, v, null,'#607d8b', collisionAvoidance)
+      const start = [x, y1, klines[0].prices.slice().reverse()[i].toFixed(2)+`/${v}`];
+      const end = [x, y2, klines[1].prices.slice().reverse()[i].toFixed(2)+`/${v}`];
+      ;y1<y2
+      ? paintLine(ctx, start, end, '#607d8b', collisionAvoidance)
+      : paintLine(ctx, end, start, '#607d8b', collisionAvoidance)
     } catch(e){
       console.warn(e);
       console.log('klines.prices',klines[0].prices)
@@ -237,22 +287,21 @@ function paintTransactions(chart, betaMap, bar_type, labels, collisionAvoidance)
       // 生成标签内容
       const valueFormatter = (sz, side, price, tgtCcy) => `${SIDE_SYMBOL[side]}${(format2USDT(sz, price, tgtCcy))}`;
 
-      const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${px1}`;
-      const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${px2}`;
-
       // 生成标签文本
       const rateTag = `${(diffRate * 100).toFixed(2)}%`;
       profit = profit || 0;
       const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
       const tag = type === 'opening' 
-        ? `${rateTag} 开仓${closed?"(已平)":""}` 
-        : `${rateTag} 平仓`;
-      const tag2 = type === 'opening' ? `${profit_text}$`:`${profit_text}$`
-      
+        ? `${rateTag}/开仓${closed?"(已平)":""}` 
+        : `${rateTag}/平仓`;
+      const tag2 = `$${profit_text}`;
+      const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${px1}`;
+      const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${px2}`;
+
       // 绘制连接线
       ;spx1>spx2
-      ? paintLine(ctx, [x1, y1, v1], [x2, y2, v2], tag, tag2, color, collisionAvoidance)
-      : paintLine(ctx, [x2, y2, v2], [x1, y1, v1], tag, tag2, color, collisionAvoidance)
+      ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${tag}`], [x2, y2, v2], color, collisionAvoidance)
+      : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${tag}`], [x1, y1, v1], color, collisionAvoidance)
 
     });
   };
@@ -263,7 +312,7 @@ function paintTransactions(chart, betaMap, bar_type, labels, collisionAvoidance)
 }
 
 
-function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, text2, color, collisionAvoidance){
+function paintLine(ctx,[x1, y1, v1], [x2, y2, v2],color, collisionAvoidance){
   ctx.setLineDash([5, 3]);
   // 绘制竖线
   ctx.beginPath();
@@ -276,35 +325,44 @@ function paintLine(ctx,[x1, y1, v1], [x2, y2, v2], text, text2, color, collision
   // 绘制圆点
   ctx.beginPath();
   ctx.fillStyle = color;
-  ctx.arc(x1,y1, 3,0, Math.PI*2);
-  ctx.arc(x2,y2, 3,0, Math.PI*2);
+  ctx.arc(x1,y1, 2,0, Math.PI*2);
+  ctx.arc(x2,y2, 2,0, Math.PI*2);
   ctx.fill();
 
   // 绘制差值文本
   ctx.fillStyle = color;
   ctx.font = 'bold 12px '+font_style;
 
-  const {width:w_t} = ctx.measureText(text);
-  const {width:w_v1} = ctx.measureText(v1);
-  const {width:w_v2} = ctx.measureText(v2);
+  // const {width:w_t} = ctx.measureText(text);
+  // const {width:w_v1} = ctx.measureText(v1);
 
+
+  const v_arr1 = v1.split("/");
+  const v_w_arr1 = v_arr1.map(v=>ctx.measureText(v).width);
+  const max_v_w1 = Math.max(...v_w_arr1);
+
+  const v_arr2 = v2.split("/");
+  const v_w_arr2 = v_arr2.map(v=>ctx.measureText(v).width);
+  const max_v_w2 = Math.max(...v_w_arr2);
+  
+debugger
   // 防止重叠，转换坐标
-  ;({x:x1, y:y1} = collisionAvoidance(x1 - w_v1 / 2, y1 - 20, w_v1, 40));
-  ;({x:x2, y:y2} = collisionAvoidance(x2 - w_v2 / 2, y2 + 20, w_v2, 10));
+  ;({x:x1, y:y1} = collisionAvoidance(x1 - max_v_w1 / 2, y1 - 20, max_v_w1, v_arr1.length*15));
+  ;({x:x2, y:y2} = collisionAvoidance(x2 - max_v_w2 / 2, y2 + 20, max_v_w2, v_arr2.length*15));
 
-  // 绘制标签
-  if(text2) {
-    const w_t2 = ctx.measureText(text2).width
-    ctx.fillText(`${text2}`, x1+(w_v1-w_t2)/2,  Math.min(y1, y2) - 24)
-  }
-  ctx.fillText(`${text}`, x1+(w_v1-w_t)/2,  Math.min(y1, y2) - 12);
+  debugger
   // 绘制上边沿
-  ctx.fillText(v1, x1, y1);
-  // 绘制下边沿
-  ctx.fillText(v2, x2, y2);
+  v_arr1.map((v,i)=>{
+    ctx.fillText(v, x1 + (max_v_w1 - v_w_arr1[i])/2, y1-i*15);
+  })  // 绘制下边沿
+  v_arr2.map((v,i)=>{
+    ctx.fillText(v, x2 + (max_v_w2 - v_w_arr2[i])/2, y2+i*15);
+  })
+  
   // 重置虚线样式（恢复为实线）
   ctx.setLineDash([]);
 }
+
 
 function paintProfit (profits,labels, assetIds, themes){
   // 计算差值并添加注释
@@ -461,44 +519,6 @@ function drawInfoTable(ctx, data, first_col, headers, themes) {
 }
 
 
-// 打印拟合权重
-export function paintRegressionWeight (weights){
-  // 计算差值并添加注释
-  const configuration = {
-    // type: 'scatter',
-    type:'line',
-    data: {
-        labels:weights.map((it,id)=>id),
-        datasets: [{
-          label: '拟合权重',
-          data: weights.slice().reverse(),
-          borderColor: '#ad85e9',
-          pointBackgroundColor:'#ad85e9',
-          borderWidth: 1.2,
-          fill: false,  // 不填充颜色
-          pointRadius: 1.2, // 设置点的大小
-          tension: 0.2  // 设置曲线平滑度 (0 为折线)
-        }
-      ]
-    },
-    options: {
-      responsive: true, // 确保响应式布局
-      maintainAspectRatio: false, // 允许自定义宽高比例
-      plugins: {
-        legend: { labels: { color: 'black' } }
-      },
-      layout: {
-        padding: 40
-      },
-    },
-  };
-
-  (async () => {
-    const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-    fs.writeFileSync('./chart/weights.jpg', image);
-  })();
-}
-
 function simpAssetName(name){
   return name.split('-')[0]
 }
@@ -554,7 +574,7 @@ function createCollisionAvoidance() {
         // 根据重叠量计算力度
         const force = Math.sqrt(overlapX * overlapX + overlapY * overlapY);
         totalDx += dx * force * forceFactor;
-        totalDy += dy * force * forceFactor;
+        totalDy += 1.2*dy * force * forceFactor;
       }
 
       // 无碰撞时退出循环

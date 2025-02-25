@@ -1,6 +1,6 @@
 import { batchOrders, getOrderInfo } from "./api.js"
 import { readLastBeta, readOpeningTransactions, readPrice, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
-import { hashString, parseOrderData } from "./tools.js"
+import { calcProfit, hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
 
@@ -54,8 +54,8 @@ export async function open_positions(long, short, size){
 export async function open_positions_limit(long, short, price_long, price_short, size){
   const tradeId = hashString(generateCounterBasedId());
   const beta = readLastBeta();
-  const order_long = createOrder_limit(long, price_long, size, 1)
-  const order_short = createOrder_limit(short, price_short, size, 0)
+  const order_long = createOrder_limit(long, price_long, size/price_long, 1)
+  const order_short = createOrder_limit(short, price_short, size/price_short, 0)
 
   // 下单
   const result = await executeOrders([order_long, order_short])
@@ -123,7 +123,7 @@ function createOrder_limit(instId, price, size, side){
     "ordType":"limit",
     "clOrdId":hashString(`${instId}${side}${size}${Date.now()}`),
     "px":price+"",
-    "sz":size/price+"",
+    "sz":size+"",
     "clOrdId":hashString(`${instId}${side}${price}${size}${Date.now()}`),
   }
 }
@@ -149,50 +149,6 @@ function mergeOrder2Result(arr){
   })
   return Object.values(map);
 }
-
-function calcProfit(orders){
-  let fee_usdt = 0,cost = 0,sell=0
-  orders.map(order=>{
-    const {
-      side,// 方向  sell buy
-      sz,// 交易了多少金额
-      accFillSz,// 交易了多少数量
-      avgPx,// 交易的平均价格
-      fee,// 平台收取的手续费，为负数 //卖的手续费为USTD, 买的为本币
-      tgtCcy,//
-      feeCcy,
-      ordType
-    } = order
-    
-    const unit_fee = feeCcy === 'USDT'?true:false;
-    // debugger
-    if(ordType==='limit'){
-
-      if(side==='buy'){
-        cost += parseFloat(accFillSz * avgPx);
-      }
-      if(side==='sell'){
-        sell += parseFloat(accFillSz * avgPx);
-      }
-    } else {
-      // 单位 false:本币; true:usdt
-      const unit_fgt = tgtCcy === 'base_ccy'?false:true;
-
-      if(side==='buy'){
-        cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-      }
-      if(side==='sell'){
-        sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-      }
-    }
-    fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
-  })
-  // console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
-  console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
-  return sell - cost + fee_usdt;
-}
-
-
 
 
 // 标准化订单参数
@@ -220,21 +176,21 @@ export async function marketMaker(assetId, price, size, dir){
   const tradeId = hashString(generateCounterBasedId());
   let p1= 0,p2=0
   if(dir>0){
-    p2=price*1.003;
+    p2=price*1.005;
     p1=price*1;
   }
   if(dir<0){
     p2=price*1;
-    p1=price*0.997;
+    p1=price*0.995;
   }
 
   if(dir==0){
-    p2=price*1.003;
-    p1=price*0.997;
+    p2=price*1.005;
+    p1=price*0.995;
   }
 
-  const order_short = createOrder_limit(assetId, p2, size, 0)
-  const order_long = createOrder_limit(assetId, p1, size, 1)
+  const order_short = createOrder_limit(assetId, p2, size/p2, 0)
+  const order_long = createOrder_limit(assetId, p1, size/p1, 1)
 
   // 下单
   let result = await executeOrders([order_long, order_short])
@@ -264,16 +220,16 @@ async function fetchOrders(orders){
 
 
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
-// const tradeId = await open_positions('SOL-USDT','BTC-USDT',10)
-// const tradeId = await open_positions('SOL-USDT','ETH-USDT',100)
-// const tradeId = await open_positions('ETH-USDT','BTC-USDT',200)
+// await open_positions('SOL-USDT','BTC-USDT',400)
+// const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
+// const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',300)
+// await open_positions('ETH-USDT','BTC-USDT',400)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
-// const tradeId = await open_positions_limit('BTC-USDT', 'ETH-USDT',91000, 3500, 20)
 // setTimeout(()=>{
 //   close_position(tradeId)
 // },1000)
 
 
-// close_position("7bb45218")
+close_position("5f5271c0")
 
-// const profit = await marketMaker('ETH-USDT', readPrice('ETH-USDT'), 10, -1)
+// const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
