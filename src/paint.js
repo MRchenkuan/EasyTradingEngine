@@ -303,6 +303,9 @@ function paintTransactions(transaction, chart, betaMap, bar_type, labels, collis
 
 
 function paintLine(ctx,[x1, y1, v1], [x2, y2, v2],color, collisionAvoidance){
+
+  const vertical_offset = 10;
+
   ctx.setLineDash([5, 3]);
   // 绘制竖线
   ctx.beginPath();
@@ -327,24 +330,30 @@ function paintLine(ctx,[x1, y1, v1], [x2, y2, v2],color, collisionAvoidance){
   // const {width:w_v1} = ctx.measureText(v1);
 
 
-  const v_arr1 = v1.split("/");
+  const v_arr1 = v1.split("/").reverse();
   const v_w_arr1 = v_arr1.map(v=>ctx.measureText(v).width);
   const max_v_w1 = Math.max(...v_w_arr1);
 
   const v_arr2 = v2.split("/");
   const v_w_arr2 = v_arr2.map(v=>ctx.measureText(v).width);
   const max_v_w2 = Math.max(...v_w_arr2);
+
   
   // 防止重叠，转换坐标
-  ;({x:x1, y:y1} = collisionAvoidance(x1 - max_v_w1 / 2, y1 - 20, max_v_w1, v_arr1.length*15));
-  ;({x:x2, y:y2} = collisionAvoidance(x2 - max_v_w2 / 2, y2 + 20, max_v_w2, v_arr2.length*15));
+  ;({x:x1, y:y1} = collisionAvoidance(x1 - max_v_w1 / 2, y1 - 15 - v_arr1.length*15, max_v_w1, v_arr1.length*15));
+  ;({x:x2, y:y2} = collisionAvoidance(x2 - max_v_w2 / 2, y2 - 15 + v_arr2.length*15, max_v_w2, v_arr2.length*15));
+
+  // ctx.beginPath();
+  // ctx.rect(x1,y1,max_v_w1, v_arr1.length*15)
+  // ctx.rect(x2,y2,max_v_w2, v_arr2.length*15)
+  // ctx.stroke();
 
   // 绘制上边沿
   v_arr1.map((v,i)=>{
-    ctx.fillText(v, x1 + (max_v_w1 - v_w_arr1[i])/2, y1-i*15);
+    ctx.fillText(v, x1 + (max_v_w1 - v_w_arr1[i])/2, y1+i*15 + vertical_offset);
   })  // 绘制下边沿
   v_arr2.map((v,i)=>{
-    ctx.fillText(v, x2 + (max_v_w2 - v_w_arr2[i])/2, y2+i*15);
+    ctx.fillText(v, x2 + (max_v_w2 - v_w_arr2[i])/2, y2+i*15 + vertical_offset);
   })
   
   // 重置虚线样式（恢复为实线）
@@ -562,7 +571,6 @@ export function paintTransactionSlice( tradeId, themes_map, labels, klines, bar_
 
   assetIds = [...new Set(assetIds)];
 
-  debugger
   const scaled_prices = klines.filter(({id, price, ts})=>orders.find(it=>it.instId === id)).map(({id, prices, ts})=>{
     return {
       prices: prices.map(it=>it*order_map[id].beta).slice().reverse(),
