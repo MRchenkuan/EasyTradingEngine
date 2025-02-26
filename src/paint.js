@@ -2,7 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { blendColors, formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
-import { getLastTransactions, readLastNBeta } from './recordTools.js';
+import { getClosingTransaction, getLastTransactions, getOpeningTransaction, readLastNBeta } from './recordTools.js';
 
 const width = 2200, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -15,7 +15,7 @@ const styles = {
   tension: 0.2  // 设置曲线平滑度 (0 为折线)
 }
 
-export function paint(assetIds, scaled_prices, themes, labels, gate, klines, beta_arr, bar_type){  
+export function paint(assetIds, scaled_prices, themes, labels, gate, klines, beta_map, bar_type){  
   // 计算差值并添加注释
   const configuration = {
     // type: 'scatter',
@@ -40,7 +40,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
       },
       layout: {
         padding: {
-          top: 120,
+          top: 140,
           bottom: 60,
           left: 60,
           right:60
@@ -62,7 +62,7 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
           const start_price = prices[prices.length - index -1] || prices[prices.length - 1];
           const price= prices[0];
           const rate = (price-start_price)/start_price;
-          return [beta_arr[i_info].toFixed(6), price, rate]
+          return [beta_map[assetId].toFixed(6), price, rate]
         })
         // 信息表格绘制
         drawInfoTable(ctx, info_data, assetIds, ['β(对冲比)','价格','涨跌幅'], themes);
@@ -81,15 +81,11 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
 
         // ctx.fillText(`${graph.key}: ${(diff_rate*100).toFixed(2)}%`, width*0.8, 20+20*graph.index);
         // 开平仓信息绘制
-        const beta_map = {};
-        assetIds.map((assid, index) => beta_map[assid] = beta_arr[index]);
-        paintTransactions(chart, beta_map, bar_type, labels, collisionAvoidance);
+        const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')]
+        paintTransactions(transactions, chart, beta_map, bar_type, labels, collisionAvoidance);
 
         // 实时利润绘制
         paintProfit(profit, labels, assetIds, themes);
-
-        // beta值绘制
-        paintBetaValue();
       }
     }]
   };
@@ -181,6 +177,7 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoida
     // }
 
     profit.push(diff_rate)
+    if(!gate)continue;
     // 交易信号生成
     if(diff_rate < gate){
       //没有达到门限
@@ -227,7 +224,7 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoida
   return profit;
 }
 
-function paintTransactions(chart, betaMap, bar_type, labels, collisionAvoidance) {
+function paintTransactions(transaction, chart, betaMap, bar_type, labels, collisionAvoidance) {
   const ctx = chart.ctx;
   const xScale = chart.scales.x;
   const yScale = chart.scales.y;
@@ -236,79 +233,72 @@ function paintTransactions(chart, betaMap, bar_type, labels, collisionAvoidance)
   const CLOSE_COLOR = 'green';
   const SIDE_SYMBOL = { buy: "+", sell: '-' };
 
-  // 通用处理函数
-  const processTransaction = (transaction, type) => {
+  transaction.forEach(({ orders, profit, closed, side: transaction_side }) => {
+    const [order1, order2] = orders;
+    const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1 } = order1;
+    const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2 } = order2;
+
+    //已平仓的不展示
+    // if(transaction_side==='opening' && closed) return 
+
+    let color = {
+      'opening':OPEN_COLOR,
+      'closing':CLOSE_COLOR,
+    }[transaction_side];
     
-    transaction.forEach(({ orders, profit, closed, side: transaction_side }) => {
-      const [order1, order2] = orders;
-      const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1 } = order1;
-      const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2 } = order2;
+    if(closed){
+      color = "#ff000090"
+    }
 
-      //已平仓的不展示
-      if(type==='opening' && closed) return 
+    // 转换时间戳和计算坐标
+    const label_1 = formatTimestamp(ts1, bar_type);
+    const label_2 = formatTimestamp(ts2, bar_type);
+    if(!labels.includes(label_1) || !labels.includes(label_2)){
+      console.warn('开平仓记号已经超出图标的绘制范围',label_1,label_2)
+      return;
+    }
+    if(xScale && yScale){}else{return};
+    let x1 = xScale.getPixelForValue(formatTimestamp(ts1, bar_type));
+    let x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
+    
+    // 计算标准化价格
+    const spx1 = px1 * betaMap[instId1];
+    const spx2 = px2 * betaMap[instId2];
+    
+    // 获取Y轴坐标
+    let y1 = yScale.getPixelForValue(spx1);
+    let y2 = yScale.getPixelForValue(spx2);
 
-      let color = {
-        'opening':OPEN_COLOR,
-        'closing':CLOSE_COLOR,
-      }[transaction_side];
-      
-      if(closed){
-        color = "#ff000090"
-      }
+    // 计算价差比率
+    const diffRate = Math.abs((spx2 - spx1) / Math.min(spx2, spx1));
+    
+    // 将价格单位都转为USDT
+    const format2USDT = (sz, price,tgtCcy) => {
+      if(tgtCcy==='base_ccy') return (sz * price).toFixed(2);
+      if(tgtCcy==='quote_ccy') return sz;
+      throw("未知货币单位: ",tgtCcy)
+    }
 
-      // 转换时间戳和计算坐标
-      const label_1 = formatTimestamp(ts1, bar_type);
-      const label_2 = formatTimestamp(ts2, bar_type);
-      if(!labels.includes(label_1) || !labels.includes(label_2)){
-        console.warn('开平仓记号已经超出图标的绘制范围',label_1,label_2)
-        return;
-      }
-      let x1 = xScale.getPixelForValue(formatTimestamp(ts1, bar_type));
-      let x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
-      
-      // 计算标准化价格
-      const spx1 = px1 * betaMap[instId1];
-      const spx2 = px2 * betaMap[instId2];
-      
-      // 获取Y轴坐标
-      let y1 = yScale.getPixelForValue(spx1);
-      let y2 = yScale.getPixelForValue(spx2);
+    // 生成标签内容
+    const valueFormatter = (sz, side, price, tgtCcy) => `${SIDE_SYMBOL[side]}${(format2USDT(sz, price, tgtCcy))}`;
 
-      // 计算价差比率
-      const diffRate = Math.abs((spx2 - spx1) / Math.min(spx2, spx1));
-      
-      // 将价格单位都转为USDT
-      const format2USDT = (sz, price,tgtCcy) => {
-        if(tgtCcy==='base_ccy') return (sz * price).toFixed(2);
-        if(tgtCcy==='quote_ccy') return sz;
-        throw("未知货币单位: ",tgtCcy)
-      }
+    // 生成标签文本
+    const rateTag = `${(diffRate * 100).toFixed(2)}%`;
+    profit = profit || 0;
+    const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
+    const tag = transaction_side === 'opening' 
+      ? `${rateTag}/开仓${closed?"(已平)":""}` 
+      : `${rateTag}/平仓`;
+    const tag2 = `$${profit_text}`;
+    const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${px1}`;
+    const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${px2}`;
 
-      // 生成标签内容
-      const valueFormatter = (sz, side, price, tgtCcy) => `${SIDE_SYMBOL[side]}${(format2USDT(sz, price, tgtCcy))}`;
+    // 绘制连接线
+    ;spx1>spx2
+    ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${tag}`], [x2, y2, v2], color, collisionAvoidance)
+    : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${tag}`], [x1, y1, v1], color, collisionAvoidance)
 
-      // 生成标签文本
-      const rateTag = `${(diffRate * 100).toFixed(2)}%`;
-      profit = profit || 0;
-      const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
-      const tag = type === 'opening' 
-        ? `${rateTag}/开仓${closed?"(已平)":""}` 
-        : `${rateTag}/平仓`;
-      const tag2 = `$${profit_text}`;
-      const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${px1}`;
-      const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${px2}`;
-
-      // 绘制连接线
-      ;spx1>spx2
-      ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${tag}`], [x2, y2, v2], color, collisionAvoidance)
-      : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${tag}`], [x1, y1, v1], color, collisionAvoidance)
-
-    });
-  };
-
-  // 处理开仓和平仓交易
-  processTransaction(getLastTransactions(100, 'opening'), 'opening', OPEN_COLOR);
-  processTransaction(getLastTransactions(100, 'closing'), 'closing', CLOSE_COLOR);
+  });
 }
 
 
@@ -345,12 +335,10 @@ function paintLine(ctx,[x1, y1, v1], [x2, y2, v2],color, collisionAvoidance){
   const v_w_arr2 = v_arr2.map(v=>ctx.measureText(v).width);
   const max_v_w2 = Math.max(...v_w_arr2);
   
-debugger
   // 防止重叠，转换坐标
   ;({x:x1, y:y1} = collisionAvoidance(x1 - max_v_w1 / 2, y1 - 20, max_v_w1, v_arr1.length*15));
   ;({x:x2, y:y2} = collisionAvoidance(x2 - max_v_w2 / 2, y2 + 20, max_v_w2, v_arr2.length*15));
 
-  debugger
   // 绘制上边沿
   v_arr1.map((v,i)=>{
     ctx.fillText(v, x1 + (max_v_w1 - v_w_arr1[i])/2, y1-i*15);
@@ -406,47 +394,6 @@ function paintProfit (profits,labels, assetIds, themes){
     fs.writeFileSync('./chart/distance.jpg', image);
   })();
 }
-
-// 打印实时对冲比例
-function paintBetaValue (){
-  const data = readLastNBeta(1000);
-  // 计算差值并添加注释
-  const configuration = {
-    // type: 'scatter',
-    type:'line',
-    data: {
-        labels:Object.keys(data),
-        datasets: [{
-          label: 'β值',
-          data: Object.values(data),
-          borderColor: '#ad85e9',
-          pointBackgroundColor:'#ad85e9',
-          borderWidth: 1.2,
-          fill: false,  // 不填充颜色
-          pointRadius: 1.2, // 设置点的大小
-          tension: 0.2  // 设置曲线平滑度 (0 为折线)
-        }
-      ]
-    },
-    options: {
-      responsive: true, // 确保响应式布局
-      maintainAspectRatio: false, // 允许自定义宽高比例
-      plugins: {
-        legend: { labels: { color: 'black' } }
-      },
-      layout: {
-        padding: 40
-      },
-    },
-  };
-
-  (async () => {
-    const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-    fs.writeFileSync('./chart/β.jpg', image);
-  })();
-}
-
-
 
 function drawTable(ctx, data, headers, themes) {
   const left = width*0.01;
@@ -589,4 +536,96 @@ function createCollisionAvoidance() {
     placed.push({ ...current });
     return { x: current.x, y: current.y };
   };
+}
+
+
+
+// 打印切片
+export function paintTransactionSlice( tradeId, themes_map, labels, klines, bar_type){ 
+  const open_transaction = getOpeningTransaction(tradeId);
+  const close_transaction = getClosingTransaction(tradeId);
+
+  const orders_open = open_transaction.orders
+  const orders_close = close_transaction ? close_transaction.orders: [];
+
+  const orders = [...orders_open, ...orders_close];
+
+  const order_map = {};
+  let assetIds = []
+  const beta_map = {};
+
+  ;orders.forEach(({beta,instId,avgPx,accFillSz, sz, ts}, index)=>{
+    order_map[instId] = {beta,instId,avgPx,accFillSz, sz, ts}
+    assetIds[index] = instId;
+    beta_map[instId] = beta
+  })
+
+  assetIds = [...new Set(assetIds)];
+
+  debugger
+  const scaled_prices = klines.filter(({id, price, ts})=>orders.find(it=>it.instId === id)).map(({id, prices, ts})=>{
+    return {
+      prices: prices.map(it=>it*order_map[id].beta).slice().reverse(),
+      id,
+      color:themes_map[id]
+    }
+  })
+
+  // 计算差值并添加注释
+  const configuration = {
+    // type: 'scatter',
+    type:'line',
+    data: {
+      labels,
+      datasets: scaled_prices.map((it,id)=>{
+        return {
+          label:assetIds[id],
+          data: it.prices,
+          borderColor: it.color,
+          pointBackgroundColor:it.color,
+          ...styles
+        }
+      })
+    },
+    options: {
+      responsive: true, // 确保响应式布局
+      maintainAspectRatio: false, // 允许自定义宽高比例
+      plugins: {
+        legend: { labels: { color: 'black' } }
+      },
+      layout: {
+        padding: {
+          top: 140,
+          bottom: 60,
+          left: 60,
+          right:60
+        }
+      },
+    },
+    plugins:[{
+      afterDraw: function(chart) {
+        const ctx = chart.ctx;
+        // 为了避免标签重叠先搞个位置收集器
+        const collisionAvoidance = createCollisionAvoidance();
+
+        // // 交易信号绘制
+        const profit = {};
+        for (let i = 0; i < scaled_prices.length - 1; i++) {
+          for (let j = i + 1; j < scaled_prices.length; j++) {
+            profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i].prices, scaled_prices[j].prices, null, klines, collisionAvoidance);
+          }
+        }
+        // 绘制实时利润空间表格
+        drawProfitTable(chart, assetIds, assetIds.map(it=>themes_map[it]), profit);
+
+        // 开平仓信息绘制
+        paintTransactions([open_transaction, close_transaction].filter(t=>t), chart, beta_map, bar_type, labels, collisionAvoidance);
+      }
+    }]
+  };
+
+  (async () => {
+    const image = await chartJSNodeCanvas.renderToBuffer(configuration);
+    fs.writeFileSync(`./chart/slices/candle_chart_${tradeId}.jpg`, image);
+  })();
 }

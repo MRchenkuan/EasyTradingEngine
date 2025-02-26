@@ -116,6 +116,7 @@ export async function getPrices(assetId, {
       collections = collections.concat(data);
     }
     return {
+      id:assetId,
       prices:collections.map(it=>safeParseFloat(parseCandleData(it)[feild])),
       ts:collections.map(it=>parseCandleData(it)['ts']),
     }
@@ -243,4 +244,22 @@ export function calcProfit(orders){
   })
   console.log(`计算盈利: 总买单${cost}, 总卖单${sell},总手续费${fee_usdt}, 利润${sell - cost + fee_usdt}`)
   return sell - cost + fee_usdt;
+}
+
+export function createMapFrom(arr1, arr2){
+  // 参数类型校验
+  if (!Array.isArray(arr1) || !Array.isArray(arr2)) {
+    throw new TypeError('Both arguments must be arrays');
+  }
+  
+  // 数组长度校验
+  if (arr1.length !== arr2.length) {
+    throw new Error('Arrays must be of equal length');
+  }
+
+// 参数校验逻辑同前...
+return arr1.reduce((obj, key, index) => {
+  obj[key] = arr2[index];
+  return obj;
+}, {});
 }

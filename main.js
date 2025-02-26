@@ -1,10 +1,10 @@
 import WebSocket from 'ws'
 import express from 'express'
 import { findBestFitLine } from './src/regression.js'
-import { paint } from './src/paint.js'
-import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute } from './src/tools.js'
+import { paint, paintTransactionSlice } from './src/paint.js'
+import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute, createMapFrom } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { getLastTransactions, readOpeningTransactions, recordPrice, updateTransaction, writeBetaValue } from './src/recordTools.js'
+import { getLastTransactions, readOpeningTransactions, recordBetaMap, recordPrice, updateTransaction, writeBetaValue } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
 
@@ -16,15 +16,15 @@ const dkp={}
 // storeConnection('ws_private', ws_private);
 
 const gate = 10.1;
-const bar_type = '15m';
+const bar_type = '5m';
 const price_type = 'close'
 const once_limit = 300;
-const candle_limit =1500;
+const candle_limit =2000;
 const assets = [
   {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'OKB-USDT', theme:'#85dde9'},
 ]
 
@@ -34,7 +34,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,18,0,0,0).getTime(),
+  to_when:new Date(2025,1,24,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
@@ -48,19 +48,25 @@ function printKlines(klines){
   try{
     const refer_kline = klines[0];
     const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
-  
-    const beta_arr=[1];
+    const beta_map={ [assets[0].id]:1 };
     const scaled_prices = klines.map((it,id)=>{
-      const {prices, ts} = it;
+      const {prices, ts, id:assetId} = it;
       if(id==0) return dataset(prices);
       const {a, b} = findBestFitLine(prices, refer_kline.prices);
       if(id==1) writeBetaValue(formatTimestamp(Date.now()),a)
       console.log(`[${formatTimestamp(ts[0])}]拟合的多项式系数:`, {a, b});
-      beta_arr.push(a);
+      beta_map[assetId] = a;
       return dataset(prices.map(it=>a*it+b));
     })
-  
-    paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_arr, bar_type)
+    recordBetaMap(beta_map);
+    paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_map, bar_type)
+    
+    // 绘制每次开仓的截图
+    const opening_transactions = [...getLastTransactions(100,'opening')];
+    opening_transactions.map(({tradeId, })=>{
+      paintTransactionSlice(tradeId, createMapFrom(assetIds, themes), x_label, klines, bar_type)
+    })
+    
   }catch(e){
     console.log(e);
     console.log(klines)
@@ -147,7 +153,6 @@ ws_business.on('message', (message) => {
       dkp[instId] ??= { };
       dkp[instId][formatTimestamp(ts)] = {price:close, ts};
       refreshKlineGraph(dkp);
-      
     }
   }
 });

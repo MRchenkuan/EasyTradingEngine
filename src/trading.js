@@ -1,5 +1,5 @@
 import { batchOrders, getOrderInfo } from "./api.js"
-import { readLastBeta, readOpeningTransactions, readPrice, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
+import { readBetaMap, readLastBeta, readOpeningTransactions, readPrice, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
 import { calcProfit, hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
@@ -8,6 +8,14 @@ import { generateCounterBasedId } from "./uuid.js";
 // 订单执行器（通用下单逻辑）
 export async function executeOrders(orderList) {
   const {data=[]} = await batchOrders(orderList)
+  ;data.some(order=>{
+    if(order.sCode == 0){
+      return true
+    } else {
+      throw new Error(`下单失败...${order.sMsg}`)
+      return false;
+    }
+  });
   let result = mergeOrder2Result([...orderList, ...data])
   let orderDetails = await Promise.all(result.map(async order=>{
     const {data=[]} = await getOrderInfo(order.instId, order.ordId)
@@ -28,16 +36,18 @@ export async function executeOrders(orderList) {
  */
 export async function open_positions(long, short, size){
   const tradeId = hashString(generateCounterBasedId());
-  const beta = readLastBeta();
   const order_long = createOrder_market(long, size, 1)
   const order_short = createOrder_market(short, size, 0)
-
   // 下单
   const result = await executeOrders([order_long, order_short])
+  const beta_map = readBetaMap();
+  result.map(order=>{
+    order.beta = beta_map[order.instId];
+  })
   // 有任何报错都撤单
   // TODO 撤单
   // 成功则记录订单信息
-  recordOpeningTransactions(tradeId, result, beta)
+  recordOpeningTransactions(tradeId, result)
   // 10秒后如果都未成交则撤单
   // TODO 超时撤单
   return tradeId;
@@ -59,10 +69,14 @@ export async function open_positions_limit(long, short, price_long, price_short,
 
   // 下单
   const result = await executeOrders([order_long, order_short])
+  const beta_map = readBetaMap();
+  result.map(order=>{
+    order.beta = beta_map[order.instId];
+  })
   // 有任何报错都撤单
   // TODO 撤单
   // 成功则记录订单信息
-  recordOpeningTransactions(tradeId, result, beta)
+  recordOpeningTransactions(tradeId, result)
   // 10秒后如果都未成交则撤单
   // TODO 超时撤单
   return tradeId;
@@ -87,7 +101,6 @@ export async function close_position(tradeId){
   const { orders:opening_orders } =openingRecord;
 
   // 创建订单参数
-  const beta = readLastBeta();
   const orders_info = opening_orders.map(opening_order=>{
     // todo 严谨来说需要做各种单位判断
     const {instId, side, avgPx:price, accFillSz:count, clOrdId } = opening_order;
@@ -95,7 +108,11 @@ export async function close_position(tradeId){
   })
 
   console.log('平仓...', orders_info)
-  const result = await executeOrders(orders_info)
+  const result = await executeOrders(orders_info);
+  const beta_map = readBetaMap();
+  result.map(order=>{
+    order.beta = beta_map[order.instId];
+  })
 
   // 计算利润
   const profit = calcProfit([...opening_orders, ...result]);
@@ -107,7 +124,7 @@ export async function close_position(tradeId){
   // 有任何报错都撤单
   // TODO 撤单
   // 成功则记录订单信息
-  recordClosingTransactions(tradeId, profit, result, beta)
+  recordClosingTransactions(tradeId, profit, result)
   // 10秒后如果都未成交则撤单
   // TODO 超时撤单
   return 
@@ -153,6 +170,7 @@ function mergeOrder2Result(arr){
 
 // 标准化订单参数
 function processOrderDetail(orderDetail){
+  debugger
   return orderDetail.map(order=>{
     const {instId, clOrdId,avgPx,px, ordId,sz,accFillSz, fee,feeCcy, tgtCcy, state} = order;
     return {
@@ -221,15 +239,17 @@ async function fetchOrders(orders){
 
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // await open_positions('SOL-USDT','BTC-USDT',400)
-// const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
-// const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',300)
+const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
+// const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','BTC-USDT',400)
+// await open_positions('OKB-USDT','BTC-USDT',400)
+// await open_positions('ETH-USDT','OKB-USDT',400)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
 // setTimeout(()=>{
 //   close_position(tradeId)
 // },1000)
 
 
-close_position("5f5271c0")
+// close_position("f6665c11")
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
