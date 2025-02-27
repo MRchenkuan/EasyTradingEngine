@@ -125,12 +125,6 @@ export async function getPrices(assetId, {
   }
 }
 
-
-export function dataset(data){
-  // return calculateReturns(data.slice().reverse()).map(it=>it*100)
-  return data.slice().reverse();
-}
-
 export function getTsOfStartOfToday(){
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());

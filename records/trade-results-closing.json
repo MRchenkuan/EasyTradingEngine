@@ -1,3 +1,100 @@
 [
-
+  {
+    "tradeId": "077579d9",
+    "side": "closing",
+    "profit": 1.5262556812709764,
+    "orders": [
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "6817c505",
+        "sz": "8.616975",
+        "tgtCcy": "base_ccy",
+        "ordId": "2284057719774306304",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740572624516",
+        "px": "",
+        "avgPx": "46.37",
+        "accFillSz": "8.616975",
+        "fee": "-0.39956913075",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [1975.5086921170825, 0]
+      },
+      {
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "354c6234",
+        "sz": "0.00449171",
+        "tgtCcy": "base_ccy",
+        "ordId": "2284057719807860736",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740572624517",
+        "px": "",
+        "avgPx": "88261.9",
+        "accFillSz": "0.00449171",
+        "fee": "-0.00000449171",
+        "feeCcy": "BTC",
+        "state": "filled",
+        "beta": [1,0]
+      }
+    ]
+  },
+  {
+    "tradeId": "4848b1e1",
+    "side": "closing",
+    "profit": 1.776625894099893,
+    "orders": [
+      {
+        "instId": "SOL-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "841764ba",
+        "sz": "2.128565",
+        "tgtCcy": "base_ccy",
+        "ordId": "2284459662476763136",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740584603342",
+        "px": "",
+        "avgPx": "139.92",
+        "accFillSz": "2.128565",
+        "fee": "-0.2978288148",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [1,0]
+      },
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "2dfc0045",
+        "sz": "0.120968",
+        "tgtCcy": "base_ccy",
+        "ordId": "2284459662476763138",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1740584603342",
+        "px": "",
+        "avgPx": "2437.5",
+        "accFillSz": "0.120968",
+        "fee": "-0.000120968",
+        "feeCcy": "ETH",
+        "state": "filled",
+        "beta": [0.05732554269199088,0]
+      }
+    ]
+  }
 ]

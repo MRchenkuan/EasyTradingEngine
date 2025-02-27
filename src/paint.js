@@ -2,7 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { blendColors, formatTimestamp, getTsOfStartOfToday } from './tools.js';
 import { calculateCorrelationMatrix } from './mathmatic.js';
-import { getClosingTransaction, getLastTransactions, getOpeningTransaction, readLastNBeta } from './recordTools.js';
+import { getClosingTransaction, getLastTransactions, getOpeningTransaction } from './recordTools.js';
 
 const width = 2200, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -62,14 +62,13 @@ export function paint(assetIds, scaled_prices, themes, labels, gate, klines, bet
           const start_price = prices[prices.length - index -1] || prices[prices.length - 1];
           const price= prices[0];
           const rate = (price-start_price)/start_price;
-          return [beta_map[assetId].toFixed(6), price, rate]
+          return [beta_map[assetId][0].toFixed(6), price, rate]
         })
         // 信息表格绘制
         drawInfoTable(ctx, info_data, assetIds, ['β(对冲比)','价格','涨跌幅'], themes);
-        const s = simpAssetName;
+
         // // 交易信号绘制
         const profit = {};
-        let k=0
         for (let i = 0; i < scaled_prices.length - 1; i++) {
           for (let j = i + 1; j < scaled_prices.length; j++) {
             profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i], scaled_prices[j], gate, klines, collisionAvoidance);
@@ -177,6 +176,7 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoida
     // }
 
     profit.push(diff_rate)
+
     if(!gate)continue;
     // 交易信号生成
     if(diff_rate < gate){
@@ -208,8 +208,8 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoida
     prev_diff_rate = diff_rate
     try{   
       const v = (diff_rate*100).toFixed(2)+"%";
-      const start = [x, y1, klines[0].prices.slice().reverse()[i].toFixed(2)+`/${v}`];
-      const end = [x, y2, klines[1].prices.slice().reverse()[i].toFixed(2)+`/${v}`];
+      const start = [x, y1, klines[0].prices[i].toFixed(2)+`/${v}`];
+      const end = [x, y2, klines[1].prices[i].toFixed(2)+`/${v}`];
       ;y1<y2
       ? paintLine(ctx, start, end, '#607d8b', collisionAvoidance)
       : paintLine(ctx, end, start, '#607d8b', collisionAvoidance)
@@ -217,7 +217,7 @@ function paintTradingSignal(chart, yData1, yData2, gate, klines, collisionAvoida
       console.warn(e);
       console.log('klines.prices',klines[0].prices)
       console.log('klines.prices',klines[1].prices)
-      console.log('klines[0].prices.slice().reverse()[i]',klines[0].prices.slice().reverse()[i])
+      console.log('klines[0].prices[i]',klines[0].prices.slice()[i])
       console.log('i',i)
     }
   }
@@ -262,8 +262,8 @@ function paintTransactions(transaction, chart, betaMap, bar_type, labels, collis
     let x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
     
     // 计算标准化价格
-    const spx1 = px1 * betaMap[instId1];
-    const spx2 = px2 * betaMap[instId2];
+    const spx1 = px1 * betaMap[instId1][0];
+    const spx2 = px2 * betaMap[instId2][0];
     
     // 获取Y轴坐标
     let y1 = yScale.getPixelForValue(spx1);
@@ -573,7 +573,7 @@ export function paintTransactionSlice( tradeId, themes_map, labels, klines, bar_
 
   const scaled_prices = klines.filter(({id, price, ts})=>orders.find(it=>it.instId === id)).map(({id, prices, ts})=>{
     return {
-      prices: prices.map(it=>it*order_map[id].beta).slice().reverse(),
+      prices: prices.map(it=>it*order_map[id].beta[0]),
       id,
       color:themes_map[id]
     }
@@ -623,11 +623,38 @@ export function paintTransactionSlice( tradeId, themes_map, labels, klines, bar_
             profit[`${assetIds[i]}:${assetIds[j]}`] = paintTradingSignal(chart, scaled_prices[i].prices, scaled_prices[j].prices, null, klines, collisionAvoidance);
           }
         }
+
+        listenOpenSignal();
+        // 计算当前diffrate有没有超
+        // 读取所有未平仓的开仓信息
+        // 计算同一个品种是否已经有头寸
+        // 判断当前的diff是否超过前一个diff的1.5倍
+        // 如果没有之前的开仓记录则开仓，如果没有超过1.5则继续等
+
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+            // TODO 开仓信号 paintTradingSignal
+
         // 绘制实时利润空间表格
         drawProfitTable(chart, assetIds, assetIds.map(it=>themes_map[it]), profit);
 
         // 开平仓信息绘制
         paintTransactions([open_transaction, close_transaction].filter(t=>t), chart, beta_map, bar_type, labels, collisionAvoidance);
+
+
+        // TODO 平仓信号在此判断
+        
       }
     }]
   };
@@ -636,4 +663,58 @@ export function paintTransactionSlice( tradeId, themes_map, labels, klines, bar_
     const image = await chartJSNodeCanvas.renderToBuffer(configuration);
     fs.writeFileSync(`./chart/slices/candle_chart_${tradeId}.jpg`, image);
   })();
+}
+
+
+/**
+ * 根据当前的两个序列算利差
+ * @param {*} chart 
+ * @param {*} yData1 
+ * @param {*} yData2 
+ * @param {*} gate 
+ * @param {*} klines 
+ * @param {*} collisionAvoidance 
+ * @returns 
+ */
+function listenOpenSignal(prices1, prices2, gate){
+  return
+  let prev_diff_rate = 0;
+
+  const profit = [];
+  // 遍历每个数据点，绘制竖线并标注差值
+  for (let i = 0; i < prices1.length; i++) {
+    const diff_rate = Math.abs((prices2[i] - prices1[i])/Math.min(prices2[i],prices1[i]))
+    profit.push(diff_rate)
+
+    if(!gate)continue;
+    // 交易信号生成
+    if(diff_rate < gate){
+      //没有达到门限
+      if(prev_diff_rate){
+        // 有前次门限
+        if(diff_rate<=0.005){
+          // 如果当前距离足够小，则认为已经收敛，重置门限，重新开仓
+          prev_diff_rate=0;
+        }
+      }
+      continue
+    } else {
+      // 达到门限
+      if(prev_diff_rate){
+
+        // 再次达到门限，超上次 n 倍
+        if(diff_rate > prev_diff_rate*1.5){
+          prev_diff_rate = diff_rate;
+        }else{
+          // 没超则过
+          continue                  
+        }
+      }else{
+        // 首次达到门限
+        prev_diff_rate = diff_rate
+      }
+    }
+    prev_diff_rate = diff_rate
+  }
+  return profit;
 }

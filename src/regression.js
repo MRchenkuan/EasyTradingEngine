@@ -1,8 +1,3 @@
-import * as math from 'mathjs'
-import {std} from 'mathjs'
-
-
-
 // 找到最佳拟合参数
 export function findBestFitLine(A,B) {
     // return fitOLS(A, B)
@@ -38,10 +33,7 @@ function skew(x) {
 }
 
 function fitStockRelationship(stockA, stockB) {
-
-
     const {A,B} = cleanElements(stockA, stockB, 15)
-
     if (A.length !== B.length || A.length === 0) {
         throw new Error("Input arrays must have the same non-zero length");
     }

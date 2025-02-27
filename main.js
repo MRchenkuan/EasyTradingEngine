@@ -2,11 +2,12 @@ import WebSocket from 'ws'
 import express from 'express'
 import { findBestFitLine } from './src/regression.js'
 import { paint, paintTransactionSlice } from './src/paint.js'
-import { getPrices, dataset, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute, createMapFrom } from './src/tools.js'
+import { getPrices, toTrickTimeMark, formatTimestamp, getTsOfStartOfToday, parseCandleData, throttleAsync, getLastWholeMinute, createMapFrom } from './src/tools.js'
 import { calculateReturns } from './src/mathmatic.js'
-import { getLastTransactions, readOpeningTransactions, recordBetaMap, recordPrice, updateTransaction, writeBetaValue } from './src/recordTools.js'
+import { getLastTransactions, readOpeningTransactions, recordBetaMap, recordPrice, updateTransaction } from './src/recordTools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
+import { TradeEngine } from './src/TradeEngine/TradeEngine.js'
 
 const ws_connection_pool={}
 const dkp={}
@@ -21,12 +22,14 @@ const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
 const assets = [
-  {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
+  {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#abb2b9'},
   {id: 'OKB-USDT', theme:'#85dde9'},
 ]
+
+TradeEngine.start()
 
 const params = {
   bar_type,
@@ -34,7 +37,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,24,0,0,0).getTime(),
+  to_when:new Date(2025,1,20,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
@@ -42,21 +45,29 @@ const themes = assets.map(it=>it.theme);
 
 const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it, params)));
 
-printKlines(klines);
+klines.map(({id, prices, ts})=>{
+  TradeEngine.updatePrices(id, prices, ts, bar_type);
+})
+
+
+// TradeEngine.renderGraph(100);
+
+
+
+printKlines(Object.values(TradeEngine.getAllMarketData(bar_type)));
 
 function printKlines(klines){
   try{
     const refer_kline = klines[0];
-    const x_label = toTrickTimeMark(refer_kline.ts.slice().reverse());
-    const beta_map={ [assets[0].id]:1 };
+    const x_label = toTrickTimeMark(refer_kline.ts);
+    const beta_map={ [assets[0].id]: [1, 0] };
     const scaled_prices = klines.map((it,id)=>{
       const {prices, ts, id:assetId} = it;
-      if(id==0) return dataset(prices);
+      if(id==0) return prices;
       const {a, b} = findBestFitLine(prices, refer_kline.prices);
-      if(id==1) writeBetaValue(formatTimestamp(Date.now()),a)
       console.log(`[${formatTimestamp(ts[0])}]拟合的多项式系数:`, {a, b});
-      beta_map[assetId] = a;
-      return dataset(prices.map(it=>a*it+b));
+      beta_map[assetId] = [a, b];
+      return prices.map(it=>a*it+b);
     })
     recordBetaMap(beta_map);
     paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_map, bar_type)
@@ -74,35 +85,23 @@ function printKlines(klines){
 }
 
 
-const refreshKlineGraph = throttleAsync((dkp)=>{
-  let klines_dynamic = [];
+const refreshKlineGraph = throttleAsync(()=>{
+  let klines_dynamic = [];// {'SOL-USDT':{id, ts, prices}}
   assets.map((asset, id)=>{
     const instId = asset.id;
-    if(!dkp[instId]) return;
-    const additions_prices = Object.values(dkp[instId]).slice().reverse()
-    const ts_arr = additions_prices.map(it=>it.ts);
-    const price_arr = additions_prices.map(it=>it.price)
-
-    const kline = klines[id];
-    klines_dynamic[id] ??= { prices:[], ts:[]};
-    klines_dynamic[id].prices = price_arr.concat(kline.prices)
-    klines_dynamic[id].ts = ts_arr.concat(kline.ts)
-    klines_dynamic[id].id = instId;
-    klines_dynamic[id] = duplicateRemoval(klines_dynamic[id]);
+    klines_dynamic[id] = TradeEngine.getMarketData(instId, bar_type)
   })
 
 
   // 交易信号判断和处理
   const opening_transactions = getLastTransactions(100,'opening');
 
-  opening_transactions.map(({tradeId, closed, orders, beta})=>{
+  opening_transactions.map(({tradeId, closed, orders})=>{
     if(!closed){
 
       let fee_usdt = 0,cost = 0,sell=0;
       orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
-        const asset = klines_dynamic.find(it=>it&&it.id === instId);
-        if(!asset) return;
-        const realtime_price = asset.prices[0];
+        const realtime_price = TradeEngine.getPrice(instId);
         // 单位 false:本币; true:usdt
         const unit_fgt = tgtCcy === 'base_ccy'?false:true;
         const unit_fee = feeCcy === 'USDT'?true:false;
@@ -134,6 +133,10 @@ const refreshKlineGraph = throttleAsync((dkp)=>{
 const ws_business = new WebSocket(base_url+'/ws/v5/business');
 storeConnection('ws_business', ws_business);
 
+
+
+
+
 ws_business.on('open', () => {
   console.log('ws_business已连接到服务器');
   assets.map(async it=>{
@@ -149,13 +152,17 @@ ws_business.on('message', (message) => {
   if(channel.indexOf('candle')===0){
     if(data){
       const {open, close,ts} = parseCandleData(data[0])
-      recordPrice(instId, close)
+      recordPrice(instId, close);
       dkp[instId] ??= { };
       dkp[instId][formatTimestamp(ts)] = {price:close, ts};
       refreshKlineGraph(dkp);
+      TradeEngine.updatePrice(instId, close, ts, bar_type);
     }
   }
+  
 });
+
+
 
 ws_business.on('close', (code, reason) => {
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);

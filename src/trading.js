@@ -1,5 +1,5 @@
 import { batchOrders, getOrderInfo } from "./api.js"
-import { readBetaMap, readLastBeta, readOpeningTransactions, readPrice, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
+import { getLastTransactions, getOpeningTransaction, readBetaMap, readOpeningTransactions, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
 import { calcProfit, hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
@@ -63,7 +63,6 @@ export async function open_positions(long, short, size){
  */
 export async function open_positions_limit(long, short, price_long, price_short, size){
   const tradeId = hashString(generateCounterBasedId());
-  const beta = readLastBeta();
   const order_long = createOrder_limit(long, price_long, size/price_long, 1)
   const order_short = createOrder_limit(short, price_short, size/price_short, 0)
 
@@ -190,6 +189,7 @@ function processOrderDetail(orderDetail){
 }
 
 
+// 做市商策略
 export async function marketMaker(assetId, price, size, dir){
   const tradeId = hashString(generateCounterBasedId());
   let p1= 0,p2=0
@@ -222,34 +222,88 @@ export async function marketMaker(assetId, price, size, dir){
 }
 
 
-async function fetchOrders(orders){
-  let orderDetails = await Promise.all(orders.map(async order=>{
-    const {data=[]} = await getOrderInfo(order.instId, order.ordId)
-    return data[0];
-  }));
-  if(orderDetails.every(order=>order.state ==='filled')){
-    return orderDetails;
-  } else {
-    await new Promise(resove=>setTimeout(resove, 3000));
-    return await fetchOrders(orders);
+// 持续查询订单
+// async function fetchOrders(orders){
+//   let orderDetails = await Promise.all(orders.map(async order=>{
+//     const {data=[]} = await getOrderInfo(order.instId, order.ordId)
+//     return data[0];
+//   }));
+//   if(orderDetails.every(order=>order.state ==='filled')){
+//     return orderDetails;
+//   } else {
+//     await new Promise(resove=>setTimeout(resove, 3000));
+//     return await fetchOrders(orders);
+//   }
+// }
+async function fetchOrders(
+  orders,
+  initialDelay = 3000
+) {
+  let retryCount = 0;
+  let currentDelay = initialDelay;
+  const completedOrders = new Map();
+
+  while (true) {
+    const pendingOrders = orders.filter(
+      order => !completedOrders.has(order.ordId)
+    );
+
+    try {
+      const details = await Promise.all(
+        pendingOrders.map(async order => {
+          const { data = [] } = await getOrderInfo(order.instId, order.ordId);
+          return { ordId: order.ordId, detail: data[0] };
+        })
+      );
+
+      // 更新已完成订单的缓存
+      details.forEach(({ ordId, detail }) => {
+        if (detail.state === 'filled') {
+          completedOrders.set(ordId, detail);
+        }
+      });
+
+      // 检查是否全部完成
+      if (completedOrders.size === orders.length) {
+        return orders.map(order => completedOrders.get(order.ordId));
+      }
+
+    } catch (error) {
+      if (retryCount >= maxRetries) {
+        throw Object.assign(
+          new Error(`Failed after ${retryCount} retries: ${error.message}`),
+          { cause: error }
+        );
+      }
+      // 失败时保持当前延迟时间避免雪崩
+      await new Promise(resolve => setTimeout(resolve, currentDelay));
+    }
   }
 }
 
-
-
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // await open_positions('SOL-USDT','BTC-USDT',400)
-const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
+// const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
 // const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','BTC-USDT',400)
+// await open_positions('ETH-USDT','SOL-USDT',600)
 // await open_positions('OKB-USDT','BTC-USDT',400)
 // await open_positions('ETH-USDT','OKB-USDT',400)
+// await open_positions('BTC-USDT','OKB-USDT',400)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
 // setTimeout(()=>{
 //   close_position(tradeId)
 // },1000)
 
 
-// close_position("f6665c11")
+// close_position("d9e76b9a")
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
+
+getLastTransactions(100, 'opening').map(it=>{
+  const orders = it.orders;
+  orders.map(o=>{
+    if(!Array.isArray(o.beta)) o.beta = [o.beta, 0]
+  })
+  updateTransaction(it.tradeId, 'opening', {orders})
+})

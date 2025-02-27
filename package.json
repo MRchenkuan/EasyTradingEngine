@@ -16,6 +16,7 @@
     "axios": "^1.7.9",
     "chartjs-node-canvas": "^4.1.6",
     "crypto": "^1.0.1",
+    "events": "^3.3.0",
     "express": "^4.21.2",
     "mathjs": "^14.2.1",
     "regression": "^2.0.1",
