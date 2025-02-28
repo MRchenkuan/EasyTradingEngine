@@ -1,4 +1,4 @@
-import { getLastTransactions, recordBetaMap, updateTransaction } from "../recordTools.js";
+import { getLastTransactions, recordBetaMap, recordPrice, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { createMapFrom, formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./HedgeProcessor.js";
@@ -279,6 +279,7 @@ export class TradeEngine{
 
     // 更新实时价格
     this.realtime_price[assetId] = sorted_prices.at(-1);
+    recordPrice(assetId, this.realtime_price[assetId]);
     // this._status
   }
 
@@ -343,6 +344,7 @@ static updatePrice(assetId, price, ts, bar) {
   }
   // 更新实时价格
   this.realtime_price[assetId] = existingPrices.at(-1);
+  recordPrice(assetId, this.realtime_price[assetId]);
 }
 
   /**
@@ -421,6 +423,7 @@ static updatePrice(assetId, price, ts, bar) {
   static start(){
     const status = this.checkEngine();
     if(status == 2){
+      this.refreshBeta();
       this.refreshTransactions()
     } else if(status == 1){
       console.log('启动完成,进行初始化...')

@@ -13,7 +13,7 @@ const ws_connection_pool={}
 // storeConnection('ws_private', ws_private);
 
 const gate = 10.1;
-const bar_type = '15m';
+const bar_type = '5m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
