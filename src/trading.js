@@ -296,14 +296,14 @@ async function fetchOrders(
 // },1000)
 
 
-// close_position("d9e76b9a")
+close_position("0d8b38f8")
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
 
-getLastTransactions(100, 'opening').map(it=>{
-  const orders = it.orders;
-  orders.map(o=>{
-    if(!Array.isArray(o.beta)) o.beta = [o.beta, 0]
-  })
-  updateTransaction(it.tradeId, 'opening', {orders})
-})
+// getLastTransactions(100, 'opening').map(it=>{
+//   const orders = it.orders;
+//   orders.map(o=>{
+//     if(!Array.isArray(o.beta)) o.beta = [o.beta, 0]
+//   })
+//   updateTransaction(it.tradeId, 'opening', {orders})
+// })

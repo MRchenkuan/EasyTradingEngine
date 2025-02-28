@@ -1,16 +1,23 @@
-import { recordBetaMap } from "../recordTools.js";
+import { getLastTransactions, recordBetaMap, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
-import { formatTimestamp, toTrickTimeMark } from "../tools.js";
+import { createMapFrom, formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./HedgeProcessor.js";
 
 export class TradeEngine{
   static processors = [];
-  static market_data={}
+  static market_data={}; // 行情数据
   static realtime_price = {};
-  static _main_asset = ""
+  static _main_asset = ""; // 主资产
   static _timer = {};
   static _bar_type = "";
   static _beta_map = {};
+  static _main_asset = ""
+  static _once_limit = 100
+  static _candle_limit = 300
+  static _asset_names = [] // 资产列表
+  static _graph = {}
+  static _gate = 0.05
+  static _status = 0; //1 启动中 2运行中 -1出错
 
   /**
    * 工厂函数，创建监听器
@@ -23,56 +30,129 @@ export class TradeEngine{
   }
 
   /**
-   * 刷新beta
+   * todo 实现私有属性的读取
+   * @returns 
    */
-  static refreshBeta(){
-    const mainAsset = this.getMainAsset();
-    this._beta_map[mainAsset.id] = [1,0];
-    Object.values(this.getAllMarketData()).map((it,id)=>{
+  static getMetaInfo(){
+    return {}
+  }
+
+  /**
+   * 获取根据主资产缩放后的价格
+   * @returns 
+   */
+  static getAllScaledPrices(){
+    const klines = Object.values(this.getAllMarketData());
+    return klines.map((it,id)=>{
       const {prices, ts, id:assetId} = it;
-      if(assetId==this._main_asset) return;
-      const {a, b} = findBestFitLine(prices, mainAsset.prices);
-      console.log(`[${formatTimestamp(ts.at(-1))}]拟合的多项式系数(${assetId}):`, {a, b});
-      this._beta_map[assetId] = [a, b];
-    });
-    recordBetaMap(this._beta_map);
-    return this._beta_map;
+      if(assetId==TradeEngine._main_asset) return {...it};
+      const [a, b] = TradeEngine._beta_map[assetId] || [1, 0];
+      return {
+        ...it,
+        prices: prices.map(it=>a*it+b)
+      }
+    }); 
+  }
+
+  static getMainAssetLabels(){
+    return this.getMainAsset().ts.map(it=>formatTimestamp(it, this._bar_type))
+  }
+
+  /**
+   * 获取实时利润
+   */
+  static getRealtimeProfits(){
+    const scaled_prices = this.getAllScaledPrices();
+    const profit = {};
+    for (let i = 0; i < scaled_prices.length - 1; i++) {
+      for (let j = i + 1; j < scaled_prices.length; j++) {
+        const assetId1 = scaled_prices[i].id;
+        const assetId2 = scaled_prices[j].id;
+
+        const prices1 = scaled_prices[i].prices;
+        const prices2 = scaled_prices[j].prices;
+        profit[`${assetId1}:${assetId2}`] = this._calcPriceGapProfit(prices1.at(-1),  prices2.at(-1), (prices1.at(-1)+prices2.at(-1))/2)
+      }
+    }
+    return profit
+  }
+
+
+    /**
+   * 获取实时利润
+   */
+    static getAllHistoryProfits(){
+      const scaled_prices = this.getAllScaledPrices();
+      const profit = {};
+      for (let i = 0; i < scaled_prices.length - 1; i++) {
+        for (let j = i + 1; j < scaled_prices.length; j++) {
+          const assetId1 = scaled_prices[i].id;
+          const assetId2 = scaled_prices[j].id;
+          const prices1 = scaled_prices[i].prices;
+          const prices2 = scaled_prices[j].prices;
+          
+          profit[`${assetId1}:${assetId2}`] = prices1.map((p1,id)=>{
+            const p2 = prices2[id];
+            return this._calcPriceGapProfit(p1, p2, (p1+p2)/2);
+          })
+        }
+      }
+      return profit
+    }
+
+  /**
+   * 计算预期利润
+   * @param {*} a 
+   * @param {*} b 
+   * @param {*} n 
+   * @returns 
+   */
+  static _calcPriceGapProfit(a, b, n){
+    return ((n-b)/b - (n-a)/a)/2*(a>b?1:-1)
   }
 
 
   /**
-   * 渲染图片
-   * @param {*} duration 
+   * 刷新beta
    */
-  static renderGraph(duration){
-    try{
-      const refer_kline = this.getMainAsset();
-      const x_label = toTrickTimeMark(refer_kline.ts);
-      const klines = this.getAllMarketData();
-      const scaled_prices = Object.values(klines).map((it,id)=>{
-        const {prices, ts, id:assetId} = it;
-        if(assetId==this._main_asset) return prices;
-        const [a, b] = this._beta_map[assetId] || [1, 0];
-        return prices.map(it=>a*it+b);
-      });
-
-      // // 绘制主图
-      // paint(assetIds, scaled_prices, themes, x_label, gate, klines, beta_map, bar_type)
-      
-      // // 绘制每次开仓的截图
-      // const opening_transactions = [...getLastTransactions(100,'opening')];
-      // opening_transactions.map(({tradeId, })=>{
-      //   paintTransactionSlice(tradeId, createMapFrom(assetIds, themes), x_label, klines, bar_type)
-      // })
-      
-    }catch(e){
-      console.log(e);
+  static refreshBeta(){
+    // 获取主资产数据
+    const mainAssetData = this.getMarketData(this._main_asset);
+    if (!mainAssetData) {
+      console.error("主资产数据未找到");
+      return;
     }
 
-    this._timer.render_graph = setTimeout(()=>{
-      this.renderGraph(duration);
-    }, duration)
+    // 处理单个资产
+    const processAsset = (assetId) => {
+      const assetData = this.getMarketData(assetId);
+      if (!assetData?.prices || !assetData?.ts || !assetData?.prices?.length || !mainAssetData?.prices?.length) {
+        console.warn(`资产 ${assetId} 数据不完整`);
+        return;
+      }
+      if (assetId === this._main_asset) {
+        this._beta_map[assetId] = [1, 0];
+        return; // 跳过主资产
+      }
+      const { a, b } = findBestFitLine(
+        assetData.prices,
+        mainAssetData.prices
+      );
+      const lastTs = assetData.ts[assetData.ts.length - 1];
+      console.log(
+        `[${formatTimestamp(lastTs)}]拟合的多项式系数(${assetId}):`,
+        { a, b }
+      );
+      this._beta_map[assetId] = [a, b];
+    };
+
+    const allAssets = this.getAllMarketData();
+    for (const [id, data] of Object.entries(allAssets)) {
+      processAsset(id); // 直接传递资产ID
+    }
+    recordBetaMap(this._beta_map);
   }
+
 
   /**
    * 设置主资产
@@ -88,10 +168,23 @@ export class TradeEngine{
    * 设置引擎基本信息
    * @param {*} param0 
    */
-  static setMetaInfo({bar, main_asset}){
-    if(bar) this._bar_type = bar;
+  static setMetaInfo({
+    bar_type,
+    main_asset,
+    once_limit, 
+    candle_limit, 
+    assets,
+    gate,
+  }){
+    if(bar_type) this._bar_type = bar_type;
     if(main_asset) this._main_asset = main_asset;
-    this.refreshBeta();
+    if(once_limit) this._once_limit = once_limit;
+    if(candle_limit) this._candle_limit = once_limit;
+    if(gate) this._gate = gate;
+    if(assets){
+      this._asset_names = assets.map(it=>it.id);
+    }
+    return this;
     // dosmt
   }
 
@@ -101,7 +194,7 @@ export class TradeEngine{
    * @returns 
    */
   static getMainAsset(){
-    return this.market_data[this._bar_type][this._main_asset];
+    return this.market_data?.[this._bar_type]?.[this._main_asset];
   }
 
 
@@ -121,8 +214,8 @@ export class TradeEngine{
    * @returns 
    */
   static getMarketData(assetId, bar){
-    if(!bar) bar = this._bar_type; 
-    return this.market_data[bar][assetId];
+    const barType = bar ?? this._bar_type;
+    return this.market_data?.[barType]?.[assetId];
   }
 
   /**
@@ -186,7 +279,7 @@ export class TradeEngine{
 
     // 更新实时价格
     this.realtime_price[assetId] = sorted_prices.at(-1);
-    this.refreshBeta()
+    // this._status
   }
 
 /**
@@ -250,7 +343,6 @@ static updatePrice(assetId, price, ts, bar) {
   }
   // 更新实时价格
   this.realtime_price[assetId] = existingPrices.at(-1);
-  this.refreshBeta();
 }
 
   /**
@@ -272,15 +364,82 @@ static updatePrice(assetId, price, ts, bar) {
     return low;
   }
 
+  static refreshTransactions(){
+    //todo 将来做筛选交易信号判断和处理
+    const opening_transactions = getLastTransactions(100,'opening');
+  
+    opening_transactions.map(({tradeId, closed, orders})=>{
+      if(!closed){
+        let fee_usdt = 0,cost = 0,sell=0;
+        orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
+          const realtime_price = TradeEngine.getPrice(instId);
+          // 单位 false:本币; true:usdt
+          const unit_fgt = tgtCcy === 'base_ccy'?false:true;
+          const unit_fee = feeCcy === 'USDT'?true:false;
+  
+          if(side==='buy'){
+            cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+            // 实时估算
+            sell += realtime_price * accFillSz
+          }
+  
+          if(side==='sell'){
+            sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+            // 实时估算
+            cost += realtime_price * accFillSz
+          }
+          fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
+        })
+        const profit =  sell - cost + fee_usdt;
+        updateTransaction(tradeId,'opening',{profit});
+      }
+    });
+  }
+
+  static checkEngine(){
+    try{
+      if(this._status!==2){
+        // 启动中
+        if(Object.values(this.getAllMarketData()||{}).length === this._asset_names.length){
+          // 初始化中
+          this._status = 1;
+          if(Object.values(this._beta_map).length === this._asset_names.length){
+            this._status = 2;
+          }
+        }
+      }
+      return this._status;
+    }catch(e){
+      console.log(e);
+      this._status = -1
+    }
+  }
 
   /**
    * 监听
    */
   static start(){
+    const status = this.checkEngine();
+    if(status == 2){
+      this.refreshTransactions()
+    } else if(status == 1){
+      console.log('启动完成,进行初始化...')
+      this.refreshBeta();
+    } else if(status === 0){
+      console.log('交易引擎启动中...')
+    } else {
+      throw new Error("启动失败...")      
+    }
+
+    // this.processors.forEach((p)=>{
+    //   p.tick();
+    // })
+
+
+    clearTimeout(this._timer.start);
     this._timer.start = setTimeout(()=>{
-      // this.market_data['SOL-USDT']
-      this.start()
-    }, 1000);
+      this.start();
+    }, 3000)
   }
 
   static stop(){
@@ -288,13 +447,3 @@ static updatePrice(assetId, price, ts, bar) {
   }
 
 }
-
-
-// const T1 = new HedgeTrigger(['SOL-USDT', 'TRUMP-USDT']);
-
-// T1.listen();
-
-
-
-
-

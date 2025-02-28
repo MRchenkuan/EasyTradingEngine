@@ -4,6 +4,7 @@ import crypto from 'crypto';
 export class HedgeProcessor extends IProcessor{
   
   assetNames = [];
+  _gate = 0.045
 
   constructor(assetNames){
     super(assetNames);
@@ -12,6 +13,10 @@ export class HedgeProcessor extends IProcessor{
   }
 
   calculateProfit(){
+
+  }
+
+  renderGraph(chart){
 
   }
 

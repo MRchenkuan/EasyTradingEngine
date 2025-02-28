@@ -1,7 +1,7 @@
 // 找到最佳拟合参数
 export function findBestFitLine(A,B) {
     // return fitOLS(A, B)
-    return fitStockRelationship(A,B)
+    return fitStockRelationship(A.slice(),B.slice())
     // return  {a:0.06545 ,b:0}
 }
 
@@ -9,6 +9,9 @@ export function findBestFitLine(A,B) {
 
 // 基础线性回归
 function fitOLS(stockA, stockB){
+    if(stockA.length<=100){
+        // debugger
+    }
     const minLength = Math.min(stockA.length, stockB.length); // 取两个数组的最小长度
     if (minLength === 0) {
         throw new Error("Input arrays must have at least one element");
