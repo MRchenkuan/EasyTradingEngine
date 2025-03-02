@@ -6,7 +6,7 @@ import { getClosingTransaction, getLastTransactions, getOpeningTransaction } fro
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
 
-const width = 2200, height = 800;
+const width = 1800, height = 800;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
 const font_style = "Monaco, Menlo, Consolas, monospace";
 
@@ -14,7 +14,7 @@ const styles = {
   borderWidth: 1,
   fill: false,  // 不填充颜色
   pointRadius: 0.5, // 设置点的大小
-  tension: 0.2  // 设置曲线平滑度 (0 为折线)
+  tension: 0.1  // 设置曲线平滑度 (0 为折线)
 }
 
 export class VisualEngine{
@@ -67,11 +67,16 @@ export class VisualEngine{
     }, 1000)
   }
 
+  /**
+   * 单独绘制每个头寸的分片
+   */
   static drawTransctionSlices(){
     // 绘制每次开仓的截图
     const opening_transactions = [...getLastTransactions(100,'opening')];
-    opening_transactions.map(({tradeId, })=>{
-      this._paintTransactionSlice(tradeId);
+    opening_transactions.map(({tradeId, closed})=>{
+      // if(!closed){
+        this._paintTransactionSlice(tradeId);
+      // }
     })
   }
 
@@ -160,7 +165,6 @@ export class VisualEngine{
   static _paintProfit (){
     const labels = TradeEngine.getMainAssetLabels();
     let profits =  TradeEngine.getAllHistoryProfits();
-    const assetIds = TradeEngine._asset_names;
     const themes_map = this.getThemes();
 
     // 计算差值并添加注释
@@ -180,10 +184,10 @@ export class VisualEngine{
               data: profits[key].map(it=>it*100),
               borderColor: color,
               pointBackgroundColor:color,
-              borderWidth: 1.2,
+              borderWidth: 1,
               fill: false,  // 不填充颜色
-              pointRadius: 1.2, // 设置点的大小
-              tension: 0.2  // 设置曲线平滑度 (0 为折线)
+              pointRadius: .5, // 设置点的大小
+              tension: 0.1  // 设置曲线平滑度 (0 为折线)
             }
           })
       },
@@ -219,8 +223,8 @@ export class VisualEngine{
   
     transactions.forEach(({ orders, profit, closed, side: transaction_side }) => {
       const [order1, order2] = orders;
-      const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1 } = order1;
-      const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2 } = order2;
+      const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1, beta:beta1, } = order1;
+      const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2, beta:beta2, } = order2;
   
       //已平仓的不展示
       // if(transaction_side==='opening' && closed) return 
@@ -246,17 +250,21 @@ export class VisualEngine{
       let x1 = xScale.getPixelForValue(formatTimestamp(ts1, bar_type));
       let x2 = xScale.getPixelForValue(formatTimestamp(ts2, bar_type));
       
-      // 计算标准化价格
-      const spx1 = px1 * betaMap[instId1][0];
-      const spx2 = px2 * betaMap[instId2][0];
+      // 计算实时标准化价格
+      const spx1 = px1 * betaMap[instId1][0] + betaMap[instId1][1];
+      const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
+
+      // 计算开仓时标准化价格
+      const fspx1 = px1 * beta1[0] + beta2[1];
+      const fspx2 = px2 * beta2[0] + beta2[1];
+
       
       // 获取Y轴坐标
       let y1 = yScale.getPixelForValue(spx1);
       let y2 = yScale.getPixelForValue(spx2);
   
       // 计算价差比率
-      const r_p = TradeEngine.getRealtimeProfits();
-      const diffRate = r_p[`${instId1}:${instId2}`] || r_p[`${instId2}:${instId1}`];
+      const diffRate = TradeEngine._calcPriceGapProfit(fspx1, fspx2, (fspx1+fspx2)/2);
 
       // 将价格单位都转为USDT
       const format2USDT = (sz, price,tgtCcy) => {
@@ -315,7 +323,7 @@ export class VisualEngine{
     })
   
   
-    const left = width*0.75;
+    const left = width*0.70;
     const top = height*0.01
     const cellWidth = 80; // 单元格宽度
     const cellHeight = 20; // 单元格高度
@@ -370,7 +378,7 @@ export class VisualEngine{
     })
 
     
-    const left = width*0.25;
+    const left = width*0.35;
     const top = height*0.01;
     const cellWidth = 90; // 单元格宽度
     const cellHeight = 20; // 单元格高度

@@ -287,7 +287,8 @@ async function fetchOrders(
 // const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','BTC-USDT',400)
 // await open_positions('ETH-USDT','SOL-USDT',600)
-// await open_positions('OKB-USDT','BTC-USDT',400)
+// // await open_positions('OKB-USDT','BTC-USDT',400)
+// await open_positions('OKB-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','OKB-USDT',400)
 // await open_positions('BTC-USDT','OKB-USDT',400)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
@@ -296,7 +297,7 @@ async function fetchOrders(
 // },1000)
 
 
-close_position("0d8b38f8")
+close_position("04693706")
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
 

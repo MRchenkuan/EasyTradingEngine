@@ -87,6 +87,7 @@ function filterOutsideElements(data, distances){
 
 
 function cleanElements(stockA, stockB, iterater=1){
+    if(stockA.length<=30 || stockB.length<=30) return {A:stockA, B:stockB};
     while(iterater-->0){
         let {a} = fitOLS(stockA,stockB);
         let distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);

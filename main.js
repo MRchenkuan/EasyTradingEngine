@@ -37,8 +37,10 @@ TradeEngine.setMetaInfo({
   gate,
 }).start();
 
+TradeEngine.createHedge(['SOL-USDT', 'ETH-USDT']);
+
 /**
- * 启动可视化引擎
+ * 启动图像引擎
  */
 VisualEngine.setMetaInfo({
   assets

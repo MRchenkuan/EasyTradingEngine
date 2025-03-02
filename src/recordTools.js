@@ -118,7 +118,7 @@ export function recordOpeningTransactions(tradeId, orders) {
 
         const index = data.findIndex(item => item.tradeId === tradeId);
         const record = {
-            tradeId, side:"opening", closed:false, orders
+            tradeId, side:"opening", closed:false, orders, ts: Math.max(...orders.map(it=>parseInt(it.ts)))
         }
         if(index<0) {
             data.push(record);
@@ -147,7 +147,7 @@ export function recordClosingTransactions(tradeId, profit, orders) {
 
         const index = data.findIndex(item => item.tradeId === tradeId);
         const record = {
-            tradeId, side:"closing", profit, orders
+            tradeId, side:"closing", profit, orders, ts: Math.max(...orders.map(it=>parseInt(it.ts)))
         };
         if(index<0) {
             data.push(record);
@@ -213,6 +213,22 @@ export function readPrice(assetId) {
     }
 }
 
+export function readPrices() {
+    try {
+        if (!fs.existsSync(filePath_price)) {
+            console.log('File does not exist.');
+            return null;
+        }
+        // 读取文件内容
+        const content = fs.readFileSync(filePath_price, 'utf-8');
+        const data = JSON.parse(content);
+        return data
+    } catch (error) {
+        console.error('订单读取错误:', error);
+        return null;
+    }
+}
+
 
 export function recordBetaMap(beta_map) {
     try {
@@ -253,7 +269,7 @@ export function recordMarketMakerTransactions(tradeId, orders) {
 
         const index = data.findIndex(item => item.tradeId === tradeId);
         const record = {
-            tradeId, orders
+            tradeId, orders, ts: Math.max(...orders.map(it=>parseInt(it.ts)))
         };
         if(index<0) {
             data.push(record);

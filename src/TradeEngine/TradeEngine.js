@@ -1,4 +1,4 @@
-import { getLastTransactions, recordBetaMap, recordPrice, updateTransaction } from "../recordTools.js";
+import { getLastTransactions, readPrice, readPrices, recordBetaMap, recordPrice, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { createMapFrom, formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./HedgeProcessor.js";
@@ -24,7 +24,7 @@ export class TradeEngine{
    * @param {*} assetNames 
    */
   static createHedge(assetNames){
-    const hp = new HedgeProcessor(assetNames)
+    const hp = new HedgeProcessor(assetNames, TradeEngine)
     this.processors.push(hp);
     return hp;
   }
@@ -417,14 +417,31 @@ static updatePrice(assetId, price, ts, bar) {
     }
   }
 
+  static runAllProcessors(){
+    this.processors.forEach((p)=>{
+      setTimeout(()=>{        
+        p.tick({
+          ctx: this,
+          scaled_prices: this.getAllScaledPrices(),
+          beta_map: this._beta_map,
+          realtime_prices: readPrices()
+        })
+      })
+    })
+  }
+
   /**
    * 监听
    */
   static start(){
     const status = this.checkEngine();
     if(status == 2){
+      // 更新对冲比
       this.refreshBeta();
-      this.refreshTransactions()
+      // 更新交易记录
+      this.refreshTransactions();
+      // 运行所有的交易处理器
+      this.runAllProcessors();
     } else if(status == 1){
       console.log('启动完成,进行初始化...')
       this.refreshBeta();
@@ -433,11 +450,6 @@ static updatePrice(assetId, price, ts, bar) {
     } else {
       throw new Error("启动失败...")      
     }
-
-    // this.processors.forEach((p)=>{
-    //   p.tick();
-    // })
-
 
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(()=>{
