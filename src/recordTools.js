@@ -74,7 +74,7 @@ export function getLastTransactions(last_n,type){
     }
 }
 
-// 更新开平仓单
+// 更新持仓
 export function updateTransaction(tradeId, type, args){
     const file_path = {
         "opening":filePath_trade_results_opening,

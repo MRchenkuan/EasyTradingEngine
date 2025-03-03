@@ -13,7 +13,7 @@ const ws_connection_pool={}
 // storeConnection('ws_private', ws_private);
 
 const gate = 10.1;
-const bar_type = '5m';
+const bar_type = '15m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
@@ -37,7 +37,9 @@ TradeEngine.setMetaInfo({
   gate,
 }).start();
 
-TradeEngine.createHedge(['SOL-USDT', 'ETH-USDT']);
+TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 10, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 10, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 10, 0.02);
 
 /**
  * 启动图像引擎
@@ -53,7 +55,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,23,0,0,0).getTime(),
+  to_when:new Date(2025,1,24,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
@@ -89,6 +91,8 @@ ws_business.on('message', (message) => {
 });
 
 ws_business.on('close', (code, reason) => {
+  TradeEngine.stop();
+  VisualEngine.stop();
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
 });
 

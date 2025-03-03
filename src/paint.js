@@ -112,7 +112,7 @@ export function createCollisionAvoidance() {
         // 根据重叠量计算力度
         const force = Math.sqrt(overlapX * overlapX + overlapY * overlapY);
         totalDx += dx * force * forceFactor;
-        totalDy += 1.2*dy * force * forceFactor;
+        totalDy += dy * force * forceFactor;
       }
 
       // 无碰撞时退出循环

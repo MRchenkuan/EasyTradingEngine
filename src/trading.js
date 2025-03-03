@@ -91,12 +91,12 @@ export async function close_position(tradeId){
   
   const openingRecord = readOpeningTransactions(tradeId)
   // 需要做一些校验
-  if(!openingRecord) throw new Error('平仓单不存在');
+  if(!openingRecord) throw new Error('平仓头寸不存在');
   if(openingRecord.closed){
     console.warn('不能重复对订单平仓')
     return;
   }
-  // todo 是否是开仓单等等
+  // todo 是否是开仓头寸等等
   const { orders:opening_orders } =openingRecord;
 
   // 创建订单参数
@@ -130,7 +130,7 @@ export async function close_position(tradeId){
 }
 
 
-function createOrder_limit(instId, price, size, side){
+export function createOrder_limit(instId, price, size, side){
   return {
     instId,
     // "tdMode":side>0 ?"cash": 'isolated', // isolated
@@ -158,7 +158,7 @@ export function createOrder_market(instId, size, side, is_base_ccy){
 }
 
 // 合并订单结果
-function mergeOrder2Result(arr){
+export function mergeOrder2Result(arr){
   const map = {};
   arr.map(it=>{
     map[it.clOrdId] = {...(map[it.clOrdId]||{}),...it};
@@ -169,7 +169,6 @@ function mergeOrder2Result(arr){
 
 // 标准化订单参数
 function processOrderDetail(orderDetail){
-  debugger
   return orderDetail.map(order=>{
     const {instId, clOrdId,avgPx,px, ordId,sz,accFillSz, fee,feeCcy, tgtCcy, state} = order;
     return {
@@ -283,21 +282,23 @@ async function fetchOrders(
 
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
 // await open_positions('SOL-USDT','BTC-USDT',400)
+// await open_positions('SOL-USDT','ETH-USDT',400)
 // const tradeId = await open_positions('SOL-USDT','ETH-USDT',300)
 // const tradeId = await open_positions('TRUMP-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','BTC-USDT',400)
 // await open_positions('ETH-USDT','SOL-USDT',600)
-// // await open_positions('OKB-USDT','BTC-USDT',400)
+// await open_positions('OKB-USDT','BTC-USDT',400)
 // await open_positions('OKB-USDT','SOL-USDT',400)
 // await open_positions('ETH-USDT','OKB-USDT',400)
 // await open_positions('BTC-USDT','OKB-USDT',400)
+// await open_positions('BTC-USDT','ETH-USDT',400)
 // const tradeId = await open_positions('BTC-USDT', 'ETH-USDT',200);
 // setTimeout(()=>{
 //   close_position(tradeId)
 // },1000)
 
 
-close_position("04693706")
+// close_position("04693706")
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
 

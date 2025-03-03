@@ -1,7 +1,7 @@
 import { getLastTransactions, readPrice, readPrices, recordBetaMap, recordPrice, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { createMapFrom, formatTimestamp } from "../tools.js";
-import { HedgeProcessor } from "./HedgeProcessor.js";
+import { HedgeProcessor } from "./processors/HedgeProcessor.js";
 
 export class TradeEngine{
   static processors = [];
@@ -23,17 +23,21 @@ export class TradeEngine{
    * 工厂函数，创建监听器
    * @param {*} assetNames 
    */
-  static createHedge(assetNames){
-    const hp = new HedgeProcessor(assetNames, TradeEngine)
+  static createHedge(assetNames, size, gate){
+    if(!assetNames || assetNames.length<2) throw new Error(`${assetNames}未设置对冲资产`)
+    if(!gate || gate <= 0) throw new Error(assetNames, `${assetNames}必须设置门限`)
+    const hp = new HedgeProcessor(assetNames, size, gate, TradeEngine)
     this.processors.push(hp);
     return hp;
   }
 
   /**
-   * todo 实现私有属性的读取
+   * TODO 实现私有属性的读取
    * @returns 
    */
   static getMetaInfo(){
+
+    // TODO 后续再实现
     return {}
   }
 
@@ -223,7 +227,7 @@ export class TradeEngine{
    * @param {*} assetId 
    * @returns 
    */
-  static getPrice(assetId){
+  static getRealtimePrice(assetId){
     return this.realtime_price[assetId];
   }
 
@@ -374,7 +378,7 @@ static updatePrice(assetId, price, ts, bar) {
       if(!closed){
         let fee_usdt = 0,cost = 0,sell=0;
         orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
-          const realtime_price = TradeEngine.getPrice(instId);
+          const realtime_price = TradeEngine.getRealtimePrice(instId);
           // 单位 false:本币; true:usdt
           const unit_fgt = tgtCcy === 'base_ccy'?false:true;
           const unit_fee = feeCcy === 'USDT'?true:false;
@@ -458,7 +462,7 @@ static updatePrice(assetId, price, ts, bar) {
   }
 
   static stop(){
-    clearTimeout(this._timer)
+    clearTimeout(this._timer.start)
   }
 
 }

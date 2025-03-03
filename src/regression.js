@@ -87,15 +87,21 @@ function filterOutsideElements(data, distances){
 
 
 function cleanElements(stockA, stockB, iterater=1){
+    let A = stockA.slice(), B= stockB.slice();
     if(stockA.length<=30 || stockB.length<=30) return {A:stockA, B:stockB};
     while(iterater-->0){
+        if(stockA.length<=10 || stockB.length<=10) {
+            console.log("过度整理...进行还原")
+            return {A, B};
+        }
         let {a} = fitOLS(stockA,stockB);
         let distances = stockA.map(it=>it*a).map((s_a,id)=>s_a-stockB[id]);
-        // let normalize_distance = normalizeArrayToRange(distances,-1,1).map(skew)
-        // paintRegressionWeight(normalize_distance)
         stockA = filterOutsideElements(stockA, distances);
         stockB = filterOutsideElements(stockB, distances);
     }
-    
+    if(stockA.length<=10 || stockB.length<=10) {
+        console.log("过度整理...进行还原")
+        return {A, B};
+    }
     return {A:stockA, B:stockB}
 }

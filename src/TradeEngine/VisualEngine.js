@@ -67,6 +67,10 @@ export class VisualEngine{
     }, 1000)
   }
 
+  static stop(){
+    clearTimeout(this._timer.start)
+  }
+  
   /**
    * 单独绘制每个头寸的分片
    */
