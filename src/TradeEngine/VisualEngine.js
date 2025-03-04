@@ -56,7 +56,6 @@ export class VisualEngine{
   
   static start(){
     const status = TradeEngine.checkEngine();
-    
     if(status == 2){
       this.drawMainGraph();
       this.drawTransctionSlices();

@@ -1,5 +1,5 @@
 import { LocalVariable } from "../LocalVariable.js";
-import { getLastTransactions, recordPrice, updateTransaction } from "../recordTools.js";
+import { getLastTransactions, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./processors/HedgeProcessor.js";

@@ -90,7 +90,7 @@ function cleanElements(stockA, stockB, iterater=1){
     let A = stockA.slice(), B= stockB.slice();
     if(stockA.length<=30 || stockB.length<=30) return {A:stockA, B:stockB};
     while(iterater-->0){
-        if(stockA.length<=10 || stockB.length<=10) {
+        if(stockA.length<=30 || stockB.length<=30) {
             console.log("过度整理...进行还原")
             return {A, B};
         }
@@ -99,7 +99,7 @@ function cleanElements(stockA, stockB, iterater=1){
         stockA = filterOutsideElements(stockA, distances);
         stockB = filterOutsideElements(stockB, distances);
     }
-    if(stockA.length<=10 || stockB.length<=10) {
+    if(stockA.length<=30 || stockB.length<=30) {
         console.log("过度整理...进行还原")
         return {A, B};
     }
