@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { TradeEngine } from "../TradeEngine.js";
 import { calcProfit, formatTimestamp } from "../../tools.js";
 import { close_position, open_positions } from "../../trading.js";
+import { LocalVariable } from "../../LocalVariable.js";
 
 export class HedgeProcessor extends IProcessor{
   
@@ -13,7 +14,7 @@ export class HedgeProcessor extends IProcessor{
   _open_gate = 0.045;// 开仓门限
   _close_gate = 0.005;// 平仓-重置门限
   _timer = {};
-  _prev_diff_rate = 0;
+  // _prev_diff_rate = 0;
   _position_size = 10; // 10 usdt
   /**
    * 
@@ -26,9 +27,20 @@ export class HedgeProcessor extends IProcessor{
     this.asset_names = asset_names;
     this._open_gate = gate; // 门限大小
     this._position_size = size; // 头寸规模
+    this.local_variables = new LocalVariable("processor/"+asset_names.sort().join(":"));
+    
     // 轮询本地头寸
     this.refreshOpeningTrasactions();
   }
+
+  get _prev_diff_rate(){
+    return this.local_variables._prev_diff_rate;
+  }
+
+  set _prev_diff_rate(v){
+    this.local_variables._prev_diff_rate = v
+  }
+
 
   /**
    * 获取两个对冲资产的价格
@@ -201,6 +213,7 @@ export class HedgeProcessor extends IProcessor{
           const [spt_px1, spt_px2]=[pt_px1*beta1[0]+beta1[1], pt_px2*beta2[0]+beta2[1]];
           const prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(spt_px1, spt_px2, (spt_px1+spt_px2)/2)
           console.log(`最近一次开仓的 diff_rate：${(prev_transactions_diff_rate*100).toFixed(2)}, 最近一次记录的最大值为：${(this._prev_diff_rate*100).toFixed(2)}`)
+          // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
           this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate)
         }
       }

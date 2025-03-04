@@ -4,7 +4,6 @@ import path from 'path'
 // 获取当前文件的目录路径
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 // 文件路径
-const filePath_beta = path.join(__dirname, '../records/β.json');
 const filePath_trade_results_opening = path.join(__dirname, '../records/trade-results-opening.json');
 const filePath_trade_results_closing = path.join(__dirname, '../records/trade-results-closing.json');
 const filePath_trade_results_makert_maker = path.join(__dirname, '../records/trade-market-maker.json');

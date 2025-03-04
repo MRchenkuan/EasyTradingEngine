@@ -1,0 +1,13 @@
+{
+  "processor": {
+    "BTC-USDT:ETH-USDT": {
+      "_prev_diff_rate": 0.03488319357072739
+    },
+    "ETH-USDT:OKB-USDT": {
+      "_prev_diff_rate": 0.03323829499137908
+    },
+    "BTC-USDT:OKB-USDT": {
+      "_prev_diff_rate": 0.027223979055749015
+    }
+  }
+}
