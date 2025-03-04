@@ -212,23 +212,6 @@ export function readPrice(assetId) {
     }
 }
 
-export function readPrices() {
-    try {
-        if (!fs.existsSync(filePath_price)) {
-            console.log('File does not exist.');
-            return null;
-        }
-        // 读取文件内容
-        const content = fs.readFileSync(filePath_price, 'utf-8');
-        const data = JSON.parse(content);
-        return data
-    } catch (error) {
-        console.error('订单读取错误:', error);
-        return null;
-    }
-}
-
-
 export function recordBetaMap(beta_map) {
     try {
         // 写入文件

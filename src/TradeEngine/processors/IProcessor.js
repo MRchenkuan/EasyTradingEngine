@@ -5,7 +5,6 @@ export class IProcessor{
    * 监听
    */
   listen(){
-    debugger
     this.timer = setTimeout(this.listen, 1000);
   }
 

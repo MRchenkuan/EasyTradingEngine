@@ -1,21 +1,21 @@
-import { getLastTransactions, readPrice, readPrices, recordBetaMap, recordPrice, updateTransaction } from "../recordTools.js";
+import { LocalVariable } from "../LocalVariable.js";
+import { getLastTransactions, recordPrice, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
-import { createMapFrom, formatTimestamp } from "../tools.js";
+import { formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./processors/HedgeProcessor.js";
 
 export class TradeEngine{
   static processors = [];
   static market_data={}; // 行情数据
-  static realtime_price = {};
+  static realtime_price = new LocalVariable('TradeEngine/realtime_price');
   static _main_asset = ""; // 主资产
   static _timer = {};
   static _bar_type = "";
-  static _beta_map = {};
+  static _beta_map = new LocalVariable('TradeEngine/_beta_map');
   static _main_asset = ""
   static _once_limit = 100
   static _candle_limit = 300
   static _asset_names = [] // 资产列表
-  static _graph = {}
   static _gate = 0.05
   static _status = 0; //1 启动中 2运行中 -1出错
 
@@ -154,7 +154,7 @@ export class TradeEngine{
     for (const [id, data] of Object.entries(allAssets)) {
       processAsset(id); // 直接传递资产ID
     }
-    recordBetaMap(this._beta_map);
+    // recordBetaMap(this._beta_map);
   }
 
 
@@ -283,7 +283,7 @@ export class TradeEngine{
 
     // 更新实时价格
     this.realtime_price[assetId] = sorted_prices.at(-1);
-    recordPrice(assetId, this.realtime_price[assetId]);
+    // recordPrice(assetId, this.realtime_price[assetId]);
     // this._status
   }
 
@@ -348,7 +348,7 @@ static updatePrice(assetId, price, ts, bar) {
   }
   // 更新实时价格
   this.realtime_price[assetId] = existingPrices.at(-1);
-  recordPrice(assetId, this.realtime_price[assetId]);
+  // recordPrice(assetId, this.realtime_price[assetId]);
 }
 
   /**
@@ -428,7 +428,7 @@ static updatePrice(assetId, price, ts, bar) {
           ctx: this,
           scaled_prices: this.getAllScaledPrices(),
           beta_map: this._beta_map,
-          realtime_prices: readPrices()
+          realtime_prices: this.realtime_price
         })
       })
     })

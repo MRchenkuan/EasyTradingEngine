@@ -54,7 +54,7 @@
         ]
       }
     ],
-    "profit": -57.58134413870004
+    "profit": -54.26800991870015
   },
   {
     "tradeId": "bf01b77e",
@@ -111,7 +111,7 @@
         ]
       }
     ],
-    "profit": 2.012588120599921
+    "profit": 6.187744980599709
   },
   {
     "tradeId": "a4b8db27",
@@ -168,7 +168,7 @@
         ]
       }
     ],
-    "profit": -6.398279354780129
+    "profit": -3.7366702647800594
   },
   {
     "tradeId": "22246ddf",
@@ -225,7 +225,7 @@
       }
     ],
     "ts": 1740997122752,
-    "profit": 0.1341836162839977
+    "profit": 0.10126323328400436
   },
   {
     "tradeId": "3c97eb30",
@@ -282,10 +282,10 @@
       }
     ],
     "ts": 1740997122783,
-    "profit": -0.5548739133460016
+    "profit": -0.4289025263459981
   },
   {
-    "tradeId": "d0b0c1c3",
+    "tradeId": "59de0d3f",
     "side": "opening",
     "closed": false,
     "orders": [
@@ -294,22 +294,79 @@
         "tdMode": "cash",
         "side": "buy",
         "ordType": "market",
-        "clOrdId": "e223df91",
+        "clOrdId": "8292f794",
         "sz": "10",
         "tgtCcy": "quote_ccy",
-        "ordId": "2298362200896757760",
+        "ordId": "2300610269625376768",
         "sCode": "0",
         "sMsg": "Order placed",
         "tag": "",
-        "ts": "1740998931274",
+        "ts": "1741065928943",
         "px": "",
-        "avgPx": "2378.62",
-        "accFillSz": "0.004204",
-        "fee": "-0.000004204",
+        "avgPx": "2100.2",
+        "accFillSz": "0.004761",
+        "fee": "-0.000004761",
         "feeCcy": "ETH",
         "state": "filled",
         "beta": [
-          0.05964869980907155,
+          0.05961035355981114,
+          0
+        ]
+      },
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "c2495b6e",
+        "sz": "10",
+        "tgtCcy": "quote_ccy",
+        "ordId": "2300610269625376770",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741065928943",
+        "px": "",
+        "avgPx": "42.74",
+        "accFillSz": "0.233973",
+        "fee": "-0.01000000602",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          3.0805540483387417,
+          0
+        ]
+      }
+    ],
+    "ts": 1741065928943,
+    "profit": -0.021789608219999056
+  },
+  {
+    "tradeId": "0732aaf1",
+    "side": "opening",
+    "closed": false,
+    "orders": [
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "37cada75",
+        "sz": "10",
+        "tgtCcy": "quote_ccy",
+        "ordId": "2300610269625376772",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741065928943",
+        "px": "",
+        "avgPx": "2100.2",
+        "accFillSz": "0.004761",
+        "fee": "-0.000004761",
+        "feeCcy": "ETH",
+        "state": "filled",
+        "beta": [
+          0.05961035355981114,
           0
         ]
       },
@@ -318,27 +375,27 @@
         "tdMode": "cash",
         "side": "sell",
         "ordType": "market",
-        "clOrdId": "4b31f7d9",
+        "clOrdId": "6b42254e",
         "sz": "10",
         "tgtCcy": "quote_ccy",
-        "ordId": "2298362200930312192",
+        "ordId": "2300610269625376774",
         "sCode": "0",
         "sMsg": "Order placed",
         "tag": "",
-        "ts": "1740998931275",
+        "ts": "1741065928943",
         "px": "",
-        "avgPx": "92190",
-        "accFillSz": "0.00010848",
-        "fee": "-0.0100007712",
+        "avgPx": "84053.3",
+        "accFillSz": "0.00011898",
+        "fee": "-0.010000661634",
         "feeCcy": "USDT",
         "state": "filled",
         "beta": [
-          0.00162635140007662,
+          0.001628974495000904,
           0
         ]
       }
     ],
-    "ts": 1740998931275,
-    "profit": -0.44017064967999786
+    "ts": 1741065928943,
+    "profit": -0.02527050983400135
   }
 ]

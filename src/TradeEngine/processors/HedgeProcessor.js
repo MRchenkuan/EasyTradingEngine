@@ -14,7 +14,6 @@ export class HedgeProcessor extends IProcessor{
   _open_gate = 0.045;// 开仓门限
   _close_gate = 0.005;// 平仓-重置门限
   _timer = {};
-  // _prev_diff_rate = 0;
   _position_size = 10; // 10 usdt
   /**
    * 
@@ -27,18 +26,21 @@ export class HedgeProcessor extends IProcessor{
     this.asset_names = asset_names;
     this._open_gate = gate; // 门限大小
     this._position_size = size; // 头寸规模
-    this.local_variables = new LocalVariable("processor/"+asset_names.sort().join(":"));
+    this.local_variables = new LocalVariable("processor");
     
     // 轮询本地头寸
     this.refreshOpeningTrasactions();
   }
 
   get _prev_diff_rate(){
-    return this.local_variables._prev_diff_rate;
+    this.local_variables._prev_diff_rate??={};
+    this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")] ??= 0;
+    return this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")];
   }
 
   set _prev_diff_rate(v){
-    this.local_variables._prev_diff_rate = v
+    this.local_variables._prev_diff_rate??={};
+    this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")] = v
   }
 
 
@@ -55,7 +57,7 @@ export class HedgeProcessor extends IProcessor{
   // 轮询本地未平仓头寸
   refreshOpeningTrasactions(){
     this.opening_transactions = this._getTransactions({side:'opening'});
-    clearTimeout(this._timer.refresh_opening_trans)
+    clearTimeout(this._timer.refresh_opening_trans);
     // 轮询
     this._timer.refresh_opening_trans = setTimeout(()=>{
       this.refreshOpeningTrasactions();
@@ -181,7 +183,7 @@ export class HedgeProcessor extends IProcessor{
       // 如果没有则直接开仓
       // todo 遇到的一个问题是当滑点严重时，重启程序会重新开仓，需要记录开仓距离
       let transactions = this._getTransactions({ closed:false, side: 'opening' });
-
+      
       if(spx1>spx2){
         transactions = transactions.filter(({orders})=>{
           return orders.every(({instId, side})=>{
@@ -203,7 +205,6 @@ export class HedgeProcessor extends IProcessor{
       }
       
       const prev_transactions = transactions.at(-1);
-
       // 如果查询到之前有开平仓记录，则与当前进行比较
       if(prev_transactions){
         console.log(`最近一次开仓:${formatTimestamp(prev_transactions.ts)},${prev_transactions.orders.map(o=>[o.instId, o.side, o.sz, o.avgPx])}`)
@@ -212,6 +213,7 @@ export class HedgeProcessor extends IProcessor{
           const [beta1, beta2] = prev_transactions.orders.map(it=>it.beta)
           const [spt_px1, spt_px2]=[pt_px1*beta1[0]+beta1[1], pt_px2*beta2[0]+beta2[1]];
           const prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(spt_px1, spt_px2, (spt_px1+spt_px2)/2)
+
           console.log(`最近一次开仓的 diff_rate：${(prev_transactions_diff_rate*100).toFixed(2)}, 最近一次记录的最大值为：${(this._prev_diff_rate*100).toFixed(2)}`)
           // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
           this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate)
@@ -222,7 +224,6 @@ export class HedgeProcessor extends IProcessor{
       if(this._prev_diff_rate){
         // 前次达到过，再次达到门限，超上次 n 倍
         if(diff_rate > this._prev_diff_rate*1.5){
-          debugger
           ;spx1 > spx2
           ? open_positions(instId2, instId1,this._position_size)
           : open_positions(instId1, instId2,this._position_size)
@@ -235,7 +236,6 @@ export class HedgeProcessor extends IProcessor{
         }
       }else{
         // 首次达到门限
-        debugger
         console.log(`------首次达到门限------开仓----long:${spx1 > spx2?instId2:instId1}-----short:${spx1 < spx2?instId2:instId1}------`)
         ;spx1 > spx2
         ? open_positions(instId2, instId1,this._position_size)

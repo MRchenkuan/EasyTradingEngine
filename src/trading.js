@@ -1,8 +1,15 @@
 import { batchOrders, getOrderInfo } from "./api.js"
-import { getLastTransactions, getOpeningTransaction, readBetaMap, readOpeningTransactions, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
+import { LocalVariable } from "./LocalVariable.js";
+import { getLastTransactions, getOpeningTransaction, readOpeningTransactions, recordClosingTransactions, recordMarketMakerTransactions, recordOpeningTransactions, updateTransaction } from "./recordTools.js"
 import { calcProfit, hashString, parseOrderData } from "./tools.js"
 import { generateCounterBasedId } from "./uuid.js";
 
+
+
+function getBetaMap(){
+  const beta_map = new LocalVariable("TradeEngine");
+  return Reflect.getOwnPropertyDescriptor(beta_map,"_beta_map").value;
+}
 
 
 // 订单执行器（通用下单逻辑）
@@ -40,7 +47,7 @@ export async function open_positions(long, short, size){
   const order_short = createOrder_market(short, size, 0)
   // 下单
   const result = await executeOrders([order_long, order_short])
-  const beta_map = readBetaMap();
+  const beta_map = getBetaMap();
   result.map(order=>{
     order.beta = beta_map[order.instId];
   })
@@ -68,7 +75,7 @@ export async function open_positions_limit(long, short, price_long, price_short,
 
   // 下单
   const result = await executeOrders([order_long, order_short])
-  const beta_map = readBetaMap();
+  const beta_map = getBetaMap();
   result.map(order=>{
     order.beta = beta_map[order.instId];
   })
@@ -108,7 +115,7 @@ export async function close_position(tradeId){
 
   console.log('平仓...', orders_info)
   const result = await executeOrders(orders_info);
-  const beta_map = readBetaMap();
+  const beta_map = getBetaMap();
   result.map(order=>{
     order.beta = beta_map[order.instId];
   })
