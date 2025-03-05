@@ -212,7 +212,7 @@ export class VisualEngine{
 
 
   /**
-   * 绘制已开仓头寸的实时价差
+   * 绘制实时价差信息
    * @param {*} chart 
    * @param {*} tradeId 
    * @param {*} collisionAvoidance 
@@ -287,7 +287,15 @@ export class VisualEngine{
     : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${rateTag}`], [x1, y1, v1], color, collisionAvoidance)
   }
 
-  static _drawTransactions(chart, transactions, betaMap, collisionAvoidance){
+
+  /**
+   * 绘制历史价差信息
+   * @param {*} chart 
+   * @param {*} transactions 
+   * @param {*} betaMap 
+   * @param {*} collisionAvoidance 
+   */
+  static _drawTransactions(chart, transactions, betaMap, collisionAvoidance, show_closed=false){
     const bar_type = TradeEngine._bar_type;
     const ctx = chart.ctx;
     const xScale = chart.scales.x;
@@ -304,7 +312,7 @@ export class VisualEngine{
       const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2, beta:beta2, } = order2;
   
       //已平仓的不展示
-      // if(transaction_side==='opening' && closed) return 
+      if(!show_closed && (transaction_side==="closing" || closed)) return
   
       let color = {
         'opening':OPEN_COLOR,
@@ -537,6 +545,10 @@ export class VisualEngine{
   }
 
 
+  /**
+   * 绘制每一笔交易的切片
+   * @param {*} tradeId 
+   */
   static _paintTransactionSlice(tradeId){ 
     const open_transaction = getOpeningTransaction(tradeId);
     const close_transaction = getClosingTransaction(tradeId);
@@ -609,7 +621,7 @@ export class VisualEngine{
   
           // 开平仓信息绘制
           const transactions = [open_transaction, close_transaction].filter(it=>it);
-          this._drawTransactions(chart, transactions, beta_map, collisionAvoidance) 
+          this._drawTransactions(chart, transactions, beta_map, collisionAvoidance, true) 
 
           // 绘制实时距离
           this._drawRealtimeDistance(chart, tradeId, collisionAvoidance)
