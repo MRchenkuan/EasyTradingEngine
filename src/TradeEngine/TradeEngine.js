@@ -3,6 +3,7 @@ import { getLastTransactions, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./processors/HedgeProcessor.js";
+import { MarketMakerProcessor } from "./processors/MarketMakerProcessor.js";
 
 export class TradeEngine{
   static processors = [];
@@ -20,15 +21,30 @@ export class TradeEngine{
   static _status = 0; //1 启动中 2运行中 -1出错
 
   /**
-   * 工厂函数，创建监听器
+   * 对冲监听器
    * @param {*} assetNames 
+   * @param {*} size 
+   * @param {*} gate 
+   * @returns 
    */
   static createHedge(assetNames, size, gate){
     if(!assetNames || assetNames.length<2) throw new Error(`${assetNames}未设置对冲资产`)
     if(!gate || gate <= 0) throw new Error(assetNames, `${assetNames}必须设置门限`)
-    const hp = new HedgeProcessor(assetNames, size, gate, TradeEngine)
+    const hp = new HedgeProcessor(assetNames, size, gate, this);
     this.processors.push(hp);
     return hp;
+  }
+
+  /**
+   * 创建做市商
+   * @param {*} assetName 
+   * @param {*} size 
+   * @param {*} distance 
+   */
+  static createMarketMaker(assetName, size, distance){
+    const mp = new MarketMakerProcessor(assetName, size, distance, this);
+    this.processors.push(mp);
+    return mp
   }
 
   /**

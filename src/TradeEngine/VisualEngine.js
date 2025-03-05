@@ -163,8 +163,6 @@ export class VisualEngine{
     }
   }
 
-
-
   static _paintProfit (){
     const labels = TradeEngine.getMainAssetLabels();
     let profits =  TradeEngine.getAllHistoryProfits();

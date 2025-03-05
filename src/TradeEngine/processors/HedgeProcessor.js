@@ -1,18 +1,19 @@
 import { getLastTransactions, updateTransaction } from "../../recordTools.js";
-import { IProcessor } from "./IProcessor.js";
+import { AbstractProcessor } from "./AbstractProcessor.js";
 import crypto from 'crypto';
 import { TradeEngine } from "../TradeEngine.js";
 import { calcProfit, formatTimestamp } from "../../tools.js";
 import { close_position, open_positions } from "../../trading.js";
 import { LocalVariable } from "../../LocalVariable.js";
+import { debug } from "console";
 
-export class HedgeProcessor extends IProcessor{
+export class HedgeProcessor extends AbstractProcessor{
   
   asset_names = [];
   opening_transactions=[];
   engine = null;
   _open_gate = 0.045;// 开仓门限
-  _close_gate = 0.005;// 平仓-重置门限
+  _close_gate = 0.003;// 平仓-重置门限
   _timer = {};
   _position_size = 10; // 10 usdt
   /**
@@ -20,27 +21,25 @@ export class HedgeProcessor extends IProcessor{
    * @param {*} assetNames 
    */
   constructor(asset_names, size, gate, engine){
-    super(asset_names);
+    super();
     this.engine = engine;
     this.id=hashString(`${Date.now()}${asset_names.join('')}`)
     this.asset_names = asset_names;
     this._open_gate = gate; // 门限大小
     this._position_size = size; // 头寸规模
-    this.local_variables = new LocalVariable("processor");
+    this.local_variables = new LocalVariable(`HedgeProcessor/${this.asset_names.sort().join(":")}`);
     
     // 轮询本地头寸
     this.refreshOpeningTrasactions();
   }
 
   get _prev_diff_rate(){
-    this.local_variables._prev_diff_rate??={};
-    this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")] ??= 0;
-    return this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")];
+    this.local_variables._prev_diff_rate??=0;
+    return this.local_variables._prev_diff_rate;
   }
 
   set _prev_diff_rate(v){
-    this.local_variables._prev_diff_rate??={};
-    this.local_variables._prev_diff_rate[this.asset_names.sort().join(":")] = v
+    this.local_variables._prev_diff_rate = v
   }
 
 
@@ -85,6 +84,8 @@ export class HedgeProcessor extends IProcessor{
 
   /**
    * 时间触发器
+   * @param {*} args 引擎的上下文
+   * @implements
    */
   tick(args){
     // console.log('tick', this.asset_names , args.realtime_prices)
@@ -105,10 +106,15 @@ export class HedgeProcessor extends IProcessor{
     transactions.forEach(({ tradeId, orders, profit, closed, side: transaction_side }) => {
       const close_gate = this._close_gate;
       /**
+       * todo
        * 关于平仓条件 betaMap 这里需要考虑一个问题
        * 如果按照开仓时的对冲比平仓，可以确保利润，可能等的时间更长，也可能牺牲超额利润
        * 如果照当前实时的对冲比平仓，可以快速平仓，可能牺牲利润，也可能获得超额利润
-       *  */ 
+       * 
+       *  */
+      /* 这里为按开仓对冲比平仓，确保利润 */
+      // const betaMap = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
+      /* 这里为按照实时对冲比平仓，只要不亏利润 -- 币市可以优先考虑这个，因为资产之间的相关性变化比较大 */
       const betaMap = this.engine._beta_map;
       const [instId1, instId2] = this.asset_names;
       const [px1, px2] = this.asset_names.map(assetId=>this.engine.getRealtimePrice(assetId));
@@ -130,8 +136,8 @@ export class HedgeProcessor extends IProcessor{
         if(profit>0){
           close_position(tradeId);
         } else {
-          console.log(`[${tradeId}]满足平仓条件，${diff_rate}<=(${close_gate})但利润为负:${profit}`)
-        }
+          console.log(`[${tradeId}]满足平仓（实时对冲比）条件，${diff_rate}<=(${close_gate})但利润为负:${profit}`)
+        }       
       }
 
     })
