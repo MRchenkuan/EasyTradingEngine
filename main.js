@@ -12,7 +12,6 @@ const ws_connection_pool={}
 
 // storeConnection('ws_private', ws_private);
 
-const gate = 10.1;
 const bar_type = '15m';
 const price_type = 'close'
 const once_limit = 300;
@@ -34,8 +33,7 @@ TradeEngine.setMetaInfo({
   bar_type,
   once_limit, 
   candle_limit, 
-  assets,
-  gate,
+  assets
 }).start();
 
 TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 10, 0.02);

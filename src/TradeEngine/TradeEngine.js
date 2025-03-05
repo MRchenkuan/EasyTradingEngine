@@ -17,7 +17,6 @@ export class TradeEngine{
   static _once_limit = 100
   static _candle_limit = 300
   static _asset_names = [] // 资产列表
-  static _gate = 0.05
   static _status = 0; //1 启动中 2运行中 -1出错
 
   /**
@@ -194,13 +193,11 @@ export class TradeEngine{
     once_limit, 
     candle_limit, 
     assets,
-    gate,
   }){
     if(bar_type) this._bar_type = bar_type;
     if(main_asset) this._main_asset = main_asset;
     if(once_limit) this._once_limit = once_limit;
     if(candle_limit) this._candle_limit = once_limit;
-    if(gate) this._gate = gate;
     if(assets){
       this._asset_names = assets.map(it=>it.id);
     }
