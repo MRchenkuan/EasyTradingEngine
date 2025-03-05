@@ -1,7 +1,7 @@
 # 一句话简介
-这是一个自动化交易引擎
+一个自动化交易引擎
 # ONE MORE THING
-附带实现了一个交易策略（统计套利策略）：拟合两个资产价格，通过多空对冲实现套利
+一个自动化交易策略（统计套利）：拟合两个资产价格，通过多空对冲实现套利
 # 先看效果
 ### 大盘指标 位置：chart/candle_chart.jpg
 ![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
