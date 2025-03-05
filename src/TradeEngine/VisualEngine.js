@@ -1,6 +1,6 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
-import { blendColors, createMapFrom, formatTimestamp, getTsOfStartOfToday, hashString, toTrickTimeMark } from '../tools.js';
+import { blendColors, calcProfit, createMapFrom, formatTimestamp, getTsOfStartOfToday, hashString, toTrickTimeMark } from '../tools.js';
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import { getClosingTransaction, getLastTransactions, getOpeningTransaction } from '../recordTools.js';
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
@@ -211,6 +211,82 @@ export class VisualEngine{
   }
 
 
+  /**
+   * 绘制已开仓头寸的实时价差
+   * @param {*} chart 
+   * @param {*} tradeId 
+   * @param {*} collisionAvoidance 
+   * @returns 
+   */
+  static _drawRealtimeDistance(chart, tradeId, collisionAvoidance){
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+  
+    const SIDE_SYMBOL = { buy: "+", sell: '-' };
+
+    const labels = TradeEngine.getMainAssetLabels();
+
+    const transaction = getOpeningTransaction(tradeId);
+  
+    const [order1, order2] = transaction.orders;
+    const { instId:instId1, avgPx: px1, sz: sz1, side: side1, tgtCcy:tgtCcy1, beta:beta1, } = order1;
+    const { instId:instId2, avgPx: px2, sz: sz2, side: side2, tgtCcy:tgtCcy2, beta:beta2, } = order2;
+
+    //已平仓的不展示
+    if(transaction.closed) return 
+
+    let color = '#7b1fa2';
+
+    // 转换时间戳和计算坐标
+    if(xScale && yScale){}else{return};
+    let x1 = xScale.getPixelForValue(labels.at(-1));
+    let x2 = xScale.getPixelForValue(labels.at(-1));
+    
+    // 获取市价
+    const r_px1 = TradeEngine.getRealtimePrice(instId1);
+    const r_px2 = TradeEngine.getRealtimePrice(instId2);
+    
+    // 按开仓时标准化计算当前市价
+    const sr_px1 = r_px1 * beta1[0] + beta1[1];
+    const sr_px2 = r_px2 * beta2[0] + beta2[1];
+
+    // 计算开仓时标准化价格
+    const fspx1 = px1 * beta1[0] + beta1[1];
+    const fspx2 = px2 * beta2[0] + beta2[1];
+
+    // 获取Y轴坐标
+    let y1 = yScale.getPixelForValue(sr_px1);
+    let y2 = yScale.getPixelForValue(sr_px2);
+
+    // 计算价差比率
+    const diffRate = TradeEngine._calcPriceGapProfit(sr_px1, sr_px2, (sr_px1+sr_px2)/2);
+
+    // 将价格单位都转为USDT
+    const format2USDT = (sz, price,tgtCcy) => {
+      if(tgtCcy==='base_ccy') return (sz * price).toFixed(2);
+      if(tgtCcy==='quote_ccy') return sz;
+      throw("未知货币单位: ",tgtCcy)
+    }
+
+    // 生成标签内容
+    const valueFormatter = (sz, side, price, tgtCcy) => `${SIDE_SYMBOL[side]}${(format2USDT(sz, price, tgtCcy))}`;
+
+    // 生成标签文本
+    const rateTag = `${(diffRate * 100).toFixed(2)}%`;
+
+    let profit = transaction.profit || 0;
+    const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
+    const tag2 = `$${profit_text}`;
+    const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${parseFloat(px1).toFixed(2)}`;
+    const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${parseFloat(px2).toFixed(2)}`;
+
+    // 绘制连接线
+    ;fspx1>fspx2
+    ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${rateTag}`], [x2, y2, v2], color, collisionAvoidance)
+    : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${rateTag}`], [x1, y1, v1], color, collisionAvoidance)
+  }
+
   static _drawTransactions(chart, transactions, betaMap, collisionAvoidance){
     const bar_type = TradeEngine._bar_type;
     const ctx = chart.ctx;
@@ -222,7 +298,7 @@ export class VisualEngine{
     const SIDE_SYMBOL = { buy: "+", sell: '-' };
     const labels = TradeEngine.getMainAssetLabels();
   
-    transactions.forEach(({ orders, profit, closed, side: transaction_side }) => {
+    transactions.forEach(({ orders, profit, closed, side: transaction_side, tradeId }) => {
       const [order1, order2] = orders;
       const { ts: ts1, avgPx: px1, instId: instId1, sz: sz1, side: side1, tgtCcy:tgtCcy1, beta:beta1, } = order1;
       const { ts: ts2, avgPx: px2, instId: instId2, sz: sz2, side: side2, tgtCcy:tgtCcy2, beta:beta2, } = order2;
@@ -256,7 +332,7 @@ export class VisualEngine{
       const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
 
       // 计算开仓时标准化价格
-      const fspx1 = px1 * beta1[0] + beta2[1];
+      const fspx1 = px1 * beta1[0] + beta1[1];
       const fspx2 = px2 * beta2[0] + beta2[1];
 
       
@@ -264,8 +340,10 @@ export class VisualEngine{
       let y1 = yScale.getPixelForValue(spx1);
       let y2 = yScale.getPixelForValue(spx2);
   
+
       // 计算价差比率
-      const diffRate = TradeEngine._calcPriceGapProfit(fspx1, fspx2, (fspx1+fspx2)/2);
+      const diffRate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx1+spx2)/2)
+      
 
       // 将价格单位都转为USDT
       const format2USDT = (sz, price,tgtCcy) => {
@@ -458,6 +536,7 @@ export class VisualEngine{
     });
   }
 
+
   static _paintTransactionSlice(tradeId){ 
     const open_transaction = getOpeningTransaction(tradeId);
     const close_transaction = getClosingTransaction(tradeId);
@@ -531,6 +610,9 @@ export class VisualEngine{
           // 开平仓信息绘制
           const transactions = [open_transaction, close_transaction].filter(it=>it);
           this._drawTransactions(chart, transactions, beta_map, collisionAvoidance) 
+
+          // 绘制实时距离
+          this._drawRealtimeDistance(chart, tradeId, collisionAvoidance)
 
           // 绘制信息表格
           this._drawInfoTable(chart);

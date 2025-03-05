@@ -1,5 +1,5 @@
 import { LocalVariable } from "../LocalVariable.js";
-import { getLastTransactions, updateTransaction } from "../recordTools.js";
+import { getClosingTransaction, getLastTransactions, getOpeningTransaction, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
 import { formatTimestamp } from "../tools.js";
 import { HedgeProcessor } from "./processors/HedgeProcessor.js";
@@ -120,7 +120,7 @@ export class TradeEngine{
     }
 
   /**
-   * 计算预期利润
+   * 计算预期开仓利润率
    * @param {*} a 
    * @param {*} b 
    * @param {*} n 
@@ -129,6 +129,24 @@ export class TradeEngine{
   static _calcPriceGapProfit(a, b, n){
     return ((n-b)/b - (n-a)/a)/2*(a>b?1:-1)
   }
+
+  /**
+   * 计算实际平仓利润率
+   * @param {*} a 
+   * @param {*} b 
+   * @param {*} n 
+   * @returns 
+   */
+  static _calcClosingProfitRate(tradeId){
+    const {orders: order_o} = getOpeningTransaction(tradeId);
+    const {orders: order_c} = getClosingTransaction(tradeId);
+    const beta_map = Object.fromEntries(order_o.map(o=>[o.instId,o.beta]));
+    let [a, b] = order_o.sort((a, b) => a.instId.localeCompare(b.instId)).map(it=>parseFloat(beta_map[it.instId][0]*it.avgPx+beta_map[it.instId][1]));
+    let [a2, b2] = order_c.sort((a, b) => a.instId.localeCompare(b.instId)).map(it=>parseFloat(beta_map[it.instId][0]*it.avgPx+beta_map[it.instId][1]));
+    return ((b2-b)/b - (a2-a)/a)/2*(a>b?1:-1);
+  }
+
+
 
 
   /**

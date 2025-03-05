@@ -113,9 +113,9 @@ export class HedgeProcessor extends AbstractProcessor{
        * 
        *  */
       /* 这里为按开仓对冲比平仓，确保利润 */
-      // const betaMap = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
-      /* 这里为按照实时对冲比平仓，只要不亏利润 -- 币市可以优先考虑这个，因为资产之间的相关性变化比较大（!!!由于滑点的存在，可能仍然会亏滑点） */
-      const betaMap = this.engine._beta_map;
+      const betaMap = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
+      /* 这里为按照实时对冲比平仓，只要不亏利润（!!!由于滑点的存在，可能仍然会亏滑点） */
+      // const betaMap = this.engine._beta_map;
       const [instId1, instId2] = this.asset_names;
       const [px1, px2] = this.asset_names.map(assetId=>this.engine.getRealtimePrice(assetId));
     
@@ -129,7 +129,9 @@ export class HedgeProcessor extends AbstractProcessor{
   
       // 计算价差比率
       const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx2+spx2)/2);
-      
+      // if(tradeId == 'aa1fb0df'){
+      //   debugger
+      // }
       if(diff_rate <= close_gate){
         // 平仓
         const profit = this.engine._calcRealtimeProfit(orders);
