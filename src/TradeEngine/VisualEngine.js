@@ -143,8 +143,8 @@ export class VisualEngine{
           // 绘制实时利润空间表格
           this._drawProfitTable(chart);
 
-          // 开平仓信息绘制
-          const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')];
+          // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
+          const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')].filter(it=>!it.closed);
           const beta_map = TradeEngine._beta_map;
           this._drawTransactions(chart, transactions, beta_map,collisionAvoidance)
           // 实时利润绘制
@@ -190,7 +190,7 @@ export class VisualEngine{
               borderWidth: 1,
               fill: false,  // 不填充颜色
               pointRadius: .5, // 设置点的大小
-              tension: 0.1  // 设置曲线平滑度 (0 为折线)
+              tension: .3  // 设置曲线平滑度 (0 为折线)
             }
           })
       },

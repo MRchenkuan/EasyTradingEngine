@@ -126,7 +126,7 @@ export class HedgeProcessor extends IProcessor{
       
       if(diff_rate <= close_gate){
         // 平仓
-        const profit = calcProfit(orders);
+        const profit = this.engine._calcRealtimeProfit(orders);
         if(profit>0){
           close_position(tradeId);
         } else {

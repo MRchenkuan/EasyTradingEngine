@@ -88,10 +88,10 @@ function filterOutsideElements(data, distances){
 
 function cleanElements(stockA, stockB, iterater=1){
     let A = stockA.slice(), B= stockB.slice();
-    if(stockA.length<=30 || stockB.length<=30) return {A:stockA, B:stockB};
+    if(stockA.length<=10 || stockB.length<=10) return {A:stockA, B:stockB};
     while(iterater-->0){
-        if(stockA.length<=30 || stockB.length<=30) {
-            console.log("过度整理...进行还原")
+        if(stockA.length<=10 || stockB.length<=10) {
+            console.log("过度整理...进行还原1")
             return {A, B};
         }
         let {a} = fitOLS(stockA,stockB);
@@ -99,8 +99,8 @@ function cleanElements(stockA, stockB, iterater=1){
         stockA = filterOutsideElements(stockA, distances);
         stockB = filterOutsideElements(stockB, distances);
     }
-    if(stockA.length<=30 || stockB.length<=30) {
-        console.log("过度整理...进行还原")
+    if(stockA.length<=10 || stockB.length<=10) {
+        console.log("过度整理...进行还原2")
         return {A, B};
     }
     return {A:stockA, B:stockB}

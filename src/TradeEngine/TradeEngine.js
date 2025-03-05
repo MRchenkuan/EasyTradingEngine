@@ -232,6 +232,15 @@ export class TradeEngine{
   }
 
   /**
+   * 获取资产实时价格列表
+   * @param {*} assetId 
+   * @returns 
+   */
+  static getRealtimePrices(){
+    return this.realtime_price;
+  }
+
+  /**
    * 更新时间价格序列
    * @param {*} assetId 资产标识
    * @param {*} price_arr 时间价格序列
@@ -376,30 +385,43 @@ static updatePrice(assetId, price, ts, bar) {
   
     opening_transactions.map(({tradeId, closed, orders})=>{
       if(!closed){
-        let fee_usdt = 0,cost = 0,sell=0;
-        orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
-          const realtime_price = TradeEngine.getRealtimePrice(instId);
-          // 单位 false:本币; true:usdt
-          const unit_fgt = tgtCcy === 'base_ccy'?false:true;
-          const unit_fee = feeCcy === 'USDT'?true:false;
-  
-          if(side==='buy'){
-            cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-            // 实时估算
-            sell += realtime_price * accFillSz
-          }
-  
-          if(side==='sell'){
-            sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-            // 实时估算
-            cost += realtime_price * accFillSz
-          }
-          fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
-        })
-        const profit =  sell - cost + fee_usdt;
+        const profit = this._calcRealtimeProfit(orders);
         updateTransaction(tradeId,'opening',{profit});
       }
     });
+  }
+
+  /**
+   * 根据实时价格计算订单实时净利润
+   * @param {*} orders 
+   * @returns 
+   */
+  static _calcRealtimeProfit(orders){
+    let fee_usdt = 0,cost = 0,sell=0;
+    const realtime_price_map = TradeEngine.getRealtimePrices();
+
+    orders.map(({instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy})=>{
+      const realtime_price = realtime_price_map[instId];
+      if(!realtime_price) throw new Error('实时价格获取不到')
+      // 单位 false:本币; true:usdt
+      const unit_fgt = tgtCcy === 'base_ccy'?false:true;
+      const unit_fee = feeCcy === 'USDT'?true:false;
+
+      if(side==='buy'){
+        cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+        // 实时估算
+        sell += realtime_price * accFillSz
+      }
+
+      if(side==='sell'){
+        sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
+        // 实时估算
+        cost += realtime_price * accFillSz
+      }
+      fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
+    })
+    const profit =  sell - cost + fee_usdt;
+    return profit
   }
 
   static checkEngine(){
@@ -409,9 +431,12 @@ static updatePrice(assetId, price, ts, bar) {
         if(Object.values(this.getAllMarketData()||{}).length === this._asset_names.length){
           // 初始化中
           this._status = 1;
-          if(Object.values(this._beta_map).length === this._asset_names.length){
+          if(this._asset_names.every(a_n=>this._beta_map[a_n]?.length==2)){
             this._status = 2;
           }
+          // if(Object.values(this._beta_map).length >= this._asset_names.length){
+            
+          // }
         }
       }
       return this._status;
