@@ -26,7 +26,9 @@
 - 关于β，我在HedgeProcessor中实现的是：
   - 开仓时，是根据当前的实时价格拟合情况来计算，计算后会保存在订单中
   - 平仓时，是根据原始拟合β（最初开仓时）来计算，避免开、平仓的判定条件有差异。
-- 【重要】按照惯例，代码中省略了秘钥配置（代码中缺失的 config.security.mimic.js 文件），请自行手动添加如下代码，然后自行引入
+
+# 秘钥配置
+按照惯例，代码中省略了秘钥配置（代码中缺失的 config.security.mimic.js 文件），请自行手动添加如下代码，然后自行引入
 ```javascript
 const base_url = 'wss://ws.okx.com:8443'; // 这个是
 const api_key = '你在okx上申请的 api_key';
