@@ -2,6 +2,6 @@ config.security.js
 config.security.mimic.js
 node_modules
 .vscode
-/chart/
+chart/
 β.json
-/records/
+records/
