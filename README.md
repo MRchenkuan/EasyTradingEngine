@@ -1,7 +1,7 @@
 # 一句话简介
-一个自动化交易引擎
+拟合两个资产价格，通过多空对冲实现套利
 # ONE MORE THING
-一个自动化交易策略（统计套利）：拟合两个资产价格，通过多空对冲实现套利
+实现了一个自动化交易引擎
 # 先看效果
 ### 大盘指标 位置：chart/candle_chart.jpg
 ![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
@@ -14,8 +14,8 @@
 - 切片只会展示当前头寸的开平仓信息，并且会按照原始（开仓时的）对冲比来呈现。
   - 在切片中，实时利润也是按原始对冲比来计算的（关于对冲比β，见：NOTICE）
 ### 各种资产组合的盈利空间（用于盘点当前市场整体是否适合交易） 位置：chart/distance.jpg
-- 显示资产之间的背离程度（潜在利润），幅度越大则越背离，幅度越小则越收敛
 ![image](https://github.com/user-attachments/assets/c15c4ed6-4486-46ac-8d06-d5213801466f)
+- 显示资产之间的背离程度（潜在利润），幅度越大则越背离，幅度越小则越收敛
 ### 正常启动的效果
 “所有系统启动，启动启动！”
 <img width="1136" alt="image" src="https://github.com/user-attachments/assets/02847ccb-d633-4091-a197-ac1c5abb7611" />
