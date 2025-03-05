@@ -116,6 +116,19 @@ export class HedgeProcessor extends AbstractProcessor{
       const betaMap = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
       /* 这里为按照实时对冲比平仓，只要不亏利润（!!!由于滑点的存在，可能仍然会亏滑点） */
       // const betaMap = this.engine._beta_map;
+      
+      
+      /**
+       * 
+       * 
+       * TODO
+       * 最终还是需要两个结合，优先能平仓，且不亏钱
+       * 不论是哪个 betaMap（现价也好，开仓价也好） 如果能平且没亏就平
+       * 
+       * 
+       * 
+       *  */
+      
       const [instId1, instId2] = this.asset_names;
       const [px1, px2] = this.asset_names.map(assetId=>this.engine.getRealtimePrice(assetId));
     

@@ -278,8 +278,8 @@ export class VisualEngine{
     let profit = transaction.profit || 0;
     const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
     const tag2 = `$${profit_text}`;
-    const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${parseFloat(px1).toFixed(2)}`;
-    const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${parseFloat(px2).toFixed(2)}`;
+    const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${parseFloat(r_px1).toFixed(2)}`;
+    const v2 = `(${valueFormatter(sz2, side2, px2, tgtCcy2)})/${parseFloat(r_px2).toFixed(2)}`;
 
     // 绘制连接线
     ;fspx1>fspx2
