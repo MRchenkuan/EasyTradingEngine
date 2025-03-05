@@ -14,6 +14,17 @@
 # NOTICE
 - 做市商策略会亏手续费，没有免费接口不要去跑
 - 模拟盘交易不代表实盘，实盘请手动改api地址
+- 【重要】按照惯例，代码中省略了秘钥配置（代码中缺失的 config.security.mimic.js 文件），请自行手动添加如下代码，然后自行引入
+```javascript
+const base_url = 'wss://ws.okx.com:8443'; // 这个是
+const api_key = '你在okx上申请的 api_key';
+const api_secret = '你在okx上申请的 api_secret';
+const pass_phrase = "你在okx上设置的 pass_phrase"
+
+export {
+  base_url,api_key, api_secret, pass_phrase
+}
+```
 
 # TODO
 目前统计套利策略相对完善，主要以这个为主
