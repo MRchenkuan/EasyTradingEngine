@@ -2,19 +2,19 @@
 拟合两个资产价格，通过多空对冲实现套利
 
 # 先看效果
-大盘指标 位置：chart/candle_chart.jpg
+### 大盘指标 位置：chart/candle_chart.jpg
+![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
 - 左上角各是个资产之间的ρ值（皮尔逊相关性指标），用于比较哪些资产适合做对冲
 - 中间是各个资产的实时价格、建议的对冲比（等额对冲），主要关注这个比值是否稳定
 - 右边是实测的当前开仓的利润空间
   - 由于我在HedgeProcessor中实现的是「等额」对冲，所以准确利润（相较于等量）是无法确定的（向上成交则大于平均，向下成交则小于平均），但永远会大于0。
-![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
-已开仓头寸的切片指标 位置 chart/slices
+### 已开仓头寸的切片指标 位置 chart/slices
 - 切片只会展示当前头寸的开平仓信息，并且会按照原始对冲比来呈现。
 ![image](https://github.com/user-attachments/assets/5724d877-1c7c-4f24-9ac7-329ce9c87749)
-各种资产组合的盈利空间（用于盘点当前市场整体是否适合交易） 位置：chart/distance.jpg
+### 各种资产组合的盈利空间（用于盘点当前市场整体是否适合交易） 位置：chart/distance.jpg
 - 显示资产之间的背离程度（潜在利润），幅度越大则越背离，幅度越小则越收敛
 ![image](https://github.com/user-attachments/assets/c15c4ed6-4486-46ac-8d06-d5213801466f)
-正常启动的效果
+### 正常启动的效果
 “所有系统启动，启动启动！”
 <img width="1136" alt="image" src="https://github.com/user-attachments/assets/02847ccb-d633-4091-a197-ac1c5abb7611" />
 
