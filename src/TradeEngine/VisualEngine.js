@@ -1,10 +1,3 @@
-/**
-Copyright (C) 2024@MRchenkuan
-本程序基于 GNU Affero General Public License v3.0 授权。
-详情请参阅根目录的 LICENSE 文件或访问 https://www.gnu.org/licenses/agpl-3.0.html
-商业使用需联系作者授权。
-*/
-
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
 import { blendColors, calcProfit, createMapFrom, formatTimestamp, getTsOfStartOfToday, hashString, toTrickTimeMark } from '../tools.js';
