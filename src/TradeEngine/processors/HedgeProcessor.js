@@ -155,7 +155,7 @@ export class HedgeProcessor extends AbstractProcessor{
         if(profit>0){
           close_position(tradeId);
         } else {
-          console.log(`[${tradeId}]满足平仓（实时对冲比）条件，${diff_rate}<=(${close_gate})但利润为负:${profit}`)
+          console.log(`[${tradeId}][${orders.map(it=>it.instId).join('->')}]满足平仓条件：固定${(diff_rate_fixed*100).toFixed(2)}% or 实时${(diff_rate_realtime*100).toFixed(2)}% <= 门限${(close_gate*100).toFixed(2)}% 但利润为负:$${profit.toFixed(2)}`)
         }       
       }
 

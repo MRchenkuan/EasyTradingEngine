@@ -61,7 +61,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,20,0,0,0).getTime(),
+  to_when:new Date(2025,1,21,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
