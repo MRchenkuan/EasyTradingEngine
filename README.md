@@ -61,3 +61,11 @@ export {
 | ​**加我好友一起共建**​       | ​**觉得有用也可以请我喝咖啡​**​ |
 |--------------------|-------------------------------|
 | ​<img width="453" alt="image" src="https://github.com/user-attachments/assets/4b5b6ba4-b196-43d8-9527-37acf52ec878" /> | <img width="452" alt="image" src="https://github.com/user-attachments/assets/6f06f1f2-82bb-4be8-97bf-39f32b551aff" /> |
+
+
+# LICENSE
+
+本项目基于 **GNU Affero General Public License v3.0 (AGPLv3)** 开源。  
+- ✅ 允许：查看、修改、非商业用途的分发。  
+- ⚠️ 要求：基于本项目的衍生作品（包括网络服务）**必须开源**。  
+- 💼 **商业用途**：需联系作者（[393667111@qq.com](mailto:393667111@qq.com)）获取商业授权并支付费用。  
