@@ -103,31 +103,17 @@ export class HedgeProcessor extends AbstractProcessor{
     const transactions = this._getTransactions({side:'opening'});
 
     //遍历所有未平仓的头寸，根据当前价格和历史beta计算是否关闭
-    transactions.forEach(({ tradeId, orders, profit, closed, side: transaction_side }) => {
+    transactions.forEach(({ tradeId, orders }) => {
       const close_gate = this._close_gate;
       /**
-       * todo
        * 关于平仓条件 betaMap 这里需要考虑一个问题
        * 如果按照开仓时的对冲比平仓，可以确保利润，可能等的时间更长，也可能牺牲超额利润
        * 如果照当前实时的对冲比平仓，可以快速平仓，可能牺牲利润，也可能获得超额利润
-       * 
        *  */
       /* 这里为按开仓对冲比平仓，确保利润 */
-      const betaMap = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
+      const betaMap_fixed = Object.fromEntries(orders.map(({ instId, beta }) => [instId, beta]));
       /* 这里为按照实时对冲比平仓，只要不亏利润（!!!由于滑点的存在，可能仍然会亏滑点） */
-      // const betaMap = this.engine._beta_map;
-      
-      
-      /**
-       * 
-       * 
-       * TODO
-       * 最终还是需要两个结合，优先能平仓，且不亏钱
-       * 不论是哪个 betaMap（现价也好，开仓价也好） 如果能平且没亏就平
-       * 
-       * 
-       * 
-       *  */
+      const betaMap_realtime = this.engine._beta_map;
       
       const [instId1, instId2] = this.asset_names;
       const [px1, px2] = this.asset_names.map(assetId=>this.engine.getRealtimePrice(assetId));
@@ -135,17 +121,28 @@ export class HedgeProcessor extends AbstractProcessor{
       if(!px1 || !px2){
         return false;
       }
-  
-      // 计算实时标准化价格
-      const spx1 = px1 * betaMap[instId1][0] + betaMap[instId1][1];
-      const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
-  
-      // 计算价差比率
-      const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx2+spx2)/2);
-      // if(tradeId == 'aa1fb0df'){
-      //   debugger
-      // }
-      if(diff_rate <= close_gate){
+
+      const n = this.engine._normalizePrice;
+      // 固定标准化价格
+      const spx1_fixed = n(px1, betaMap_fixed[instId1]);
+      const spx2_fixed = n(px2, betaMap_fixed[instId2]);
+      // 固定价差比率
+      const diff_rate_fixed = TradeEngine._calcPriceGapProfit(spx1_fixed, spx2_fixed, (spx1_fixed+spx2_fixed)/2);
+
+      // 动态标准化价格
+      const spx1_realtime = n(px1, betaMap_realtime[instId1]);
+      const spx2_realtime = n(px2, betaMap_realtime[instId2]);
+      // 动态价差比率
+      const diff_rate_realtime = TradeEngine._calcPriceGapProfit(spx1_realtime, spx2_realtime, (spx1_realtime+spx2_realtime)/2);
+
+      /**
+       * 最终还是需要两个结合，优先能平仓，且不亏钱
+       * 不论是哪个 betaMap（现价也好，开仓价也好） 如果能平且没亏就平
+       * 两种价差比率有一种达到门限，即平仓，确保尽快平仓避免资金占用
+       * 不必担心开仓即平仓，因为一般来说开仓后的β不会发生大的变化
+       * 而长时间后，尽管β发生变化，但我们的平仓目的不再是盈利而是避免资金占用，因此尽快平仓
+       *  */ 
+      if(diff_rate_fixed <= close_gate || diff_rate_realtime <= close_gate){
         // 平仓
         const profit = this.engine._calcRealtimeProfit(orders);
         if(profit>0){
@@ -179,7 +176,7 @@ export class HedgeProcessor extends AbstractProcessor{
     const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
 
     // 计算价差比率
-    const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx2+spx2)/2);
+    const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx1+spx2)/2);
     
     // 判断是否超过门限
     if(!open_gate) return;

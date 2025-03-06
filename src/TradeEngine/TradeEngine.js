@@ -73,10 +73,17 @@ export class TradeEngine{
     }); 
   }
 
+  /**
+   * 获取主资产
+   * @returns 
+   */
   static getMainAssetLabels(){
     return this.getMainAsset().ts.map(it=>formatTimestamp(it, this._bar_type))
   }
 
+  static _normalizePrice(price, beta){
+    return price*beta[0]+beta[1]
+  }
   /**
    * 获取实时利润
    */
