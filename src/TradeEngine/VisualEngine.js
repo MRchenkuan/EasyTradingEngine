@@ -6,7 +6,7 @@ import { getClosingTransaction, getLastTransactions, getOpeningTransaction } fro
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
 
-const width = 1800, height = 800;
+const width = 1600, height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
 const font_style = "Monaco, Menlo, Consolas, monospace";
 
