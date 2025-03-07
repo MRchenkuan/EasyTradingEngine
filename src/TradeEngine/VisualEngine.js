@@ -5,6 +5,8 @@ import { calculateCorrelationMatrix } from '../mathmatic.js';
 import { getClosingTransaction, getLastTransactions, getOpeningTransaction } from '../recordTools.js';
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
+import path from 'path';
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const width = 1600, height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -149,13 +151,14 @@ export class VisualEngine{
           this._drawTransactions(chart, transactions, beta_map,collisionAvoidance)
           // 实时利润绘制
           this._paintProfit();
+          this._drawDateTime(chart);
         }
       }]
     };
 
     (async () => {
       const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-      fs.writeFileSync('./chart/candle_chart.jpg', image);
+      this.writeChartFile('main_chart.jpg',image);
     })();
       
     }catch(e){
@@ -206,7 +209,7 @@ export class VisualEngine{
   
     (async () => {
       const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-      fs.writeFileSync('./chart/distance.jpg', image);
+      this.writeChartFile(`distance.jpg`,image);
     })();
   }
 
@@ -409,6 +412,9 @@ export class VisualEngine{
       })
     })
   
+    // 存在对冲的资产在矩阵中标出来
+    const all_exist_hedges = TradeEngine.processors.filter(p=>p.type==="HedgeProcessor").map(it=>it.asset_names);
+    debugger
   
     const left = width*0.70;
     const top = height*0.01
@@ -440,6 +446,16 @@ export class VisualEngine{
       row.forEach((cell, colIndex) => {
         ctx.fillStyle = cell > 0 ? (cell==Math.max(...row)?"red":"green") : '#808b96';
         ctx.fillText((cell*100).toFixed(2)+"%", (colIndex + 1) * cellWidth + padding + left, yOffset + top + cellHeight / 2 + 5);
+
+        const a = headers[rowIndex];
+        const b = headers[colIndex];
+        if(all_exist_hedges.some(it=>(it.join("")===a+b || it.join("")===b+a))){
+          ctx.setLineDash([5, 3]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = '#eb984e';
+          ctx.strokeRect((colIndex + 1) * cellWidth - padding + left, yOffset + 1.2*padding + top, cellWidth-padding*5, 0.85* cellHeight); 
+          ctx.rect()
+        }
       });
     });
   }
@@ -554,12 +570,23 @@ export class VisualEngine{
     const close_transaction = getClosingTransaction(tradeId);
     const klines = Object.values(TradeEngine.getAllMarketData());
     const labels = TradeEngine.getMainAssetLabels();
-  
+
+
     const orders_open = open_transaction.orders
     const orders_close = close_transaction ? close_transaction.orders: [];
   
     const orders = [...orders_open, ...orders_close];
-  
+
+    const isClosed = open_transaction.closed && close_transaction;
+    const slug = orders_open.sort((a, b) => a.instId.localeCompare(b.instId)).map(o=>o.instId.split('-')[0].toLowerCase()).join("-");
+    const file_path = `slices/${slug}/${isClosed?'closed/':""}${tradeId}.jpg`;
+    if(isClosed && this.existChartFile(file_path)){
+      // 已关闭的不重复绘制
+      if(this.existChartFile(`slices/${slug}/${tradeId}.jpg`)){
+        this.deleteChartFile(`slices/${slug}/${tradeId}.jpg`)
+      }
+      return;
+    }
   
     const order_map = {};
     const beta_map = {};
@@ -630,6 +657,8 @@ export class VisualEngine{
           this._drawInfoTable(chart);
 
           this._drawRhoTable(chart);
+
+          this._drawDateTime(chart);
             
         }
       }]
@@ -637,8 +666,101 @@ export class VisualEngine{
   
     (async () => {
       const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-      fs.writeFileSync(`./chart/slices/candle_chart_${tradeId}.jpg`, image);
+      this.writeChartFile(file_path,image);
     })();
+  }
+
+
+  /**
+   * 绘制时间戳
+   * @param {} chart 
+   */
+  static _drawDateTime(chart) {
+    const ctx = chart.ctx
+    
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始计算
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+
+    const stamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    const left = width*0.9;
+    const top = height*0.97
+
+    ctx.fillStyle = '#808b96';
+    ctx.font = '12px'+font_style;
+    ctx.fillText(stamp, left, top);
+  }
+
+  /**
+   * 生成文件
+   * @param {*} dir 
+   * @param {*} image 
+   * @returns 
+   */
+  static writeChartFile(dir, image){
+    const fullPath = path.join('./chart', dir);
+    const dirPath = path.dirname(fullPath);
+    fs.mkdirSync(dirPath, { recursive: true });
+    return fs.writeFileSync(fullPath, image);
+  }
+
+  /**
+   * 检查文件
+   * @param {*} dir 
+   * @returns 
+   */
+  static existChartFile(dir){
+    return fs.existsSync(`./chart/${dir}`)
+  }
+
+  /**
+   * 删除文件
+   * @param {*} dir 
+   * @returns 
+   */
+  static deleteChartFile(dir){
+    const filePath = path.join('./chart', dir);
+    try {
+      fs.unlinkSync(filePath);
+      return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        console.log(`文件 ${filePath} 不存在`);
+        return false;
+      }
+      throw error; // 非"文件不存在"错误继续抛出
+    }
+  }
+
+  /**
+   * 圆角框绘制方法
+   * @param {*} x 
+   * @param {*} y 
+   * @param {*} width 
+   * @param {*} height 
+   * @param {*} radius 
+   */
+  static drawRoundedRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    // 左上角 → 右上角
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.arcTo(x + width, y, x + width, y + radius, radius);
+    // 右上角 → 右下角
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.arcTo(x + width, y + height, x + width - radius, y + height, radius);
+    // 右下角 → 左下角
+    ctx.lineTo(x + radius, y + height);
+    ctx.arcTo(x, y + height, x, y + height - radius, radius);
+    // 左下角 → 左上角
+    ctx.lineTo(x, y + radius);
+    ctx.arcTo(x, y, x + radius, y, radius);
+    ctx.closePath();
   }
   
 }

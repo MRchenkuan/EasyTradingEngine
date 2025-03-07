@@ -110,5 +110,173 @@
       }
     ],
     "ts": 1741165471794
+  },
+  {
+    "tradeId": "cb82d719",
+    "side": "closing",
+    "profit": -0.07222193453800164,
+    "orders": [
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "eaf939b9",
+        "sz": "0.246062",
+        "tgtCcy": "base_ccy",
+        "ordId": "2307295966478393344",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741265178236",
+        "px": "",
+        "avgPx": "43.95",
+        "accFillSz": "0.246062",
+        "fee": "-0.0108144249",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          3.3206931036700307,
+          0
+        ]
+      },
+      {
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "262f1aef",
+        "sz": "0.00011994",
+        "tgtCcy": "base_ccy",
+        "ordId": "2307295966478393345",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741265178236",
+        "px": "",
+        "avgPx": "90420.1",
+        "accFillSz": "0.00011994",
+        "fee": "-0.00000011994",
+        "feeCcy": "BTC",
+        "state": "filled",
+        "beta": [
+          0.0016299877051385683,
+          0
+        ]
+      }
+    ],
+    "ts": 1741265178236
+  },
+  {
+    "tradeId": "be1abefe",
+    "side": "closing",
+    "profit": -0.0033401797199992533,
+    "orders": [
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "2a6ec132",
+        "sz": "0.233644",
+        "tgtCcy": "base_ccy",
+        "ordId": "2308862559389933568",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741311866343",
+        "px": "",
+        "avgPx": "42.87",
+        "accFillSz": "0.233644",
+        "fee": "-0.01001631828",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          3.333075460177626,
+          0
+        ]
+      },
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "3dc9e9e9",
+        "sz": "0.004576",
+        "tgtCcy": "base_ccy",
+        "ordId": "2308862559389933570",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741311866343",
+        "px": "",
+        "avgPx": "2180.87",
+        "accFillSz": "0.004576",
+        "fee": "-0.000004576",
+        "feeCcy": "ETH",
+        "state": "filled",
+        "beta": [
+          0.06512065714105247,
+          0
+        ]
+      }
+    ],
+    "ts": 1741311866343
+  },
+  {
+    "tradeId": "bb720bdf",
+    "side": "closing",
+    "profit": 0.2753846757400005,
+    "orders": [
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "7257af7d",
+        "sz": "0.004622",
+        "tgtCcy": "base_ccy",
+        "ordId": "2309539922641608704",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741332053341",
+        "px": "",
+        "avgPx": "2190.5",
+        "accFillSz": "0.004622",
+        "fee": "-0.010124491",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          0.06519669864358006,
+          0
+        ]
+      },
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "99ad8813",
+        "sz": "0.227222",
+        "tgtCcy": "base_ccy",
+        "ordId": "2309539922641608706",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741332053341",
+        "px": "",
+        "avgPx": "43.17",
+        "accFillSz": "0.227222",
+        "fee": "-0.000227222",
+        "feeCcy": "OKB",
+        "state": "filled",
+        "beta": [
+          3.3291294052407436,
+          0
+        ]
+      }
+    ],
+    "ts": 1741332053341
   }
 ]

@@ -2,6 +2,9 @@
  * @abstract
  */
 export class AbstractProcessor {
+
+  type="AbstractProcessor";
+
   constructor() {
     if (new.target === AbstractProcessor) {
       throw new Error("抽象类不能直接实例化");
@@ -17,4 +20,5 @@ export class AbstractProcessor {
    * @param {number} deltaTime
    */
   tick(deltaTime) {} // 抽象方法占位
+
 }

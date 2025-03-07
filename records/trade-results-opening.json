@@ -54,7 +54,7 @@
         ]
       }
     ],
-    "profit": -59.48509178870005
+    "profit": -55.05944491870002
   },
   {
     "tradeId": "bf01b77e",
@@ -111,7 +111,7 @@
         ]
       }
     ],
-    "profit": 6.54896848059976
+    "profit": 8.095018920599804
   },
   {
     "tradeId": "a4b8db27",
@@ -168,7 +168,7 @@
         ]
       }
     ],
-    "profit": -4.2092401647801125
+    "profit": -2.8151652547801405
   },
   {
     "tradeId": "3c97eb30",
@@ -225,7 +225,7 @@
       }
     ],
     "ts": 1740997122783,
-    "profit": -0.405545674345999
+    "profit": -0.5785606973460039
   },
   {
     "tradeId": "0732aaf1",
@@ -282,7 +282,7 @@
       }
     ],
     "ts": 1741065928943,
-    "profit": -3.333457061633956
+    "profit": -0.12462936163398353
   },
   {
     "tradeId": "24e042e9",
@@ -396,7 +396,7 @@
       }
     ],
     "ts": 1741093592253,
-    "profit": -0.5272084174379983
+    "profit": -0.37524634543800195
   },
   {
     "tradeId": "aa1fb0df",
@@ -458,7 +458,7 @@
   {
     "tradeId": "cb82d719",
     "side": "opening",
-    "closed": false,
+    "closed": true,
     "orders": [
       {
         "instId": "OKB-USDT",
@@ -510,7 +510,7 @@
       }
     ],
     "ts": 1741094146991,
-    "profit": -0.10998437484399792
+    "profit": -0.07222193453800164
   },
   {
     "tradeId": "0c4b6ef1",
@@ -567,12 +567,12 @@
       }
     ],
     "ts": 1741100132514,
-    "profit": -0.3108225438799997
+    "profit": 0.04742675612000097
   },
   {
     "tradeId": "be1abefe",
     "side": "opening",
-    "closed": false,
+    "closed": true,
     "orders": [
       {
         "instId": "OKB-USDT",
@@ -624,6 +624,63 @@
       }
     ],
     "ts": 1741143127271,
-    "profit": -0.20744324031999795
+    "profit": -0.0033401797199992533
+  },
+  {
+    "tradeId": "bb720bdf",
+    "side": "opening",
+    "closed": true,
+    "orders": [
+      {
+        "instId": "ETH-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "58e9d00a",
+        "sz": "10",
+        "tgtCcy": "quote_ccy",
+        "ordId": "2309042229515313152",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741317220930",
+        "px": "",
+        "avgPx": "2163.3230852444829079",
+        "accFillSz": "0.004622",
+        "fee": "-0.000004622",
+        "feeCcy": "ETH",
+        "state": "filled",
+        "beta": [
+          0.06510187751468433,
+          0
+        ]
+      },
+      {
+        "instId": "OKB-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "a8903ff6",
+        "sz": "10",
+        "tgtCcy": "quote_ccy",
+        "ordId": "2309042229515313154",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1741317220930",
+        "px": "",
+        "avgPx": "44.01",
+        "accFillSz": "0.227222",
+        "fee": "-0.01000004022",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          3.330577442304565,
+          0
+        ]
+      }
+    ],
+    "ts": 1741317220930,
+    "profit": 0.2753846757400005
   }
 ]

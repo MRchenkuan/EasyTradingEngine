@@ -12,6 +12,7 @@ export class HedgeProcessor extends AbstractProcessor{
   asset_names = [];
   opening_transactions=[];
   engine = null;
+  type = 'HedgeProcessor'
   _open_gate = 0.045;// 开仓门限
   _close_gate = 0.003;// 平仓-重置门限
   _timer = {};
@@ -142,6 +143,7 @@ export class HedgeProcessor extends AbstractProcessor{
        * 不必担心开仓即平仓，因为一般来说开仓后的β不会发生大的变化
        * 而长时间后，尽管β发生变化，但我们的平仓目的不再是盈利而是避免资金占用，因此尽快平仓
        *  */ 
+
       if(diff_rate_fixed <= close_gate || diff_rate_realtime <= close_gate){
         // 平仓
         const profit = this.engine._calcRealtimeProfit(orders);

@@ -13,6 +13,10 @@ export class MarketMakerProcessor extends AbstractProcessor{
   id;
   _position_size;
   distance;
+  /**
+   * @override
+   */
+  type="MarketMakerProcessor"
 
   constructor(asset_name, size, distance, engine){
       super();

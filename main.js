@@ -20,8 +20,8 @@ const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
-  {id: 'TRUMP-USDT', theme:'#abb2b9'},
-  {id: 'OKB-USDT', theme:'#85fde9'},
+  {id: 'TRUMP-USDT', theme:'#90a4ae'},
+  {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
 
@@ -54,7 +54,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,21,0,0,0).getTime(),
+  to_when:new Date(2025,1,25,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
