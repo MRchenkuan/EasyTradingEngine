@@ -2,11 +2,11 @@
   "TradeEngine": {
     "realtime_price": {
       "ADA-USDT": 0.877,
-      "SOL-USDT": 143.76,
-      "BTC-USDT": 89209.7,
-      "ETH-USDT": 2198.1,
-      "TRUMP-USDT": 13.187,
-      "OKB-USDT": 43.72
+      "SOL-USDT": 143.66,
+      "BTC-USDT": 89144,
+      "ETH-USDT": 2195.1,
+      "TRUMP-USDT": 13.168,
+      "OKB-USDT": 43.68
     },
     "_beta_map": {
       "SOL-USDT": [
@@ -18,7 +18,7 @@
         0
       ],
       "ETH-USDT": [
-        0.06533049242633489,
+        0.06533107359057136,
         0
       ],
       "TRUMP-USDT": [
@@ -26,7 +26,7 @@
         0
       ],
       "OKB-USDT": [
-        3.2629244887890994,
+        3.262928471097561,
         0
       ],
       "ADA-USDT": [

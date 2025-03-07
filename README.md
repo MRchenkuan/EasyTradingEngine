@@ -3,7 +3,7 @@
 # ONE MORE THING
 实现了一个交易引擎🚀
 # 先看效果
-### 大盘指标 位置：chart/candle_chart.jpg
+### 大盘指标 位置：chart/main_chart.jpg
 ![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
 - 左上角各是个资产之间的ρ值（皮尔逊相关系数），用于比较哪些资产适合做对冲
 - 中间是各个资产的实时价格、建议的对冲比（等额对冲），主要关注这个比值是否稳定
