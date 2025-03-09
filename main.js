@@ -36,9 +36,12 @@ TradeEngine.setMetaInfo({
   assets
 }).start();
 
-TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 10, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 10, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 10, 0.02);
+TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
+
+TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
+TradeEngine.createHedge(['SOL-USDT', 'OKB-USDT'], 200, 0.02);
 
 /**
  * 启动图像引擎
@@ -54,7 +57,7 @@ const params = {
   once_limit,
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,25,0,0,0).getTime(),
+  to_when:new Date(2025,1,20,0,0,0).getTime(),
 }
 
 const assetIds = assets.map(it=>it.id);
