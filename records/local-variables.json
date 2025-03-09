@@ -2,10 +2,10 @@
   "TradeEngine": {
     "realtime_price": {
       "ADA-USDT": 0.877,
-      "SOL-USDT": 137.57,
+      "SOL-USDT": 137.59,
       "BTC-USDT": 86102,
       "ETH-USDT": 2189.98,
-      "TRUMP-USDT": 12.031,
+      "TRUMP-USDT": 12.029,
       "OKB-USDT": 43.68
     },
     "_beta_map": {
