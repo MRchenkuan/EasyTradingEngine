@@ -1,6 +1,6 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas'
 import fs from 'fs';
-import { blendColors, calcProfit, createMapFrom, formatTimestamp, getTsOfStartOfToday, hashString, toTrickTimeMark } from '../tools.js';
+import { blendColors, createMapFrom, formatTimestamp, hashString } from '../tools.js';
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import { getClosingTransaction, getLastTransactions, getOpeningTransaction } from '../recordTools.js';
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
@@ -343,8 +343,8 @@ export class VisualEngine{
       const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
 
       // 计算开仓时标准化价格
-      const fspx1 = px1 * beta1[0] + beta1[1];
-      const fspx2 = px2 * beta2[0] + beta2[1];
+      // const fspx1 = px1 * beta1[0] + beta1[1];
+      // const fspx2 = px2 * beta2[0] + beta2[1];
 
       
       // 获取Y轴坐标
@@ -381,8 +381,8 @@ export class VisualEngine{
   
       // 绘制连接线
       ;spx1>spx2
-      ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${tag}`], [x2, y2, v2], color, collisionAvoidance)
-      : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${tag}`], [x1, y1, v1], color, collisionAvoidance)
+      ? paintLine(ctx, [x1, y1, `${v1}/${tag2}/${tag}`], [x2, y2, v2+`/#${tradeId}`], color, collisionAvoidance)
+      : paintLine(ctx, [x2, y2, `${v2}/${tag2}/${tag}`], [x1, y1, v1+`/#${tradeId}`], color, collisionAvoidance)
     });
   }
 

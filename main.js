@@ -12,18 +12,29 @@ const ws_connection_pool={}
 
 // storeConnection('ws_private', ws_private);
 
-const bar_type = '15m';
+const bar_type = '5m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
 const assets = [
-  {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'BTC-USDT', theme:'#f0b27a'},
+  {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#90a4ae'},
-  {id: 'OKB-USDT', theme:'#52be80'},
+  {id: 'XRP-USDT', theme:'#ffafde'},
+  // {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
+const params = {
+  bar_type,
+  price_type,
+  once_limit,
+  candle_limit,
+  from_when: getLastWholeMinute(new Date()),
+  // from_when: new Date(2025,2,7,0,0,0).getTime(),
+  to_when:new Date(2025,2,1,0,0,0).getTime(),
+}
+
 
 /**
  * 启动交易引擎
@@ -36,12 +47,12 @@ TradeEngine.setMetaInfo({
   assets
 }).start();
 
-TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
 
-TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
-TradeEngine.createHedge(['SOL-USDT', 'OKB-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
+TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 
 /**
  * 启动图像引擎
@@ -49,16 +60,6 @@ TradeEngine.createHedge(['SOL-USDT', 'OKB-USDT'], 200, 0.02);
 VisualEngine.setMetaInfo({
   assets
 }).start();
-
-
-const params = {
-  bar_type,
-  price_type,
-  once_limit,
-  candle_limit,
-  from_when: getLastWholeMinute(new Date()),
-  to_when:new Date(2025,1,20,0,0,0).getTime(),
-}
 
 const assetIds = assets.map(it=>it.id);
 

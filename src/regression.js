@@ -1,7 +1,7 @@
 // 找到最佳拟合参数
 export function findBestFitLine(A,B) {
     // return fitOLS(A, B)
-    return fitStockRelationship(A.slice(),B.slice())
+    return fitStockRelationship_A(A.slice(),B.slice())
     // return  {a:0.06545 ,b:0}
 }
 
@@ -20,8 +20,8 @@ function fitOLS(stockA, stockB){
     let sumAB = 0, sumAA = 0;
     
     for (let i = 0; i < minLength; i++) {
-        sumAB += stockA[i] * stockB[i];
-        sumAA += stockA[i] * stockA[i];
+        sumAB +=  weight(i,minLength) * stockA[i] * stockB[i];
+        sumAA +=  weight(i,minLength) * stockA[i] * stockA[i];
     }
     
     // 计算 OLS 估计的斜率 a
@@ -35,24 +35,114 @@ function skew(x) {
     // return 1-Math.abs(x);
 }
 
-function fitStockRelationship(stockA, stockB) {
-    const {A,B} = cleanElements(stockA, stockB, 15)
-    if (A.length !== B.length || A.length === 0) {
-        throw new Error("Input arrays must have the same non-zero length");
+/**
+ * 标准线性拟合-带截距的
+ * @param {*} stockA 
+ * @param {*} stockB 
+ * @returns 
+ */
+function fitStockRelationshipWithout_AB(stockA, stockB) {
+    ;({A:stockA,B:stockB} = cleanElements(stockA, stockB, 3));
+    const minLength = Math.min(stockA.length, stockB.length);
+    if (minLength === 0) {
+        throw new Error("Input arrays must have at least one element");
     }
-
-    let sumWAB = 0, sumWAA = 0;
-    const n = A.length;
-
-    for (let i = 0; i < n; i++) {
-        sumWAB += A[i] * B[i];
-        sumWAA += A[i] * A[i];
+    
+    // 初始化加权累加器
+    let sumW = 0, sumWX = 0, sumWY = 0, sumWXY = 0, sumWX2 = 0;
+    
+    for (let i = 0; i < minLength; i++) {
+        // 计算权重（左侧权重更大）
+        // 可替换为其他权重函数：
+        // const weight = 1 / (i + 1);          // 1/(i+1) 递减
+        // const weight = Math.exp(-0.1 * i);   // 指数递减
+        
+        // 累加加权值
+        const x = stockA[i];
+        const y = stockB[i];
+        sumW += weight(i, minLength);
+        sumWX += weight(i, minLength) * x;
+        sumWY += weight(i, minLength) * y;
+        sumWXY += weight(i, minLength) * x * y;
+        sumWX2 += weight(i, minLength) * x * x;
     }
+    
+    // 计算斜率 a 和截距 b
+    const denominator = sumW * sumWX2 - sumWX * sumWX;
+    if (Math.abs(denominator) < 1e-10) {
+        throw new Error("Cannot compute OLS for collinear data");
+    }
+    
+    const a = (sumW * sumWXY - sumWX * sumWY) / denominator;
+    const b = (sumWY - a * sumWX) / sumW;
+    
+    return { a, b };
+}
 
-    const a = sumWAB / sumWAA;
+/**
+ * 不带截距的拟合
+ * @returns 
+ */
+function fitStockRelationship_A(stockA, stockB){
+    ;({A:stockA,B:stockB} = cleanElements(stockA, stockB, 3));
+    const minLength = Math.min(stockA.length, stockB.length);
+    if (minLength === 0) throw new Error("Input arrays must have at least one element");
 
-    return { a,b:0 };
-  }
+    let sumAB = 0, sumAA = 0;
+    
+    for (let i = 0; i < minLength; i++) {
+        
+        // 计算加权累加项
+        const x = stockA[i], y = stockB[i];
+        sumAB += weight(i, minLength) * x * y;
+        sumAA += weight(i, minLength) * x * x;
+    }
+    
+    // 计算斜率a（无截距项）
+    const a = sumAB / sumAA;
+    return { a, b: 0 }; // 强制截距为0
+}
+
+/**
+ * 不同实现的权重方法
+ * @param {*} i 
+ * @param {*} length 
+ * @returns 
+ */
+function weight(i, length){
+    /**
+     * 线性递减
+     */
+    return (1 - i / length)
+
+    /**
+     * 非线性递减
+     */
+    const c = 0.66; // 转折点位置
+    const m = 0.5;  // 左侧衰减速度（m越小越平缓）
+    const n = 5;    // 右侧衰减速度（n越大越陡峭）
+    const threshold = c * length;
+    let w;
+    if (i <= threshold) {
+        w = 1 - Math.pow(i / threshold, m); // 左侧慢衰减
+    } else {
+        w = Math.pow(1 - (i - threshold)/(length - threshold), n); // 右侧快衰减
+    }
+    return w;
+
+
+    /**
+     * 指数递减
+     */
+    return Math.exp(-0.1 * i)
+
+
+
+    /**
+     * 常数
+     */
+    return 1
+}
 
 
   // 归一化数组
@@ -69,13 +159,16 @@ function fitStockRelationship(stockA, stockB) {
 
 
 // 查找数组中ZScore2以内的元素
-function filterOutliersIndices(arr, threshold = 1.5) {
+function filterOutliersIndices(arr, threshold = 2) {
     const mean = arr.reduce((sum, val) => sum + val, 0) / arr.length;
     const std = Math.sqrt(arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length);
-
+    
+    // 根据数据量动态调整阈值
+    const dynamicThreshold = Math.max(threshold, 1.5 + (arr.length / 1000));
+    
     return arr
         .map((val, index) => ({ index, zScore: (val - mean) / std }))
-        .filter(item => Math.abs(item.zScore) < threshold)
+        .filter(item => Math.abs(item.zScore) < dynamicThreshold)
         .map(item => item.index);
 }
 
