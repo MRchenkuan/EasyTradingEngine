@@ -41,7 +41,7 @@ function skew(x) {
  * @param {*} stockB 
  * @returns 
  */
-function fitStockRelationshipWithout_AB(stockA, stockB) {
+function fitStockRelationship_AB(stockA, stockB) {
     ;({A:stockA,B:stockB} = cleanElements(stockA, stockB, 3));
     const minLength = Math.min(stockA.length, stockB.length);
     if (minLength === 0) {
@@ -110,6 +110,12 @@ function fitStockRelationship_A(stockA, stockB){
  * @returns 
  */
 function weight(i, length){
+
+    // /**
+    //  * 常数
+    //  */
+    // return 1
+
     /**
      * 线性递减
      */
@@ -159,7 +165,7 @@ function weight(i, length){
 
 
 // 查找数组中ZScore2以内的元素
-function filterOutliersIndices(arr, threshold = 2) {
+function filterOutliersIndices(arr, threshold = 5) {
     const mean = arr.reduce((sum, val) => sum + val, 0) / arr.length;
     const std = Math.sqrt(arr.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / arr.length);
     
@@ -171,7 +177,6 @@ function filterOutliersIndices(arr, threshold = 2) {
         .filter(item => Math.abs(item.zScore) < dynamicThreshold)
         .map(item => item.index);
 }
-
 
 function filterOutsideElements(data, distances){
     const saved_arr = filterOutliersIndices(distances);

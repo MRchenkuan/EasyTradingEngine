@@ -32,7 +32,7 @@ const params = {
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
   // from_when: new Date(2025,2,7,0,0,0).getTime(),
-  to_when:new Date(2025,2,1,0,0,0).getTime(),
+  to_when:new Date(2025,2,10,0,0,0).getTime(),
 }
 
 

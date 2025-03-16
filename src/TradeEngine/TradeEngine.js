@@ -18,6 +18,7 @@ export class TradeEngine{
   static _candle_limit = 300
   static _asset_names = [] // 资产列表
   static _status = 0; //1 启动中 2运行中 -1出错
+  static _trade_fee_rate = 0.001
 
   /**
    * 对冲监听器
@@ -449,12 +450,14 @@ static updatePrice(assetId, price, ts, bar) {
         cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
         // 实时估算
         sell += realtime_price * accFillSz
+        fee_usdt -= realtime_price * accFillSz * this._trade_fee_rate;
       }
 
       if(side==='sell'){
         sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
         // 实时估算
         cost += realtime_price * accFillSz
+        fee_usdt -= realtime_price * accFillSz * this._trade_fee_rate;
       }
       fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx)
     })
