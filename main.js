@@ -12,16 +12,16 @@ const ws_connection_pool={}
 
 // storeConnection('ws_private', ws_private);
 
-const bar_type = '5m';
+const bar_type = '15m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
 const assets = [
-  // {id: 'BTC-USDT', theme:'#f0b27a'},
+  {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  // {id: 'ETH-USDT', theme:'#85c1e9'},
+  {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#90a4ae'},
-  // {id: 'XRP-USDT', theme:'#ffafde'},
+  {id: 'XRP-USDT', theme:'#ffafde'},
   // {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
@@ -60,9 +60,9 @@ VisualEngine.setMetaInfo({
   assets,
   show_order_his:[
     // 'BTC-USDT',
-    // 'ETH-USDT',
+    'ETH-USDT',
     // 'XRP-USDT',
-    // 'SOL-USDT',
+    'SOL-USDT',
     'TRUMP-USDT',
     // 'ADA-USDT',
     // 'OKB-USDT',

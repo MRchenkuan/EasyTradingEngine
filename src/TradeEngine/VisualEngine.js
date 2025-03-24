@@ -156,7 +156,7 @@ export class VisualEngine{
           this._drawDateTime(chart);
 
           // 绘制历史订单信息
-          this._paintOrders(chart, beta_map, collisionAvoidance);
+          this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
         }
       }]
     };
@@ -178,7 +178,7 @@ export class VisualEngine{
    * @param {*} beta_map 
    * @param {*} collisionAvoidance 
    */
-  static _paintOrders(chart, beta_map, collisionAvoidance){
+  static _paintOrders(chart, asset_names, beta_map, collisionAvoidance){
     const ctx = chart.ctx;
     const xScale = chart.scales.x;
     const yScale = chart.scales.y;
@@ -186,7 +186,7 @@ export class VisualEngine{
     const labels = TradeEngine.getMainAssetLabels();
 
     // 先收集所有资产的订单
-    for(const asset_name of TradeEngine._asset_names) {
+    for(const asset_name of asset_names) {
       // 不在历史订单中显示的资产不处理
       if(!this._show_order_his.includes(asset_name)) continue;
       const data = TradeEngine.getOrderHistory({
@@ -261,9 +261,27 @@ export class VisualEngine{
           // 绘制文字标签
           ctx.font = `12px ${font_style}`;
           ctx.textAlign = 'center';
-          const label = `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}(${sideData.orders.length}笔)`;
-          const {x, y} = collisionAvoidance(fx, fy + lineDirection * (lineLength + 5), 100, 20)
-          ctx.fillText(label, x, y);
+          const label = [
+            `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}`,
+            `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`
+          ].join('/');
+          const lines = label.split('/');
+          const lineHeight = 14;
+          const totalHeight = lines.length * lineHeight;
+          
+          // sell 方向需要向上偏移文本总高度
+          const labelOffset = side === 'sell' ? -totalHeight : 10;
+          const {x: labelX, y: labelY} = collisionAvoidance(
+            fx, 
+            fy + lineDirection * (lineLength + 5) + labelOffset, 
+            100, 
+            totalHeight
+          );
+          
+          // 分行绘制标签
+          lines.forEach((text, index) => {
+            ctx.fillText(text, labelX, labelY + index * lineHeight);
+          });
           ctx.textAlign = 'start';
         }
       }
@@ -382,7 +400,7 @@ export class VisualEngine{
     // 生成标签文本
     const rateTag = `${(diffRate * 100).toFixed(2)}%`;
 
-    profit = transaction.profit || 0;
+    const profit = transaction.profit || 0;
     const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
     const tag2 = `$${profit_text}`;
     const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${parseFloat(r_px1).toFixed(2)}`;
@@ -762,6 +780,10 @@ export class VisualEngine{
           this._drawRhoTable(chart);
 
           this._drawDateTime(chart);
+
+          // 绘制历史订单信息
+          const asset_names = transactions.flatMap(it=>it.orders.map(o=>o.instId));
+          this._paintOrders(chart, asset_names, beta_map, collisionAvoidance);
             
         }
       }]
