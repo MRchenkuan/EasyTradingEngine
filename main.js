@@ -8,11 +8,8 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js'
 
 const ws_connection_pool={}
 
-// const ws_private = new WebSocket(base_url+'/ws/v5/private');
 
-// storeConnection('ws_private', ws_private);
-
-const bar_type = '15m';
+const bar_type = '5m';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
@@ -21,7 +18,7 @@ const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#90a4ae'},
-  {id: 'XRP-USDT', theme:'#ffafde'},
+  // {id: 'XRP-USDT', theme:'#ffafde'},
   // {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
@@ -32,7 +29,7 @@ const params = {
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
   // from_when: new Date(2025,2,7,0,0,0).getTime(),
-  to_when:new Date(2025,1,5,0,0,0).getTime(),
+  to_when:new Date(2025,2,15,0,0,0).getTime(),
 }
 
 /**

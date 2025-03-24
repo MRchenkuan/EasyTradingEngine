@@ -241,7 +241,7 @@ export class VisualEngine{
           ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
           ctx.fillStyle = {
             buy: 'red',
-            sell: 'blue'
+            sell: 'green'
           }[side];
           ctx.fill();
 
@@ -259,7 +259,7 @@ export class VisualEngine{
           ctx.setLineDash([]);
 
           // 绘制文字标签
-          ctx.font = `12px ${font_style}`;
+          ctx.font = `12px bold ${font_style}`;
           ctx.textAlign = 'center';
           const label = [
             `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}`,
