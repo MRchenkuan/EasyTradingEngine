@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as mimic from './config.security.mimic.js'
+import * as firm from './config.security.js'
 import { generateSignature } from './tools.js';
 
 const base_url = 'https://www.okx.com'
@@ -21,6 +22,55 @@ export async function marketCandlesHistory(instId,bar, after, before, limit){
     },
   })
 }
+
+
+/**
+ * 获取订单信息 - 实盘
+ * @param {Object} params 查询参数
+ * @param {String} params.instType 产品类型 SPOT/MARGIN/SWAP/FUTURES/OPTION
+ * @param {String} [params.uly] 标的指数
+ * @param {String} [params.instFamily] 交易品种
+ * @param {String} [params.instId] 产品ID
+ * @param {String} [params.ordType] 订单类型
+ * @param {String} [params.state] 订单状态
+ * @param {String} [params.category] 订单种类
+ * @param {String} [params.after] 请求此ID之前的分页内容
+ * @param {String} [params.before] 请求此ID之后的分页内容
+ * @param {String} [params.begin] 开始时间戳
+ * @param {String} [params.end] 结束时间戳
+ * @param {String} [params.limit] 返回结果数量，默认100
+ */
+export async function getOrderHistory(params = {}) {
+  const timestamp = new Date().toISOString();
+  const method = 'GET';
+  const requestPath = '/api/v5/trade/orders-history-archive';
+  
+  // 构建查询字符串
+  const queryString = Object.entries(params)
+    .filter(([_, value]) => value !== undefined)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('&');
+    
+  const fullPath = queryString ? `${requestPath}?${queryString}` : requestPath;
+  
+  const sign = generateSignature(timestamp, method, fullPath, '', firm.api_secret);
+
+  const headers = {
+    'OK-ACCESS-KEY': firm.api_key,
+    'OK-ACCESS-SIGN': sign,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': firm.pass_phrase
+  };
+
+  try {
+    const { data } = await axios.get(base_url + fullPath, { headers });
+    return data;
+  } catch (error) {
+    console.error('获取订单历史失败:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
 
 
 // 批量订单交易

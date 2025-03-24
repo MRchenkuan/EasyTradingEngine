@@ -1,3 +1,4 @@
+import { getOrderHistory } from "./api.js";
 import { close_position, open_positions } from "./trading.js";
 
 // const tradeId = await open_positions('ETH-USDT','SOL-USDT',300)
@@ -19,7 +20,15 @@ import { close_position, open_positions } from "./trading.js";
 // },1000)
 
 
-close_position("40d5349d")
+// close_position("40d5349d")
+// const orders = await getOrderHistory({
+//   instType: 'SPOT',
+//   instId: 'ETH-USDT',
+//   state: 'filled',
+//   limit: '50'
+// });
+// debugger
+
 
 // const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
 

@@ -1,3 +1,4 @@
+import { getOrderHistory } from "../api.js";
 import { LocalVariable } from "../LocalVariable.js";
 import { getClosingTransaction, getLastTransactions, getOpeningTransaction, updateTransaction } from "../recordTools.js";
 import { findBestFitLine } from "../regression.js";
@@ -19,6 +20,7 @@ export class TradeEngine{
   static _asset_names = [] // 资产列表
   static _status = 0; //1 启动中 2运行中 -1出错
   static _trade_fee_rate = 0.001
+  static _show_order_his = []
 
   /**
    * 对冲监听器
@@ -155,6 +157,38 @@ export class TradeEngine{
   }
 
 
+  static _orderHistoryCache = {};
+  static _lastCacheTime = {};
+  static CACHE_DURATION = 10000; // 缓存时间10秒
+  
+  /**
+   * 获取订单历史（带缓存）
+   */
+  static getOrderHistory(params) {
+    const cacheKey = params.instId;
+    this._updateCache(params, cacheKey);
+    // 无论是否过期都返回当前缓存
+    return this._orderHistoryCache[cacheKey]||[];
+  }
+
+  // 异步更新缓存的私有方法
+  static async _updateCache(params, cacheKey) {
+    try {
+      // 如果缓存过期，异步更新缓存
+      const now = Date.now();
+      this._lastCacheTime[cacheKey] ??= now;
+      const expired = now - this._lastCacheTime[cacheKey] >= this.CACHE_DURATION;
+      const empty = !this._orderHistoryCache[cacheKey]?.length;
+      if (expired || empty) {
+        const {data} = await getOrderHistory(params);
+        this._orderHistoryCache[cacheKey] = data;
+        this._lastCacheTime[cacheKey] = Date.now();
+      }
+      
+    } catch (error) {
+      console.error('更新订单历史缓存失败:', error);
+    }
+  }
 
 
   /**
@@ -184,6 +218,12 @@ export class TradeEngine{
         mainAssetData.prices
       );
       const lastTs = assetData.ts[assetData.ts.length - 1];
+      
+
+      // 记录拟合结果
+      // recordBetaHistory(assetId, a, b, lastTs); // 记录历史拟合结果
+
+
       console.log(
         `[${formatTimestamp(lastTs)}]拟合的多项式系数(${assetId}):`,
         { a, b }

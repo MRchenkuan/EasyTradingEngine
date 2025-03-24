@@ -25,6 +25,7 @@ export class VisualEngine{
   static _timer = {};
   static _asset_themes = []
   static _asset_names = []
+  static _show_order_his = []
 
 
   chart_id = hashString(`${Date.now()}${Math.random()}`)
@@ -43,7 +44,9 @@ export class VisualEngine{
    */
     static setMetaInfo({
       assets,
+      show_order_his
     }){
+      if(show_order_his) this._show_order_his = show_order_his;
       if(assets){
         this._asset_names = assets.map(it=>it.id);
         this._asset_themes = assets.map(it=>it.theme);
@@ -131,9 +134,7 @@ export class VisualEngine{
         },
       },
       plugins:[{
-        afterDraw: (chart) => {
-          const ctx = chart.ctx;
-          // 为了避免标签重叠先搞个位置收集器
+        afterDraw: async (chart) => {
           const collisionAvoidance = createCollisionAvoidance();
 
           // 绘制相关性表格
@@ -149,9 +150,13 @@ export class VisualEngine{
           const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')].filter(it=>!it.closed);
           const beta_map = TradeEngine._beta_map;
           this._drawTransactions(chart, transactions, beta_map,collisionAvoidance)
+          
           // 实时利润绘制
           this._paintProfit();
           this._drawDateTime(chart);
+
+          // 绘制历史订单信息
+          this._paintOrders(chart, beta_map, collisionAvoidance);
         }
       }]
     };
@@ -163,6 +168,105 @@ export class VisualEngine{
       
     }catch(e){
       console.log(e);
+    }
+  }
+
+
+  /**
+   * 绘制历史订单
+   * @param {*} chart 
+   * @param {*} beta_map 
+   * @param {*} collisionAvoidance 
+   */
+  static _paintOrders(chart, beta_map, collisionAvoidance){
+    const ctx = chart.ctx;
+    const xScale = chart.scales.x;
+    const yScale = chart.scales.y;
+    const xCoordOrders = new Map();
+    const labels = TradeEngine.getMainAssetLabels();
+
+    // 先收集所有资产的订单
+    for(const asset_name of TradeEngine._asset_names) {
+      // 不在历史订单中显示的资产不处理
+      if(!this._show_order_his.includes(asset_name)) continue;
+      const data = TradeEngine.getOrderHistory({
+        instType: 'SPOT',
+        instId: asset_name,
+        state: 'filled',
+        limit: '100'
+      });
+      if(data && data.length) {
+        // 直接处理订单数据
+        data.forEach((order) => {
+          const {fillTime, instId} = order;
+          const formattedTime = formatTimestamp(fillTime, TradeEngine._bar_type);
+          // 检查时间戳是否在图表范围内
+          if (!labels.includes(formattedTime)) {
+            return;
+          }
+          if (!xCoordOrders.has(formattedTime)) {
+            xCoordOrders.set(formattedTime, new Map());
+          }
+          if (!xCoordOrders.get(formattedTime).has(instId)) {
+            xCoordOrders.get(formattedTime).set(instId, {
+              buy: { orders: [], totalAmount: 0, avgPrice: 0 },
+              sell: { orders: [], totalAmount: 0, avgPrice: 0 }
+            });
+          }
+          const sideData = xCoordOrders.get(formattedTime).get(instId)[order.side];
+          const amount = order.accFillSz * order.avgPx;
+          sideData.orders.push(order);
+          sideData.totalAmount += amount;
+          sideData.avgPrice = sideData.totalAmount / sideData.orders.reduce((sum, o) => parseFloat(sum) + parseFloat(o.accFillSz), 0);
+        });
+      }
+    }
+
+    // 绘制所有订单
+    for (const [formattedTime, instIdMap] of xCoordOrders.entries()) {
+      const fx = xScale.getPixelForValue(formattedTime);
+      for (const [instId, data] of instIdMap.entries()) {
+        if (!beta_map[instId]) continue;
+        
+        for (const side of ['buy', 'sell']) {
+          const sideData = data[side];
+          if (sideData.orders.length === 0) continue;
+
+          const [a, b] = beta_map[instId];
+          const srt_px = sideData.avgPrice * a + b;
+          const fy = yScale.getPixelForValue(srt_px);
+          
+          // 绘制圆点
+          ctx.beginPath();
+          ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
+          ctx.fillStyle = {
+            buy: 'red',
+            sell: 'blue'
+          }[side];
+          ctx.fill();
+
+          // 买单向下(1)，卖单向上(-1)
+          const lineLength = 60;
+          const lineDirection = side === 'buy' ? 1 : -1;
+          
+          // 绘制垂直虚线
+          ctx.beginPath();
+          ctx.setLineDash([5, 3]);
+          ctx.moveTo(fx, fy);
+          ctx.lineTo(fx, fy + lineDirection * lineLength);
+          ctx.strokeStyle = ctx.fillStyle;
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // 绘制文字标签
+          ctx.font = `12px ${font_style}`;
+          ctx.textAlign = 'center';
+          const label = `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}(${sideData.orders.length}笔)`;
+          const {x, y} = collisionAvoidance(fx, fy + lineDirection * (lineLength + 5), 100, 20)
+          ctx.fillText(label, x, y);
+          ctx.textAlign = 'start';
+        }
+      }
     }
   }
 
@@ -278,7 +382,7 @@ export class VisualEngine{
     // 生成标签文本
     const rateTag = `${(diffRate * 100).toFixed(2)}%`;
 
-    let profit = transaction.profit || 0;
+    profit = transaction.profit || 0;
     const profit_text = (profit >=0 ? "+":"-") + `${Math.abs(profit.toFixed(2))}`
     const tag2 = `$${profit_text}`;
     const v1 = `(${valueFormatter(sz1, side1, px1, tgtCcy1)})/${parseFloat(r_px1).toFixed(2)}`;
@@ -414,7 +518,6 @@ export class VisualEngine{
   
     // 存在对冲的资产在矩阵中标出来
     const all_exist_hedges = TradeEngine.processors.filter(p=>p.type==="HedgeProcessor").map(it=>it.asset_names);
-    debugger
   
     const left = width*0.70;
     const top = height*0.01

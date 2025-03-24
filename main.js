@@ -17,11 +17,11 @@ const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
 const assets = [
-  {id: 'BTC-USDT', theme:'#f0b27a'},
+  // {id: 'BTC-USDT', theme:'#f0b27a'},
   {id: 'SOL-USDT', theme:'#ad85e9'},
-  {id: 'ETH-USDT', theme:'#85c1e9'},
+  // {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#90a4ae'},
-  {id: 'XRP-USDT', theme:'#ffafde'},
+  // {id: 'XRP-USDT', theme:'#ffafde'},
   // {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
@@ -32,9 +32,8 @@ const params = {
   candle_limit,
   from_when: getLastWholeMinute(new Date()),
   // from_when: new Date(2025,2,7,0,0,0).getTime(),
-  to_when:new Date(2025,2,10,0,0,0).getTime(),
+  to_when:new Date(2025,1,5,0,0,0).getTime(),
 }
-
 
 /**
  * 启动交易引擎
@@ -44,7 +43,7 @@ TradeEngine.setMetaInfo({
   bar_type,
   once_limit, 
   candle_limit, 
-  assets
+  assets,
 }).start();
 
 // TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
@@ -58,12 +57,47 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
  * 启动图像引擎
  */
 VisualEngine.setMetaInfo({
-  assets
+  assets,
+  show_order_his:[
+    // 'BTC-USDT',
+    // 'ETH-USDT',
+    // 'XRP-USDT',
+    // 'SOL-USDT',
+    'TRUMP-USDT',
+    // 'ADA-USDT',
+    // 'OKB-USDT',
+  ]
 }).start();
 
 const assetIds = assets.map(it=>it.id);
 
-const klines = await Promise.all(assetIds.map(async (it,id)=>await getPrices(it, params)));
+// 添加重试逻辑
+const getKlinesWithRetry = async (assetIds, params, maxRetries = 3) => {
+  const results = [];
+  for (const id of assetIds) {
+    let retries = 0;
+    while (retries < maxRetries) {
+      try {
+        const data = await getPrices(id, params);
+        results.push(data);
+        break;
+      } catch (error) {
+        retries++;
+        if (retries === maxRetries) {
+          console.error(`Failed to fetch data for ${id} after ${maxRetries} retries`);
+          results.push({ id, prices: [], ts: [] });
+        } else {
+          console.log(`Retrying ${id}, attempt ${retries + 1}/${maxRetries}`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        }
+      }
+    }
+  }
+  return results;
+};
+
+// 修改原有的数据获取逻辑
+const klines = await getKlinesWithRetry(assetIds, params);
 klines.map(({id, prices, ts})=>{
   TradeEngine.updatePrices(id, prices, ts, bar_type);
 })

@@ -126,6 +126,7 @@ export class LocalVariable {
    * @param {*} data 
    */
   _saveData(data) {
+    // 当前实现在多进程环境下可能会有竞态条件
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
     fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
   }

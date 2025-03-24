@@ -5,7 +5,6 @@ import { TradeEngine } from "../TradeEngine.js";
 import { calcProfit, formatTimestamp } from "../../tools.js";
 import { close_position, open_positions } from "../../trading.js";
 import { LocalVariable } from "../../LocalVariable.js";
-import { debug } from "console";
 
 export class HedgeProcessor extends AbstractProcessor{
   
