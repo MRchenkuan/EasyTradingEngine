@@ -1,0 +1,10 @@
+version: '3'
+services:
+  okx-trading:
+    build: .
+    volumes:
+      - ./chart:/app/chart
+      - ./records:/app/records
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped

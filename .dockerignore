@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log
+chart
+.git
+.gitignore
+.env
+*.md
+.zip
+.tar
