@@ -9,7 +9,9 @@
     "start": "node main.js",
     "trading": "node ./src/manual.js",
     "docker:build": "docker build -t okx-trading .",
-    "docker:run": "docker run -d --name okx-trading -v $(pwd)/chart:/app/chart -v $(pwd)/records:/app/records --restart unless-stopped okx-trading"
+    "docker:run": "docker run -d --name okx-trading -v $(pwd)/chart:/app/chart -v $(pwd)/records:/app/records --restart unless-stopped okx-trading",
+    "docker:save": "docker save okx-trading > okx-trading.tar",
+    "docker:load": "docker load < okx-trading.tar"
   },
   "keywords": [],
   "author": "chenkuan <393667111@qq.com>",

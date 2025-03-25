@@ -1,9 +1,12 @@
 node_modules
 npm-debug.log
 chart
+records
 .git
 .gitignore
 .env
 *.md
 .zip
 .tar
+Dockerfile
+.dockerignore

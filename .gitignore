@@ -5,3 +5,7 @@ node_modules
 chart/
 β.json
 records/
+.zip
+.tar
+okx-trading.tar.zip
+okx-trading.tar
