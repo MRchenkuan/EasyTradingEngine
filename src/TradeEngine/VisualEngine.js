@@ -6,7 +6,6 @@ import { getClosingTransaction, getLastTransactions, getOpeningTransaction } fro
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const width = 1600, height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
@@ -94,72 +93,85 @@ export class VisualEngine{
    */
   static drawMainGraph(){
     try{
-      
       const refer_kline = TradeEngine.getMainAsset();
       if(!refer_kline) return;
       const x_label = refer_kline.ts.map(it=>formatTimestamp(it, TradeEngine._bar_type));
       const scaled_prices = TradeEngine.getAllScaledPrices();
-      const assetIds = TradeEngine._asset_names;
-      const themes = this._asset_themes;
-
-
-    // 计算差值并添加注释
-    const configuration = {
-      type:'line',
-      data: {
-        labels:x_label,
-        datasets: scaled_prices.map((it,id)=>{
-          return {
-            label:assetIds[id],
-            data: it.prices,
-            borderColor: themes[id],
-            pointBackgroundColor:themes[id],
-            ...styles
-          }
-        })
-      },
-      options: {
-        responsive: true, // 确保响应式布局
-        maintainAspectRatio: false, // 允许自定义宽高比例
-        plugins: {
-          legend: { labels: { color: 'black' } }
+      
+      // 计算差值并添加注释
+      const configuration = {
+        type: 'line',  // 改回折线图
+        data: {
+          labels: x_label,
+          datasets: scaled_prices.map((it, id) => {
+            return {
+              label: this._asset_names[id],
+              data: it.prices,
+              borderColor: this._asset_themes[id],
+              pointBackgroundColor: this._asset_themes[id],
+              ...styles
+            }
+          })
         },
-        layout: {
-          padding: {
-            top: 140,
-            bottom: 60,
-            left: 60,
-            right:60
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: 'black' } }
+          },
+          scales: {
+            y: {
+              ticks: {
+                callback: function(value) {
+                  const baseValue = scaled_prices[0].prices[0];
+                  return ((value - baseValue) / baseValue * 100).toFixed(2) + '%';
+                },
+                stepSize: (value) => {
+                  const baseValue = scaled_prices[0].prices[0];
+                  return baseValue * 0.025; // 2.5% 的实际价格变化值
+                }
+              },
+            }
+          },
+          layout: {
+            padding: {
+              top: 140,
+              bottom: 60,
+              left: 60,
+              right:60
+            }
           }
         },
-      },
-      plugins:[{
-        afterDraw: async (chart) => {
-          const collisionAvoidance = createCollisionAvoidance();
+        plugins:[{
+          afterDraw: async (chart) => {
+            const baseValue = scaled_prices[0].prices[0];
 
-          // 绘制相关性表格
-          this._drawRhoTable(chart);
+            this._drawZeroLine(chart, baseValue);
+            const collisionAvoidance = createCollisionAvoidance();
 
-          // 信息表格绘制
-          this._drawInfoTable(chart);
+            // 绘制相关性表格
+            this._drawRhoTable(chart);
 
-          // 绘制实时利润空间表格
-          this._drawProfitTable(chart);
+            // 信息表格绘制
+            this._drawInfoTable(chart);
 
-          // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
-          const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')].filter(it=>!it.closed);
-          const beta_map = TradeEngine._beta_map;
-          this._drawTransactions(chart, transactions, beta_map,collisionAvoidance)
-          
-          // 实时利润绘制
-          this._paintProfit();
-          this._drawDateTime(chart);
+            // 绘制实时利润空间表格
+            this._drawProfitTable(chart);
 
-          // 绘制历史订单信息
-          this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
-        }
-      }]
-    };
+            // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
+            const transactions = [...getLastTransactions(100, 'opening'),...getLastTransactions(100, 'closing')].filter(it=>!it.closed);
+            const beta_map = TradeEngine._beta_map;
+            this._drawTransactions(chart, transactions, beta_map,collisionAvoidance)
+            
+            // 实时利润绘制
+            this._paintProfit();
+            this._drawDateTime(chart);
+
+            // 绘制历史订单信息
+            this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
+          }
+        }]
+      };
 
     (async () => {
       const image = await chartJSNodeCanvas.renderToBuffer(configuration);
@@ -171,6 +183,24 @@ export class VisualEngine{
     }
   }
 
+  /**
+   * 绘制0%参考线
+   * @private
+   */
+  static _drawZeroLine(chart, baseValue) {
+    const ctx = chart.ctx;
+    const yPixel = chart.scales.y.getPixelForValue(baseValue);
+    
+    // 绘制 0% 参考线
+    ctx.beginPath();
+    ctx.setLineDash([5, 5]);
+    ctx.strokeStyle = '#666666';
+    ctx.lineWidth = 1;
+    ctx.moveTo(chart.chartArea.left, yPixel);
+    ctx.lineTo(chart.chartArea.right, yPixel);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   /**
    * 绘制历史订单
@@ -209,13 +239,14 @@ export class VisualEngine{
           }
           if (!xCoordOrders.get(formattedTime).has(instId)) {
             xCoordOrders.get(formattedTime).set(instId, {
-              buy: { orders: [], totalAmount: 0, avgPrice: 0 },
-              sell: { orders: [], totalAmount: 0, avgPrice: 0 }
+              buy: { orders: [], totalAmount: 0, avgPrice: 0,accFillSz:0  },
+              sell: { orders: [], totalAmount: 0, avgPrice: 0, accFillSz:0 }
             });
           }
           const sideData = xCoordOrders.get(formattedTime).get(instId)[order.side];
           const amount = order.accFillSz * order.avgPx;
           sideData.orders.push(order);
+          sideData.accFillSz += parseFloat(order.accFillSz);
           sideData.totalAmount += amount;
           sideData.avgPrice = sideData.totalAmount / sideData.orders.reduce((sum, o) => parseFloat(sum) + parseFloat(o.accFillSz), 0);
         });
@@ -262,7 +293,7 @@ export class VisualEngine{
           ctx.font = `12px bold ${font_style}`;
           ctx.textAlign = 'center';
           const label = [
-            `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}`,
+            `${{'buy':'[B]','sell':'[S]'}[side]}${sideData.totalAmount.toFixed(2)}(${sideData.accFillSz.toFixed(2)})`,
             `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`
           ].join('/');
           const lines = label.split('/');
@@ -745,8 +776,24 @@ export class VisualEngine{
       options: {
         responsive: true, // 确保响应式布局
         maintainAspectRatio: false, // 允许自定义宽高比例
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: { labels: { color: 'black' } }
+        },
+        scales: {
+          y: {
+            ticks: {
+              callback: function(value) {
+                const baseValue = scaled_prices[0].prices[0];
+                return ((value - baseValue) / baseValue * 100).toFixed(2) + '%';
+              },
+              stepSize: (value) => {
+                const baseValue = scaled_prices[0].prices[0];
+                return baseValue * 0.025; // 2.5% 的实际价格变化值
+              }
+            },
+          }
         },
         layout: {
           padding: {
@@ -759,7 +806,10 @@ export class VisualEngine{
       },
       plugins:[{
         afterDraw: (chart) => {
-          const ctx = chart.ctx;
+          // 绘制零基准线
+          const baseValue = scaled_prices[0].prices[0];
+          this._drawZeroLine(chart, baseValue);
+          
           // 为了避免标签重叠先搞个位置收集器
           const collisionAvoidance = createCollisionAvoidance();
 

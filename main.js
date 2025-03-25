@@ -27,9 +27,10 @@ const params = {
   price_type,
   once_limit,
   candle_limit,
-  from_when: getLastWholeMinute(new Date()),
-  // from_when: new Date(2025,2,7,0,0,0).getTime(),
-  to_when:new Date(2025,2,15,0,0,0).getTime(),
+  // from_when: new Date(2025,2,7,0,0,0).getTime(), // 指定结束时间
+  // to_when:new Date(2025,2,15,0,0,0).getTime(), // 指定起始时间
+  from_when: getLastWholeMinute(new Date()), // 最近时间
+  to_when:new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).getTime(),// 10天前
 }
 
 /**

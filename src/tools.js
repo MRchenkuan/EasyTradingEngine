@@ -155,6 +155,13 @@ export function throttleAsync(fn, delay) {
 }
 
 
+/**
+ * 计算最后一个完整的分钟的时间戳
+ * @param {*} now
+ * @param {*} m
+ * @param {*} s
+ * @returns
+ */
 export function getLastWholeMinute(now, m=1, s=30) {
 
   now.setMinutes(now.getMinutes() - m); // 减去 1 分钟
