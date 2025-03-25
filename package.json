@@ -11,7 +11,14 @@
     "docker:build": "docker build -t okx-trading .",
     "docker:run": "docker run -d --name okx-trading -v $(pwd)/chart:/app/chart -v $(pwd)/records:/app/records --restart unless-stopped okx-trading",
     "docker:save": "docker save okx-trading > okx-trading.tar",
-    "docker:load": "docker load < okx-trading.tar"
+    "docker:load": "docker load < okx-trading.tar",
+    "docker:stop": "docker stop okx-trading",
+    "docker:start": "docker start okx-trading",
+    "docker:restart": "docker restart okx-trading",
+    "docker:logs": "docker logs -f okx-trading",
+    "docker:rm": "docker rm -f okx-trading",
+    "docker:ps": "docker ps | grep okx-trading",
+    "docker:clean": "docker system prune -f"
   },
   "keywords": [],
   "author": "chenkuan <393667111@qq.com>",
