@@ -1,7 +1,7 @@
 import axios from 'axios'
 import * as mimic from './config.security.mimic.js'
 import * as firm from './config.security.js'
-import { generateSignature } from './tools.js';
+import { calcProfit, generateSignature, hashString } from './tools.js';
 
 const base_url = 'https://www.okx.com'
 
@@ -74,11 +74,17 @@ export async function getOrderHistory(params = {}) {
 
 
 // 批量订单交易
-export async function batchOrders(orders){
+export async function batchOrders(orders) {
+  // 为每个订单添加 clOrdId
+  const ordersWithId = orders.map(order => ({
+    ...order,
+    clOrdId: order.clOrdId || hashString(`${Date.now()}${Math.random()}`)
+  }));
+
   const timestamp = new Date().toISOString();
   const method = 'POST';
   const requestPath = '/api/v5/trade/batch-orders';
-  const body = JSON.stringify(orders);
+  const body = JSON.stringify(ordersWithId);
   const sign = generateSignature(timestamp, method, requestPath, body, mimic.api_secret);
 
   const headers = {
@@ -87,8 +93,135 @@ export async function batchOrders(orders){
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
     'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    "x-simulated-trading":1
+    "x-simulated-trading": 1
   };
+
+  try {
+    const { data } = await axios.post(base_url + requestPath, ordersWithId, { headers });
+    // 将返回结果与原始订单关联
+    const enrichedData = data.data?.map(result => {
+      const originalOrder = ordersWithId.find(o => o.clOrdId === result.clOrdId);
+      return {
+        ...result,
+        instId: originalOrder.instId, 
+        originalOrder
+      };
+    }) || [];
+
+    // 打印下单结果
+    enrichedData.map(({sCode,sMsg, originalOrder}) => {
+      const {instId, side, sz} = originalOrder
+      sCode === '0' ?
+       console.log(`- ${side} ${instId} ${sz} success`) :
+       console.log(`- ${side} ${instId} ${sz} ${sMsg}`);
+    })
+
+    // 检查是否有下单失败的订单
+    const failedOrders = enrichedData.filter(order => order.sCode !== '0');
+    
+    let result = {
+      success: failedOrders.length === 0,
+      data: enrichedData,
+      failedOrders,
+      cancelledOrders: [],
+      reversedOrders: []
+    };
+
+    if (failedOrders.length > 0) {
+      // 准备撤销所有成功的订单
+      const cancelOrders = enrichedData
+        .filter(order => order.sCode === '0')
+        .map(order => ({
+          instId: order.instId,
+          // ordId: order.ordId, // 如果传 orderId 会导致撤单结果不包含 clOrdId
+          clOrdId: order.clOrdId
+        }));
+
+      if (cancelOrders.length > 0) {
+        console.error('部分订单下单失败，尝试撤销成功的订单...');
+        // 尝试撤销所有成功的订单
+        const cancelResult = await batchCancelOrders(cancelOrders);
+        result.cancelledOrders = cancelResult.data?.map(cancelOrder => {
+          const originalOrder = ordersWithId.find(o => o.clOrdId === cancelOrder.clOrdId);
+          return {
+            ...cancelOrder,
+            originalOrder
+          };
+        });
+
+        const failedCancels = result.cancelledOrders.filter(order => order.sCode !== '0');
+        result.cancelledOrders = result.cancelledOrders.filter(order => order.sCode == '0');
+
+        // 如果有撤单失败的订单，为其创建反向订单
+        if (failedCancels.length > 0) {
+          console.error('撤单失败...');
+          failedCancels.map(failedCancel => {
+            const {instId, side, sz} = failedCancel.originalOrder;
+            console.log(`- ${side} ${instId} ${sz} ${failedCancel.sMsg}`);
+          });
+          
+          console.error('创建反向订单...');
+          const reverseOrders = failedCancels.map(failedCancel => ({
+            ...failedCancel.originalOrder,
+            side: failedCancel.originalOrder.side === 'buy' ? 'sell' : 'buy',
+            clOrdId: hashString(`${Date.now()}${Math.random()}`)
+          }));
+          
+          // 执行反向订单
+          const reverseResult = await batchOrders(reverseOrders);
+          if (reverseResult.success) {
+            console.log('反向订单执行成功\n\r');
+            // 计算预计损失
+            const successOrd = enrichedData.filter(order => order.sCode === '0').map(o=>o.originalOrder);
+            const reverseOrd = [...reverseResult.data].map(o=>o.originalOrder);
+            const estimatedLoss = calcProfit([...successOrd, ...reverseOrd]);
+            console.error(`- 损耗: ${estimatedLoss.toFixed(2)} USDT`);
+          } else {
+            console.error('反向订单执行失败');
+            return {
+              success: false,
+              data: enrichedData,
+              failedOrders,
+              cancelledOrders: result.cancelledOrders,
+              reversedOrders: reverseResult.data
+            };
+          }          
+          result.reversedOrders = reverseResult.data;
+        }
+      }
+    }
+
+    return result;
+  } catch (error) {
+    console.error('批量下单错误:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+/**
+ * 批量撤单
+ * @param {Array<{instId: string, ordId?: string, clOrdId?: string}>} orders 订单数组
+ * @returns {Promise} 撤单结果
+ */
+export async function batchCancelOrders(orders){
+  if (!Array.isArray(orders) || !orders.every(order => order.instId && (order.ordId || order.clOrdId))) {
+    console.error(orders);
+    throw new Error('订单参数格式错误：每个订单必须包含 instId 和 ordId/clOrdId 中的至少一个');
+  }
+
+  const timestamp = new Date().toISOString();
+  const method = 'POST';
+  const requestPath = '/api/v5/trade/cancel-batch-orders';
+  const body = JSON.stringify(orders);
+  const sign = generateSignature(timestamp, method, requestPath, body, mimic.api_secret);
+  const headers = {
+    'Content-Type': 'application/json',
+    'OK-ACCESS-KEY': mimic.api_key,
+    'OK-ACCESS-SIGN': sign,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
+    "x-simulated-trading":1
+  }
   const {data} = await axios.post(base_url+requestPath, orders, {
     headers
   })

@@ -244,8 +244,8 @@ export class HedgeProcessor extends AbstractProcessor{
         // 前次达到过，再次达到门限，超上次 n 倍
         if(diff_rate > this._prev_diff_rate*1.5){
           ;spx1 > spx2
-          ? open_positions(instId2, instId1,this._position_size)
-          : open_positions(instId1, instId2,this._position_size)
+          ? open_positions(instId1, instId2, this._position_size)
+          : open_positions(instId2, instId1, this._position_size)
           console.log(`-----再次达到门限，${diff_rate}超上次(${this._prev_diff_rate}) n 倍-------开仓----long:${spx1 > spx2?instId2:instId1}-----short:${spx1 < spx2?instId2:instId1}------`)
           this._prev_diff_rate = diff_rate;
           return
@@ -257,8 +257,8 @@ export class HedgeProcessor extends AbstractProcessor{
         // 首次达到门限
         console.log(`------首次达到门限------开仓----long:${spx1 > spx2?instId2:instId1}-----short:${spx1 < spx2?instId2:instId1}------`)
         ;spx1 > spx2
-        ? open_positions(instId2, instId1,this._position_size)
-        : open_positions(instId1, instId2,this._position_size)
+        ? open_positions(instId1, instId2, this._position_size)
+        : open_positions(instId2, instId1, this._position_size)
         this._prev_diff_rate = diff_rate;
         return;
       }

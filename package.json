@@ -18,7 +18,9 @@
     "docker:logs": "docker logs -f okx-trading",
     "docker:rm": "docker rm -f okx-trading",
     "docker:ps": "docker ps | grep okx-trading",
-    "docker:clean": "docker system prune -f"
+    "docker:clean": "docker system prune -f",
+    "close": "node src/scripts/close.js",
+    "open": "node src/scripts/open.js"
   },
   "keywords": [],
   "author": "chenkuan <393667111@qq.com>",

@@ -206,7 +206,11 @@ export function blendColors(color1, color2, ratio = 0.5) {
 }
 
 
-
+/**
+ * 计算盈利
+ * @param {*} orders 
+ * @returns 
+ */
 export function calcProfit(orders){
   let fee_usdt = 0,cost = 0,sell=0
   orders.map(order=>{
@@ -220,7 +224,7 @@ export function calcProfit(orders){
       feeCcy,
       ordType
     } = order
-    
+    debugger
     const unit_fee = feeCcy === 'USDT'?true:false;
     if(ordType==='limit'){
 

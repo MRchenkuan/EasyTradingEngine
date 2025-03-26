@@ -9,7 +9,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js'
 const ws_connection_pool={}
 
 
-const bar_type = '5m';
+const bar_type = '1H';
 const price_type = 'close'
 const once_limit = 300;
 const candle_limit =2000;
@@ -18,7 +18,7 @@ const assets = [
   {id: 'SOL-USDT', theme:'#ad85e9'},
   {id: 'ETH-USDT', theme:'#85c1e9'},
   {id: 'TRUMP-USDT', theme:'#90a4ae'},
-  // {id: 'XRP-USDT', theme:'#ffafde'},
+  {id: 'XRP-USDT', theme:'#ffafde'},
   // {id: 'OKB-USDT', theme:'#52be80'},
   // {id: 'ADA-USDT', theme:'#85dfe9'},
 ]
@@ -59,7 +59,7 @@ VisualEngine.setMetaInfo({
   show_order_his:[
     // 'BTC-USDT',
     'ETH-USDT',
-    // 'XRP-USDT',
+    'XRP-USDT',
     'SOL-USDT',
     'TRUMP-USDT',
     // 'ADA-USDT',

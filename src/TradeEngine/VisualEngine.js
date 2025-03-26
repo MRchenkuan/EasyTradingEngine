@@ -9,7 +9,7 @@ import path from 'path';
 
 const width = 1600, height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour:'#fff' });
-const font_style = "Monaco, Menlo, Consolas, monospace";
+const font_style = "bold Monaco, Menlo, Consolas, monospace";
 
 const styles = {
   borderWidth: 1,
@@ -457,7 +457,7 @@ export class VisualEngine{
     const xScale = chart.scales.x;
     const yScale = chart.scales.y;
   
-    const OPEN_COLOR = 'red';
+    const OPEN_COLOR = '#d61c3c';
     const CLOSE_COLOR = 'green';
     const SIDE_SYMBOL = { buy: "+", sell: '-' };
     const labels = TradeEngine.getMainAssetLabels();
