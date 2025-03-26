@@ -172,9 +172,14 @@ export async function batchOrders(orders) {
           if (reverseResult.success) {
             console.log('反向订单执行成功\n\r');
             // 计算预计损失
-            const successOrd = enrichedData.filter(order => order.sCode === '0').map(o=>o.originalOrder);
-            const reverseOrd = [...reverseResult.data].map(o=>o.originalOrder);
-            const estimatedLoss = calcProfit([...successOrd, ...reverseOrd]);
+            const successOrd = enrichedData.filter(order => order.sCode === '0').map(o=>({...o,...o.originalOrder}));
+            const reverseOrd = [...reverseResult.data].map(o=>({...o,...o.originalOrder}));
+            // 分别查询successOrd和reverseOrd的订单详情，并补充到successOrd和reverseOrd中
+            const ords4reverse = await Promise.all([...successOrd, ...reverseOrd].map(async order=>{
+              const {data=[]} = await getOrderInfo(order.instId, order.ordId)
+              return data[0];
+            }));
+            const estimatedLoss = calcProfit(ords4reverse);
             console.error(`- 损耗: ${estimatedLoss.toFixed(2)} USDT`);
           } else {
             console.error('反向订单执行失败');

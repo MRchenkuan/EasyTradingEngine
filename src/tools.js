@@ -224,7 +224,6 @@ export function calcProfit(orders){
       feeCcy,
       ordType
     } = order
-    debugger
     const unit_fee = feeCcy === 'USDT'?true:false;
     if(ordType==='limit'){
 

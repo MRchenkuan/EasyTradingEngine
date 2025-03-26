@@ -1,5 +1,4 @@
 import WebSocket from 'ws'
-import express from 'express'
 import { getPrices, parseCandleData, getLastWholeMinute } from './src/tools.js'
 import { base_url } from './src/config.security.js'
 import { subscribeKlineChanel } from './src/api.js'
