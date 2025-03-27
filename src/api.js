@@ -1,28 +1,34 @@
-import axios from 'axios'
-import * as mimic from './config.security.mimic.js'
-import * as firm from './config.security.js'
+import axios from 'axios';
+import * as mimic from './config.security.mimic.js';
+import * as firm from './config.security.js';
 import { calcProfit, generateSignature, hashString } from './tools.js';
 
-const base_url = 'https://www.okx.com'
+const base_url = 'https://www.okx.com';
 
-
-export async function marketCandles(instId, bar, after, before, limit){
-  const {data} = await axios.get(base_url+'/api/v5/market/candles', {
-    params:{
-      instId,bar, after, before, limit
+export async function marketCandles(instId, bar, after, before, limit) {
+  const { data } = await axios.get(base_url + '/api/v5/market/candles', {
+    params: {
+      instId,
+      bar,
+      after,
+      before,
+      limit,
     },
-  })
+  });
   return data;
 }
 
-export async function marketCandlesHistory(instId,bar, after, before, limit){
-  return axios.get(base_url+'/api/v5/market/history-candles', {
-    params:{
-      instId,bar, after, before, limit
+export async function marketCandlesHistory(instId, bar, after, before, limit) {
+  return axios.get(base_url + '/api/v5/market/history-candles', {
+    params: {
+      instId,
+      bar,
+      after,
+      before,
+      limit,
     },
-  })
+  });
 }
-
 
 /**
  * 获取订单信息 - 实盘
@@ -44,22 +50,22 @@ export async function getOrderHistory(params = {}) {
   const timestamp = new Date().toISOString();
   const method = 'GET';
   const requestPath = '/api/v5/trade/orders-history-archive';
-  
+
   // 构建查询字符串
   const queryString = Object.entries(params)
     .filter(([_, value]) => value !== undefined)
     .map(([key, value]) => `${key}=${value}`)
     .join('&');
-    
+
   const fullPath = queryString ? `${requestPath}?${queryString}` : requestPath;
-  
+
   const sign = generateSignature(timestamp, method, fullPath, '', firm.api_secret);
 
   const headers = {
     'OK-ACCESS-KEY': firm.api_key,
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': firm.pass_phrase
+    'OK-ACCESS-PASSPHRASE': firm.pass_phrase,
   };
 
   try {
@@ -71,14 +77,12 @@ export async function getOrderHistory(params = {}) {
   }
 }
 
-
-
 // 批量订单交易
 export async function batchOrders(orders) {
   // 为每个订单添加 clOrdId
   const ordersWithId = orders.map(order => ({
     ...order,
-    clOrdId: order.clOrdId || hashString(`${Date.now()}${Math.random()}`)
+    clOrdId: order.clOrdId || hashString(`${Date.now()}${Math.random()}`),
   }));
 
   const timestamp = new Date().toISOString();
@@ -93,38 +97,39 @@ export async function batchOrders(orders) {
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
     'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    "x-simulated-trading": 1
+    'x-simulated-trading': 1,
   };
 
   try {
     const { data } = await axios.post(base_url + requestPath, ordersWithId, { headers });
     // 将返回结果与原始订单关联
-    const enrichedData = data.data?.map(result => {
-      const originalOrder = ordersWithId.find(o => o.clOrdId === result.clOrdId);
-      return {
-        ...result,
-        instId: originalOrder.instId, 
-        originalOrder
-      };
-    }) || [];
+    const enrichedData =
+      data.data?.map(result => {
+        const originalOrder = ordersWithId.find(o => o.clOrdId === result.clOrdId);
+        return {
+          ...result,
+          instId: originalOrder.instId,
+          originalOrder,
+        };
+      }) || [];
 
     // 打印下单结果
-    enrichedData.map(({sCode,sMsg, originalOrder}) => {
-      const {instId, side, sz} = originalOrder
-      sCode === '0' ?
-       console.log(`- ${side} ${instId} ${sz} success`) :
-       console.log(`- ${side} ${instId} ${sz} ${sMsg}`);
-    })
+    enrichedData.map(({ sCode, sMsg, originalOrder }) => {
+      const { instId, side, sz } = originalOrder;
+      sCode === '0'
+        ? console.log(`- ${side} ${instId} ${sz} success`)
+        : console.log(`- ${side} ${instId} ${sz} ${sMsg}`);
+    });
 
     // 检查是否有下单失败的订单
     const failedOrders = enrichedData.filter(order => order.sCode !== '0');
-    
+
     let result = {
       success: failedOrders.length === 0,
       data: enrichedData,
       failedOrders,
       cancelledOrders: [],
-      reversedOrders: []
+      reversedOrders: [],
     };
 
     if (failedOrders.length > 0) {
@@ -134,7 +139,7 @@ export async function batchOrders(orders) {
         .map(order => ({
           instId: order.instId,
           // ordId: order.ordId, // 如果传 orderId 会导致撤单结果不包含 clOrdId
-          clOrdId: order.clOrdId
+          clOrdId: order.clOrdId,
         }));
 
       if (cancelOrders.length > 0) {
@@ -145,7 +150,7 @@ export async function batchOrders(orders) {
           const originalOrder = ordersWithId.find(o => o.clOrdId === cancelOrder.clOrdId);
           return {
             ...cancelOrder,
-            originalOrder
+            originalOrder,
           };
         });
 
@@ -156,29 +161,33 @@ export async function batchOrders(orders) {
         if (failedCancels.length > 0) {
           console.error('撤单失败...');
           failedCancels.map(failedCancel => {
-            const {instId, side, sz} = failedCancel.originalOrder;
+            const { instId, side, sz } = failedCancel.originalOrder;
             console.log(`- ${side} ${instId} ${sz} ${failedCancel.sMsg}`);
           });
-          
+
           console.error('创建反向订单...');
           const reverseOrders = failedCancels.map(failedCancel => ({
             ...failedCancel.originalOrder,
             side: failedCancel.originalOrder.side === 'buy' ? 'sell' : 'buy',
-            clOrdId: hashString(`${Date.now()}${Math.random()}`)
+            clOrdId: hashString(`${Date.now()}${Math.random()}`),
           }));
-          
+
           // 执行反向订单
           const reverseResult = await batchOrders(reverseOrders);
           if (reverseResult.success) {
             console.log('反向订单执行成功\n\r');
             // 计算预计损失
-            const successOrd = enrichedData.filter(order => order.sCode === '0').map(o=>({...o,...o.originalOrder}));
-            const reverseOrd = [...reverseResult.data].map(o=>({...o,...o.originalOrder}));
+            const successOrd = enrichedData
+              .filter(order => order.sCode === '0')
+              .map(o => ({ ...o, ...o.originalOrder }));
+            const reverseOrd = [...reverseResult.data].map(o => ({ ...o, ...o.originalOrder }));
             // 分别查询successOrd和reverseOrd的订单详情，并补充到successOrd和reverseOrd中
-            const ords4reverse = await Promise.all([...successOrd, ...reverseOrd].map(async order=>{
-              const {data=[]} = await getOrderInfo(order.instId, order.ordId)
-              return data[0];
-            }));
+            const ords4reverse = await Promise.all(
+              [...successOrd, ...reverseOrd].map(async order => {
+                const { data = [] } = await getOrderInfo(order.instId, order.ordId);
+                return data[0];
+              })
+            );
             const estimatedLoss = calcProfit(ords4reverse);
             console.error(`- 损耗: ${estimatedLoss.toFixed(2)} USDT`);
           } else {
@@ -188,9 +197,9 @@ export async function batchOrders(orders) {
               data: enrichedData,
               failedOrders,
               cancelledOrders: result.cancelledOrders,
-              reversedOrders: reverseResult.data
+              reversedOrders: reverseResult.data,
             };
-          }          
+          }
           result.reversedOrders = reverseResult.data;
         }
       }
@@ -208,8 +217,11 @@ export async function batchOrders(orders) {
  * @param {Array<{instId: string, ordId?: string, clOrdId?: string}>} orders 订单数组
  * @returns {Promise} 撤单结果
  */
-export async function batchCancelOrders(orders){
-  if (!Array.isArray(orders) || !orders.every(order => order.instId && (order.ordId || order.clOrdId))) {
+export async function batchCancelOrders(orders) {
+  if (
+    !Array.isArray(orders) ||
+    !orders.every(order => order.instId && (order.ordId || order.clOrdId))
+  ) {
     console.error(orders);
     throw new Error('订单参数格式错误：每个订单必须包含 instId 和 ordId/clOrdId 中的至少一个');
   }
@@ -225,70 +237,68 @@ export async function batchCancelOrders(orders){
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
     'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    "x-simulated-trading":1
-  }
-  const {data} = await axios.post(base_url+requestPath, orders, {
-    headers
-  })
+    'x-simulated-trading': 1,
+  };
+  const { data } = await axios.post(base_url + requestPath, orders, {
+    headers,
+  });
   return data;
 }
 
-
 // 获取订单信息
-export async function getOrderInfo(instId, ordId){
+export async function getOrderInfo(instId, ordId) {
   const timestamp = new Date().toISOString();
   const method = 'GET';
   const requestPath = `/api/v5/trade/order?ordId=${ordId}&instId=${instId}`;
-  const sign = generateSignature(timestamp, method, requestPath, "", mimic.api_secret);
+  const sign = generateSignature(timestamp, method, requestPath, '', mimic.api_secret);
 
   const headers = {
     'OK-ACCESS-KEY': mimic.api_key,
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
     'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    "x-simulated-trading":1
+    'x-simulated-trading': 1,
   };
-  const {data} = await axios.get(base_url+requestPath, {
-    headers
-  })
+  const { data } = await axios.get(base_url + requestPath, {
+    headers,
+  });
 
   return data;
 }
 
-
-
 // 登录函数
-export async function doLogin(ctx){
-
+export async function doLogin(ctx) {
   // 准备登录请求
-  const timestamp = Math.round(Date.now()/1000).toFixed(3);
+  const timestamp = Math.round(Date.now() / 1000).toFixed(3);
   const method = 'GET';
   const requestPath = '/users/self/verify';
   const body = ''; // WebSocket登录请求没有body
   const sign = generateSignature(timestamp, method, requestPath, body, api_secret);
-  await ctx.send(JSON.stringify({
-    "op": "login",
-    "args":
-     [
+  await ctx.send(
+    JSON.stringify({
+      op: 'login',
+      args: [
         {
           apiKey: api_key,
           passphrase: pass_phrase,
           timestamp,
-          sign
-         }
-      ]
-   }))
+          sign,
+        },
+      ],
+    })
+  );
 }
 
-
-export async function subscribeKlineChanel(ws, channel, instId){
-  ws.send(JSON.stringify({
-    "op":"subscribe",
-    "args":[
-      {
-          "channel":channel,
-          "instId": instId
-      }
-    ]
-  }))
+export async function subscribeKlineChanel(ws, channel, instId) {
+  ws.send(
+    JSON.stringify({
+      op: 'subscribe',
+      args: [
+        {
+          channel: channel,
+          instId: instId,
+        },
+      ],
+    })
+  );
 }

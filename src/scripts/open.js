@@ -1,4 +1,4 @@
-import { open_positions } from "../trading.js";
+import { open_positions } from '../trading.js';
 
 const [asset1, asset2, amount] = process.argv.slice(2);
 

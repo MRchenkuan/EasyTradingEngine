@@ -1,5 +1,5 @@
-import fs from 'fs'
-import path from 'path'
+import fs from 'fs';
+import path from 'path';
 
 // 获取当前文件路径
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -38,14 +38,14 @@ export class LocalVariable {
         this._setValue(prop, value);
         return true;
       },
-      ownKeys: (target) => {
+      ownKeys: target => {
         const current = this._getCurrentData();
         if (typeof current === 'object' && current !== null) {
           return Reflect.ownKeys(current);
         }
         return [];
       },
-     getOwnPropertyDescriptor: (target, prop) => {
+      getOwnPropertyDescriptor: (target, prop) => {
         const current = this._getCurrentData();
         if (typeof current === 'object' && current !== null && current.hasOwnProperty(prop)) {
           return Reflect.getOwnPropertyDescriptor(current, prop);
@@ -70,7 +70,7 @@ export class LocalVariable {
           return true;
         }
         return false;
-      }
+      },
     };
     return new Proxy(this, handler);
   }
@@ -87,7 +87,7 @@ export class LocalVariable {
     }
     return current;
   }
-  
+
   _getValue(prop) {
     const current = this._getCurrentData();
     return current?.[prop];
@@ -123,7 +123,7 @@ export class LocalVariable {
 
   /**
    * 需要考虑多进程文件锁
-   * @param {*} data 
+   * @param {*} data
    */
   _saveData(data) {
     // 当前实现在多进程环境下可能会有竞态条件

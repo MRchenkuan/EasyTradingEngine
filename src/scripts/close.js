@@ -1,4 +1,4 @@
-import { close_position } from "../trading.js";
+import { close_position } from '../trading.js';
 
 const tradeId = process.argv[2];
 if (!tradeId) {
