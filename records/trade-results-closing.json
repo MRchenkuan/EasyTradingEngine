@@ -240,5 +240,153 @@
       }
     ],
     "ts": 1742968063450
+  },
+  {
+    "tradeId": "16fae35f",
+    "side": "closing",
+    "profit": 5.438756833662097,
+    "orders": [
+      {
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "63857eed",
+        "sz": "0.00453874",
+        "tgtCcy": "base_ccy",
+        "ordId": "2365714308356300800",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1743006180494",
+        "originalOrder": {
+          "instId": "BTC-USDT",
+          "tdMode": "cash",
+          "side": "sell",
+          "ordType": "market",
+          "clOrdId": "63857eed",
+          "sz": "0.00453874",
+          "tgtCcy": "base_ccy"
+        },
+        "px": "",
+        "avgPx": "86707.1",
+        "accFillSz": "0.00453874",
+        "fee": "-0.393540983054",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          1,
+          0
+        ]
+      },
+      {
+        "instId": "SOL-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "6eb41854",
+        "sz": "2.767591",
+        "tgtCcy": "base_ccy",
+        "ordId": "2365714308356300801",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1743006180494",
+        "originalOrder": {
+          "instId": "SOL-USDT",
+          "tdMode": "cash",
+          "side": "buy",
+          "ordType": "market",
+          "clOrdId": "6eb41854",
+          "sz": "2.767591",
+          "tgtCcy": "base_ccy"
+        },
+        "px": "",
+        "avgPx": "139.72",
+        "accFillSz": "2.767591",
+        "fee": "-0.002767591",
+        "feeCcy": "SOL",
+        "state": "filled",
+        "beta": [
+          650.5772078884883,
+          0
+        ]
+      }
+    ],
+    "ts": 1743006180494
+  },
+  {
+    "tradeId": "d0c941c8",
+    "side": "closing",
+    "profit": -6.9736257041224015,
+    "orders": [
+      {
+        "instId": "XRP-USDT",
+        "tdMode": "cash",
+        "side": "sell",
+        "ordType": "market",
+        "clOrdId": "1c06dba2",
+        "sz": "844.344999",
+        "tgtCcy": "base_ccy",
+        "ordId": "2366932523015135232",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1743042486120",
+        "originalOrder": {
+          "instId": "XRP-USDT",
+          "tdMode": "cash",
+          "side": "sell",
+          "ordType": "market",
+          "clOrdId": "1c06dba2",
+          "sz": "844.344999",
+          "tgtCcy": "base_ccy"
+        },
+        "px": "",
+        "avgPx": "2.3735",
+        "accFillSz": "844.344999",
+        "fee": "-2.0040528551265",
+        "feeCcy": "USDT",
+        "state": "filled",
+        "beta": [
+          35436.426809032695,
+          0
+        ]
+      },
+      {
+        "instId": "BTC-USDT",
+        "tdMode": "cash",
+        "side": "buy",
+        "ordType": "market",
+        "clOrdId": "314fab57",
+        "sz": "0.02289165",
+        "tgtCcy": "base_ccy",
+        "ordId": "2366932523015135233",
+        "sCode": "0",
+        "sMsg": "Order placed",
+        "tag": "",
+        "ts": "1743042486120",
+        "originalOrder": {
+          "instId": "BTC-USDT",
+          "tdMode": "cash",
+          "side": "buy",
+          "ordType": "market",
+          "clOrdId": "314fab57",
+          "sz": "0.02289165",
+          "tgtCcy": "base_ccy"
+        },
+        "px": "",
+        "avgPx": "87500",
+        "accFillSz": "0.02289165",
+        "fee": "-0.00002289165",
+        "feeCcy": "BTC",
+        "state": "filled",
+        "beta": [
+          1,
+          0
+        ]
+      }
+    ],
+    "ts": 1743042486120
   }
 ]

@@ -10,6 +10,11 @@ RUN apt-get update && apt-get install -y \
     librsvg2-dev \
     pkg-config \
     python3 \
+    fonts-wqy-microhei \  
+    fonts-noto-cjk \     
+    fonts-arphic-ukai \ 
+    fonts-arphic-uming \ 
+    fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
