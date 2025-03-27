@@ -9,3 +9,11 @@ records/
 .tar
 okx-trading.tar.zip
 okx-trading.tar
+
+# 忽略所有记录文件
+/records/*
+!records/.gitkeep
+
+# 忽略所有图表文件
+/chart/*
+!chart/.gitkeep
