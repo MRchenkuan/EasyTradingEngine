@@ -1,7 +1,7 @@
 {
   "name": "okx-trading",
   "version": "1.0.0",
-  "description": "拟合两个资产价格，通过多空对冲实现套利",
+  "description": "",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -24,21 +24,13 @@
     "x": "arch -x86_64 zsh && arch",
     "docker": "npm run docker:stop && npm run docker:rm && npm run docker:build && npm run docker:clean && npm run docker:run"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/MRchenkuan/EasyTradingEngine.git"
-  },
   "keywords": [],
   "author": "chenkuan <393667111@qq.com>",
   "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/MRchenkuan/EasyTradingEngine/issues"
-  },
-  "homepage": "https://github.com/MRchenkuan/EasyTradingEngine#readme",
   "dependencies": {
     "axios": "^1.7.9",
-    "canvas": "^3.1.0",
-    "chartjs-node-canvas": "^5.0.0",
+    "canvas": "3.1.0",
+    "chartjs-node-canvas": "4.1.6",
     "crypto": "^1.0.1",
     "events": "^3.3.0",
     "express": "^4.21.2",
