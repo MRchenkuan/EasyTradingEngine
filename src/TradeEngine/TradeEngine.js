@@ -26,6 +26,7 @@ export class TradeEngine {
   static _status = 0; //1 启动中 2运行中 -1出错
   static _trade_fee_rate = 0.001;
   static _show_order_his = [];
+  static _positionCost = new LocalVariable('TradeEngine/positionCost');
 
   /**
    * 对冲监听器
@@ -177,7 +178,8 @@ export class TradeEngine {
   static getOrderHistory(params) {
     const cacheKey = params.instId;
     this._updateCache(params, cacheKey);
-    // 无论是否过期都返回当前缓存
+    // 计算持仓成本
+    this._calculatePositionCost(cacheKey);
     return this._orderHistoryCache[cacheKey] || [];
   }
 
@@ -569,5 +571,71 @@ export class TradeEngine {
 
   static stop() {
     clearTimeout(this._timer.start);
+  }
+
+  /**
+   * 计算持仓成本
+   * @param {string} instId - 合约ID
+   * @returns {number} 持仓成本
+   */
+  static _calculatePositionCost(instId) {
+    const orders = this._orderHistoryCache[instId] || [];
+    let totalPosition = 0;
+    let buyTotalCost = 0;
+    let sellTotalCost = 0;
+  
+    orders.forEach(order => {
+      const {
+        side,
+        avgPx,
+        state,
+        tgtCcy,
+        accFillSz
+      } = order;
+  
+      if (state !== 'filled') return;
+  
+      const size = parseFloat(accFillSz);
+      const price = parseFloat(avgPx);
+      const isQuoteCcy = tgtCcy === 'quote_ccy';
+  
+      // 计算实际的base数量和花费的quote数量
+      const baseAmount = isQuoteCcy ? size / price : size;
+      const quoteCost = isQuoteCcy ? size : size * price;
+  
+      if (side === 'buy') {
+        totalPosition += baseAmount;
+        buyTotalCost += quoteCost;
+      } else {
+        totalPosition -= baseAmount;
+        sellTotalCost += quoteCost;
+      }
+    });
+  
+    // 计算净花费（买单总花费 - 卖单总收入）
+    const netCost = buyTotalCost - sellTotalCost;
+  
+    // 计算平均持仓成本 = 净花费 / 当前持仓量
+    const avgCost = totalPosition !== 0 ? netCost / Math.abs(totalPosition) : 0;
+  
+    // 更新到 LocalVariable
+    this._positionCost[instId] = {
+      instId,
+      position: totalPosition,
+      totalCost: netCost,
+      avgCost: avgCost,
+      updateTime: Date.now()
+    };
+  }
+
+  // 添加获取持仓成本的公共方法
+  static getPositionCost(instId) {
+    return this._positionCost[instId] || {
+      instId,
+      position: 0,
+      totalCost: 0,
+      avgCost: 0,
+      updateTime: 0
+    };
   }
 }

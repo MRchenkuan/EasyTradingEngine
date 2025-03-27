@@ -86,6 +86,45 @@ export class VisualEngine {
   }
 
   /**
+   * 绘制成本线
+   * @private
+   */
+  static _addCostLines(chart, positions) {
+    positions.forEach((data, index) => {
+      const { position, totalCost, avgCost, updateTime, instId } = data;
+      const themes_map = this.getThemes();
+      // 只在有持仓时显示成本线
+      if (position !== 0 && avgCost !== 0) {
+        const [a, b] = TradeEngine._beta_map[instId] || [1, 0];
+        const scaledCost = avgCost * a + b;
+
+        const ctx = chart.ctx;
+        const yPixel = chart.scales.y.getPixelForValue(scaledCost);
+
+        // 绘制 0% 参考线
+        ctx.beginPath();
+        ctx.setLineDash([5, 5]);
+        ctx.strokeStyle = themes_map[instId] || '#666666';
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(chart.chartArea.left, yPixel);
+        ctx.lineTo(chart.chartArea.right, yPixel);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 添加成本标签
+        ctx.font = `12px ${font_style}`;
+        ctx.fillStyle = themes_map[instId] || '#666666';
+        ctx.textAlign = 'left';
+        ctx.fillText(
+          `${simpAssetName(instId)} 成本: ${avgCost.toFixed(2)}`,
+          chart.chartArea.left + 10,
+          yPixel - 5
+        );
+      }
+    });
+  }
+
+  /**
    * 渲染图片
    * @param {*} duration
    */
@@ -167,10 +206,15 @@ export class VisualEngine {
 
               // 实时利润绘制
               this._paintProfit();
+
+              // 绘制时间
               this._drawDateTime(chart);
 
               // 绘制历史订单信息
               this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
+
+              // 绘制各个品种的成本线
+              this._addCostLines(chart, Object.values(TradeEngine._positionCost));
             },
           },
         ],
