@@ -2,7 +2,7 @@ import { getLastTransactions, updateTransaction } from '../../recordTools.js';
 import { AbstractProcessor } from './AbstractProcessor.js';
 import crypto from 'crypto';
 import { TradeEngine } from '../TradeEngine.js';
-import { calcProfit, formatTimestamp } from '../../tools.js';
+import { formatTimestamp } from '../../tools.js';
 import { close_position, open_position } from '../../trading.js';
 import { LocalVariable } from '../../LocalVariable.js';
 
@@ -15,6 +15,7 @@ export class HedgeProcessor extends AbstractProcessor {
   _close_gate = 0.003; // 平仓-重置门限
   _timer = {};
   _position_size = 10; // 10 usdt
+  _return_rate = 0.005; // 开仓-平仓 最大回撤 5%
   /**
    *
    * @param {*} assetNames
@@ -170,10 +171,12 @@ export class HedgeProcessor extends AbstractProcessor {
   captureOpening(args) {
     const open_gate = this._open_gate;
     const close_gate = this._close_gate;
+    const return_rate = this._return_rate;
     const betaMap = this.engine._beta_map;
     const [instId1, instId2] = this.asset_names;
     const [px1, px2] = this.asset_names.map(assetId => this.engine.getRealtimePrice(assetId));
 
+    // 基础校验不通过不开仓
     if (!px1 || !px2) {
       return false;
     }
@@ -185,29 +188,36 @@ export class HedgeProcessor extends AbstractProcessor {
     // 计算价差比率
     const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx1 + spx2) / 2);
 
-    // 判断是否超过门限
-    if (!open_gate) return;
     // 交易信号生成
     console.log(
-      `${instId1}:${instId2}开仓门限${(open_gate * 100).toFixed(2)}, 当前${(diff_rate * 100).toFixed(2)}，前次${(this._prev_diff_rate * 100).toFixed(2)}`
+      `开仓判断：[${instId1}]:[${instId2}] 门限：${(open_gate * 100).toFixed(2)}%， 当前：${(diff_rate * 100).toFixed(2)}%`
     );
-    if (diff_rate < open_gate) {
+    console.log(
+      `- 前次记录：`,
+      this._prev_diff_rate ? (this._prev_diff_rate * 100).toFixed(2) + '%' : '无'
+    );
+    if (!open_gate || diff_rate < open_gate) {
+      console.log(`- 没有达到距离门限，不执行开仓`);
       //没有达到门限
       if (this._prev_diff_rate) {
         // 有前次门限
         if (diff_rate <= close_gate) {
           // 如果当前距离足够小，则认为已经收敛，重置门限，准备重新开仓
-          console.log(`${this._prev_diff_rate}门限过小，进行重置`);
+          console.log(`- 距离过近：${(this._prev_diff_rate * 100).toFixed(2)}% ，重置门限记录`);
           this._prev_diff_rate = 0;
         }
       }
       return;
     } else {
-      // 先看 transition 中有没有同方向的小于当前距离*1.5的，且未平仓的
-      // 另外最多保持10秒一单，不能超了
-      // 如果有则不管
-      // 如果没有则直接开仓
-      // todo 遇到的一个问题是当滑点严重时，重启程序会重新开仓，需要记录开仓距离
+      console.log(`- 达到距离门限，判断开仓条件`);
+      /**
+       * 开仓逻辑:
+       * 1. 检查现有交易中是否存在同方向且价差小于当前距离1.5倍的未平仓订单
+       * 2. 每10秒最多执行一笔订单
+       * 3. 如果存在符合条件的订单则跳过
+       * 4. 如果不存在符合条件的订单则执行开仓
+       * 5. 由于滑点影响,需要记录实际开仓时的价差,避免程序重启后重复开仓
+       */
       let transactions = this._getTransactions({ closed: false, side: 'opening' });
 
       if (spx1 > spx2) {
@@ -243,48 +253,49 @@ export class HedgeProcessor extends AbstractProcessor {
       const prev_transactions = transactions.at(-1);
       // 如果查询到之前有开平仓记录，则与当前进行比较
       if (prev_transactions) {
-        console.log(
-          `最近一次开仓:${formatTimestamp(prev_transactions.ts)},${prev_transactions.orders.map(o => [o.instId, o.side, o.sz, o.avgPx])}`
-        );
+        const { ts } = prev_transactions;
         const [pt_px1, pt_px2] = prev_transactions.orders.map(it => it.avgPx);
-        if (pt_px1 && pt_px2) {
-          // 如果价格存在则表示开仓订单正常
-          const [beta1, beta2] = prev_transactions.orders.map(it => it.beta);
-          const [spt_px1, spt_px2] = [pt_px1 * beta1[0] + beta1[1], pt_px2 * beta2[0] + beta2[1]];
-          const prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(
-            spt_px1,
-            spt_px2,
-            (spt_px1 + spt_px2) / 2
-          );
-
-          console.log(
-            `最近一次开仓的 diff_rate：${(prev_transactions_diff_rate * 100).toFixed(2)}, 最近一次记录的最大值为：${(this._prev_diff_rate * 100).toFixed(2)}`
-          );
-          // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
-          this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate);
-        }
+        // 如果价格存在则表示开仓订单正常
+        const [beta1, beta2] = prev_transactions.orders.map(it => it.beta);
+        const [spt_px1, spt_px2] = [pt_px1 * beta1[0] + beta1[1], pt_px2 * beta2[0] + beta2[1]];
+        const prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(
+          spt_px1,
+          spt_px2,
+          (spt_px1 + spt_px2) / 2
+        );
+        console.log(
+          `-- 前次开仓的价差：${(prev_transactions_diff_rate * 100).toFixed(2)} % (${formatTimestamp(ts)})`
+        );
+        console.log(`-- 前次越过门限后的最大距离：${(this._prev_diff_rate * 100).toFixed(2)} %`);
+        // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
+        this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate);
       }
 
-      // 达到门限
       if (this._prev_diff_rate) {
         // 前次达到过，再次达到门限，超上次 n 倍
         if (diff_rate > this._prev_diff_rate * 1.5) {
+          console.log(
+            `-- 再次到达门限,并超过前次的了1.5倍: ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
+          );
           spx1 > spx2
             ? open_position(instId1, instId2, this._position_size)
             : open_position(instId2, instId1, this._position_size);
           console.log(
-            `-----再次达到门限，${diff_rate}超上次(${this._prev_diff_rate}) n 倍-------开仓----long:${spx1 > spx2 ? instId2 : instId1}-----short:${spx1 < spx2 ? instId2 : instId1}------`
+            `--- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
           );
           this._prev_diff_rate = diff_rate;
           return;
         } else {
           // 没超则过
+          console.log(
+            `- 再次到达门限,但没有超过前次的了1.5倍不执行开仓: ${(diff_rate * 100).toFixed(2)} % < 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
+          );
           return;
         }
       } else {
-        // 首次达到门限
+        console.log(`-- 首次到达门限：${(this._prev_diff_rate * 100).toFixed(2)}% 直接开仓`);
         console.log(
-          `------首次达到门限------开仓----long:${spx1 > spx2 ? instId2 : instId1}-----short:${spx1 < spx2 ? instId2 : instId1}------`
+          `--- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
         spx1 > spx2
           ? open_position(instId1, instId2, this._position_size)

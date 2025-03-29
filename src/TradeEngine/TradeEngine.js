@@ -10,6 +10,7 @@ import { findBestFitLine } from '../regression.js';
 import { formatTimestamp } from '../tools.js';
 import { HedgeProcessor } from './processors/HedgeProcessor.js';
 import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
+import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 
 export class TradeEngine {
   static processors = [];
@@ -645,5 +646,17 @@ export class TradeEngine {
         updateTime: 0,
       }
     );
+  }
+
+  /**
+   * 创建网格交易处理器
+   * @param {string} assetName - 交易资产名称
+   * @param {object} params - 网格参数
+   * @returns {GridTradingProcessor}
+   */
+  static createGridTrading(assetName, params = {}) {
+    const gp = new GridTradingProcessor(assetName, params, this);
+    this.processors.push(gp);
+    return gp;
   }
 }
