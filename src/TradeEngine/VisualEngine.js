@@ -10,6 +10,7 @@ import {
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
+import { LocalVariable } from '../LocalVariable.js';
 
 const width = 1600,
   height = 900;
@@ -32,6 +33,7 @@ export class VisualEngine {
   static _painting_interval = 2000; //
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
+  static _config = new LocalVariable('config');
 
   static createChart(...args) {
     this.charts.push(new this(...args));
@@ -196,13 +198,15 @@ export class VisualEngine {
               // 绘制实时利润空间表格
               this._drawProfitTable(chart);
 
-              // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
-              const transactions = [
-                ...getLastTransactions(100, 'opening'),
-                ...getLastTransactions(100, 'closing'),
-              ].filter(it => !it.closed);
               const beta_map = TradeEngine._beta_map;
-              this._drawTransactions(chart, transactions, beta_map, collisionAvoidance);
+              if (this._config.show_transactions!==false) {
+                // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
+                const transactions = [
+                  ...getLastTransactions(100, 'opening'),
+                  ...getLastTransactions(100, 'closing'),
+                ].filter(it => !it.closed);
+                this._drawTransactions(chart, transactions, beta_map, collisionAvoidance);
+              }
 
               // 实时利润绘制
               this._paintProfit();
@@ -211,7 +215,8 @@ export class VisualEngine {
               this._drawDateTime(chart);
 
               // 绘制历史订单信息
-              this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
+              ;(this._config.show_orders!==false) &&
+                this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
 
               // 绘制各个品种的成本线
               this._addCostLines(chart);

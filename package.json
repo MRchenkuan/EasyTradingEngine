@@ -29,7 +29,8 @@
     "docker": "npm run docker:stop && npm run docker:rm && npm run docker:build && npm run docker:clean && npm run docker:run",
     "list": "node src/scripts/positions.js",
     "monit": "node src/scripts/monit-positions.js",
-    "help": "node src/scripts/help.js"
+    "help": "node src/scripts/help.js",
+    "graph": "node src/scripts/graph.js"
   },
   "repository": {
     "type": "git",

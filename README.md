@@ -172,6 +172,14 @@ TradeEngine.createGridTrading('SOL-USDT', {
 - [ ] 【功能】「做市商策略」首先要做成 Processor,然后可以结合趋势跟踪策略优化上下沿设置，主要针对单边趋势设置一个朝向的上下边沿，例如当前价位P：正常{SELL(P+N),BUY(P-N)}；如果单边上行则{SELL(P+1.1xN),BUY(P)}；如果单边下行则{SELL(P),BUY(P-1xN)}
 - [ ] 【编码规范】为了省事，代码中大量引用交易引擎私有变量(例如: TradeEngine.\_beta_map)需要规范, 实时数据尽量从唯一的（纯函数）tick()函数中读取确保数据安全。
 
+### 显示设置
+- `npm run hide:order` - 在主图上隐藏所有的历史订单记录
+- `npm run hide:trans` - 在主图上隐藏所有的开平仓信息
+
+### 图表控制
+- `npm run graph orders` - 切换主图上历史订单记录的显示/隐藏
+- `npm run graph trans` - 切换主图上开平仓信息的显示/隐藏
+
 | ​**加我好友一起共建**​                                                                                                 | ​**觉得有用也可以请我喝咖啡​**​                                                                                       |
 | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | ​<img width="453" alt="image" src="https://github.com/user-attachments/assets/4b5b6ba4-b196-43d8-9527-37acf52ec878" /> | <img width="452" alt="image" src="https://github.com/user-attachments/assets/6f06f1f2-82bb-4be8-97bf-39f32b551aff" /> |

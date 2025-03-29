@@ -278,12 +278,35 @@ export class HedgeProcessor extends AbstractProcessor {
           console.log(
             `- ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
           );
-          // todo 补充回落逻辑
-          // todo 补充回落逻辑
-          // todo 补充回落逻辑
-          // todo 补充回落逻辑
-          // todo 补充回落逻辑
-          // todo 补充回落逻辑
+          
+
+
+
+
+
+
+
+
+
+          // 判断是否从最高点回落了指定比例
+          const max_diff_rate = Math.max(this._prev_diff_rate, diff_rate);
+          const pullback_rate = (max_diff_rate - diff_rate) / max_diff_rate;
+          
+          if (pullback_rate < this._return_rate) {
+            console.log(`- 当前回落幅度(${(pullback_rate * 100).toFixed(2)}%)未达到要求(${(this._return_rate * 100).toFixed(2)}%)，暂不开仓`);
+            return;
+          }
+          
+          console.log(`- 价格已回落${(pullback_rate * 100).toFixed(2)}%，满足开仓条件`);
+
+
+
+
+
+
+
+
+
 
           spx1 > spx2
             ? open_position(instId1, instId2, this._position_size)
@@ -296,7 +319,7 @@ export class HedgeProcessor extends AbstractProcessor {
         } else {
           // 没超则过
           console.log(
-            `不执行开仓: 再次到达门限,但没有超过前次的1.5倍.${(this._prev_diff_rate * 1.5 * 100).toFixed(2)}%`
+            `不执行开仓: 再次到达门限,但没有超过前次的1.5倍，要求：${(this._prev_diff_rate * 1.5 * 100).toFixed(2)}%`
           );
           return;
         }
@@ -306,16 +329,45 @@ export class HedgeProcessor extends AbstractProcessor {
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
 
-        // todo 补充回落逻辑
-        // todo 补充回落逻辑
-        // todo 补充回落逻辑
-        // todo 补充回落逻辑
-        // todo 补充回落逻辑
-        // todo 补充回落逻辑
+
+
+
+
+
+
+
+
+
+
+
+        
+        // 判断是否从最高点回落了指定比例
+        const max_diff_rate = diff_rate;
+        const pullback_rate = (max_diff_rate - diff_rate) / max_diff_rate;
+        
+        if (pullback_rate < this._return_rate) {
+          console.log(`- 当前回落幅度(${(pullback_rate * 100).toFixed(2)}%)未达到要求(${(this._return_rate * 100).toFixed(2)}%)，暂不开仓`);
+          return;
+        }
+        
+        console.log(`- 价格已回落${(pullback_rate * 100).toFixed(2)}%，满足开仓条件`);
+
+
+
+
+
+
+
+
+
+
 
         spx1 > spx2
           ? open_position(instId1, instId2, this._position_size)
           : open_position(instId2, instId1, this._position_size);
+        console.log(
+          `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
+        );
         this._prev_diff_rate = diff_rate;
         return;
       }

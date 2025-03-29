@@ -34,7 +34,6 @@ function displayPositions() {
     return;
   }
 
-  console.log('当前持仓:');
   const header = [
     padString('交易ID', 12),
     padString('创建时间', 15),

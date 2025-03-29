@@ -61,6 +61,12 @@ const commands = [
     command: 'format',
     usage: 'npm run format',
     description: '格式化代码'
+  },
+  {
+    command: 'graph',
+    usage: 'npm run graph [orders|trans]',
+    example: 'npm run graph orders',
+    description: '切换主图显示内容，orders 控制订单记录，trans 控制开平仓信息'
   }
 ];
 

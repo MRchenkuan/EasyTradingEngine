@@ -1,7 +1,7 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
 import { TradeEngine } from '../TradeEngine.js';
-import { createOrder_market } from '../../trading.js';
+import { createOrder_market, executeOrders } from '../../trading.js';
 
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
