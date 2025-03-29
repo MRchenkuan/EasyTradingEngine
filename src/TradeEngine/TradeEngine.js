@@ -235,7 +235,6 @@ export class TradeEngine {
       // 记录拟合结果
       // recordBetaHistory(assetId, a, b, lastTs); // 记录历史拟合结果
 
-      console.log(`[${formatTimestamp(lastTs)}]拟合的多项式系数(${assetId}):`, { a, b });
       this._beta_map[assetId] = [a, b];
     };
 

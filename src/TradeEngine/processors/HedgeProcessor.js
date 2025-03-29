@@ -190,7 +190,7 @@ export class HedgeProcessor extends AbstractProcessor {
 
     // 交易信号生成
     console.log(
-      `开仓判断：[${instId1}]:[${instId2}] 门限：${(open_gate * 100).toFixed(2)}%， 当前：${(diff_rate * 100).toFixed(2)}%`
+      `\n\r开仓判断：[${instId1}]:[${instId2}] 门限：${(open_gate * 100).toFixed(2)}%， 当前：${(diff_rate * 100).toFixed(2)}%`
     );
     console.log(
       `- 前次记录：`,
@@ -266,7 +266,7 @@ export class HedgeProcessor extends AbstractProcessor {
         console.log(
           `-- 前次开仓的价差：${(prev_transactions_diff_rate * 100).toFixed(2)} % (${formatTimestamp(ts)})`
         );
-        console.log(`-- 前次越过门限后的最大距离：${(this._prev_diff_rate * 100).toFixed(2)} %`);
+        console.log(`-- 前次最大距离：${(this._prev_diff_rate * 100).toFixed(2)} %`);
         // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
         this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate);
       }
@@ -274,29 +274,45 @@ export class HedgeProcessor extends AbstractProcessor {
       if (this._prev_diff_rate) {
         // 前次达到过，再次达到门限，超上次 n 倍
         if (diff_rate > this._prev_diff_rate * 1.5) {
+          console.log(`执行开仓：再次到达门限,并超过前次的了1.5倍`);
           console.log(
-            `-- 再次到达门限,并超过前次的了1.5倍: ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
+            `- ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
           );
+          // todo 补充回落逻辑
+          // todo 补充回落逻辑
+          // todo 补充回落逻辑
+          // todo 补充回落逻辑
+          // todo 补充回落逻辑
+          // todo 补充回落逻辑
+
           spx1 > spx2
             ? open_position(instId1, instId2, this._position_size)
             : open_position(instId2, instId1, this._position_size);
           console.log(
-            `--- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
+            `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
           );
           this._prev_diff_rate = diff_rate;
           return;
         } else {
           // 没超则过
           console.log(
-            `- 再次到达门限,但没有超过前次的了1.5倍不执行开仓: ${(diff_rate * 100).toFixed(2)} % < 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
+            `不执行开仓: 再次到达门限,但没有超过前次的1.5倍.${(this._prev_diff_rate * 1.5 * 100).toFixed(2)}%`
           );
           return;
         }
       } else {
-        console.log(`-- 首次到达门限：${(this._prev_diff_rate * 100).toFixed(2)}% 直接开仓`);
+        console.log(`首次到达门限：${(this._prev_diff_rate * 100).toFixed(2)}% 直接开仓`);
         console.log(
-          `--- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
+          `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
+
+        // todo 补充回落逻辑
+        // todo 补充回落逻辑
+        // todo 补充回落逻辑
+        // todo 补充回落逻辑
+        // todo 补充回落逻辑
+        // todo 补充回落逻辑
+
         spx1 > spx2
           ? open_position(instId1, instId2, this._position_size)
           : open_position(instId2, instId1, this._position_size);

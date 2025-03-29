@@ -93,7 +93,6 @@ export class VisualEngine {
   static _addCostLines(chart) {
     this._show_order_his.forEach(it => {
       const { position, totalCost, avgCost, updateTime, instId } = TradeEngine.getPositionCost(it);
-      console.log(`${instId}:持仓${totalCost}, 平均成本${avgCost}`);
       const themes_map = this.getThemes();
       // 只在有持仓时显示成本线
       if (position !== 0 && avgCost !== 0) {
