@@ -130,7 +130,6 @@ export {
 ```javascript
 TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
  ```
-```
 - 参数说明：
   - 第一个参数：对冲资产对数组
   - 第二个参数：交易金额（USDT）
@@ -148,8 +147,17 @@ TradeEngine.createGridTrading('SOL-USDT', {
   _max_price: 300,        // 最高触发价格
 });
  ```
-```
-
+- 参数说明：
+  - 第一个参数：交易资产
+  - 第二个参数：网格交易参数对象
+    - _grid_width：网格宽度，相邻网格价格间隔
+    - _max_drawdown：最大回撤，超过此值触发买入
+    - _max_bounce：最大反弹，超过此值触发卖出
+    - _trade_amount：每次交易数量
+    - _max_position：最大持仓数量
+    - _start_position：起始仓位
+    - _min_price：最低触发价格
+    - _max_price：最高触发价格
 - 交易逻辑：
   - 在设定的价格区间内生成等比网格
   - 价格上涨超过最大反弹时卖出
