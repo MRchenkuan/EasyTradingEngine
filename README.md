@@ -69,10 +69,10 @@ export { base_url, api_key, api_secret, pass_phrase };
   - 示例：`npm run close 318fe6d8`
 
 - `npm run list [clear]`
-- <img width="529" alt="image" src="https://github.com/user-attachments/assets/3e72abb8-8c97-4bf7-9943-57eb8d4fee8a" />
   - 查看当前持仓列表
   - 可选参数 clear 用于清理已平仓记录
   - 示例：`npm run list clear`
+<img width="529" alt="image" src="https://github.com/user-attachments/assets/3e72abb8-8c97-4bf7-9943-57eb8d4fee8a" />
 
 - `npm run monit`
   - 实时监控持仓情况，自动刷新
