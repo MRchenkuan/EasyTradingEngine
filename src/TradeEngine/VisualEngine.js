@@ -29,6 +29,7 @@ export class VisualEngine {
   static _asset_themes = [];
   static _asset_names = [];
   static _show_order_his = [];
+  static _painting_interval = 2000; //
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
 
@@ -65,7 +66,7 @@ export class VisualEngine {
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
       this.start();
-    }, 1000);
+    }, this._painting_interval);
   }
 
   static stop() {
@@ -89,9 +90,10 @@ export class VisualEngine {
    * 绘制成本线
    * @private
    */
-  static _addCostLines(chart, positions) {
-    positions.forEach((data, index) => {
-      const { position, totalCost, avgCost, updateTime, instId } = data;
+  static _addCostLines(chart) {
+    this._show_order_his.forEach(it => {
+      const { position, totalCost, avgCost, updateTime, instId } = TradeEngine.getPositionCost(it);
+      console.log(`${instId}:持仓${totalCost}, 平均成本${avgCost}`);
       const themes_map = this.getThemes();
       // 只在有持仓时显示成本线
       if (position !== 0 && avgCost !== 0) {
@@ -105,7 +107,7 @@ export class VisualEngine {
         ctx.beginPath();
         ctx.setLineDash([5, 5]);
         ctx.strokeStyle = themes_map[instId] || '#666666';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1;
         ctx.moveTo(chart.chartArea.left, yPixel);
         ctx.lineTo(chart.chartArea.right, yPixel);
         ctx.stroke();
@@ -126,7 +128,6 @@ export class VisualEngine {
 
   /**
    * 渲染图片
-   * @param {*} duration
    */
   static drawMainGraph() {
     try {
@@ -214,7 +215,7 @@ export class VisualEngine {
               this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
 
               // 绘制各个品种的成本线
-              this._addCostLines(chart, Object.values(TradeEngine._positionCost));
+              this._addCostLines(chart);
             },
           },
         ],
@@ -240,8 +241,8 @@ export class VisualEngine {
     // 绘制 0% 参考线
     ctx.beginPath();
     ctx.setLineDash([5, 5]);
-    ctx.strokeStyle = '#666666';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#aaaaaa';
+    ctx.lineWidth = 1.5;
     ctx.moveTo(chart.chartArea.left, yPixel);
     ctx.lineTo(chart.chartArea.right, yPixel);
     ctx.stroke();
@@ -331,6 +332,7 @@ export class VisualEngine {
           // 绘制垂直虚线
           ctx.beginPath();
           ctx.setLineDash([5, 3]);
+          ctx.lineWidth = 1;
           ctx.moveTo(fx, fy);
           ctx.lineTo(fx, fy + lineDirection * lineLength);
           ctx.strokeStyle = ctx.fillStyle;
@@ -724,7 +726,7 @@ export class VisualEngine {
         const b = headers[colIndex];
         if (all_exist_hedges.some(it => it.join('') === a + b || it.join('') === b + a)) {
           ctx.setLineDash([5, 3]);
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 1;
           ctx.strokeStyle = '#eb984e';
           ctx.strokeRect(
             (colIndex + 1) * cellWidth - padding + left,

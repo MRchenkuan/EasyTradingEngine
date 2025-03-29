@@ -26,7 +26,10 @@
     "close": "node src/scripts/close.js",
     "open": "node src/scripts/open.js",
     "x": "arch -x86_64 zsh && arch",
-    "docker": "npm run docker:stop && npm run docker:rm && npm run docker:build && npm run docker:clean && npm run docker:run"
+    "docker": "npm run docker:stop && npm run docker:rm && npm run docker:build && npm run docker:clean && npm run docker:run",
+    "list": "node src/scripts/positions.js",
+    "monit": "node src/scripts/monit-positions.js",
+    "help": "node src/scripts/help.js"
   },
   "repository": {
     "type": "git",

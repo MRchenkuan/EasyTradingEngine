@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '5m';
+const bar_type = '15m';
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
@@ -28,7 +28,7 @@ const params = {
   // from_when: new Date(2025,2,7,0,0,0).getTime(), // 指定结束时间
   // to_when:new Date(2025,2,15,0,0,0).getTime(), // 指定起始时间
   from_when: getLastWholeMinute(new Date()), // 最近时间
-  to_when: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).getTime(), // 10天前
+  to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(), // 12天前
 };
 
 /**
@@ -55,7 +55,7 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 VisualEngine.setMetaInfo({
   assets,
   show_order_his: [
-    // 'BTC-USDT',
+    'BTC-USDT',
     'ETH-USDT',
     'XRP-USDT',
     'SOL-USDT',

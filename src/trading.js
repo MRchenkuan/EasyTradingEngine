@@ -60,15 +60,15 @@ export async function executeOrders(orderList) {
     })
   );
   orderDetails = processOrderDetail(orderDetails);
-  console.log('下单完成..', orderDetails);
+  console.log('下单完成..');
   return {
     success: true,
     data: mergeOrder2Result([...result, ...orderDetails]),
   };
 }
 
-// 修改 open_positions 函数
-export async function open_positions(short, long, size) {
+// 修改 open_position 函数
+export async function open_position(short, long, size) {
   console.log('开仓...', short, long, size);
   const tradeId = hashString(generateCounterBasedId());
 
@@ -109,7 +109,7 @@ export async function close_position(tradeId) {
     return createOrder_market(instId, count, side === 'sell' ? 1 : 0, true);
   });
 
-  console.log('平仓...', orders_info);
+  console.log('平仓...');
   const execResult = await executeOrders(orders_info);
   if (!execResult.success) {
     return { success: false, msg: execResult.msg };

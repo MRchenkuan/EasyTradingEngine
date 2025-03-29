@@ -184,7 +184,7 @@ export function readOpeningTransactions(tradeId) {
 
     // 读取文件内容
     const content = fs.readFileSync(filePath_trade_results_opening, 'utf-8');
-    const data = JSON.parse(content);
+    let data = JSON.parse(content);
     if (!Array.isArray(data)) data = [];
 
     const index = data.findIndex(item => item.tradeId === tradeId);
