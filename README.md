@@ -10,7 +10,8 @@
 
 ### 大盘指标 位置：chart/main_chart.jpg
 
-![image](https://github.com/user-attachments/assets/c7a59364-de1e-4029-87fc-788f5cfb83e8)
+<img width="676" alt="image" src="https://github.com/user-attachments/assets/c73cdcca-264e-48bb-922e-46790c3df8cf" />
+
 
 - 左上角各是个资产之间的ρ值（皮尔逊相关系数），用于比较哪些资产适合做对冲
 - 中间是各个资产的实时价格、建议的对冲比（等额对冲），主要关注这个比值是否稳定
@@ -33,7 +34,8 @@
 ### 正常启动的效果
 
 “所有系统启动，启动启动！”
-<img width="1136" alt="image" src="https://github.com/user-attachments/assets/02847ccb-d633-4091-a197-ac1c5abb7611" />
+<img width="676" alt="image" src="https://github.com/user-attachments/assets/dedf2fea-0bac-4ed0-bf58-c90ad136dcec" />
+
 
 # NOTICE
 
