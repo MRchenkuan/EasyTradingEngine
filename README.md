@@ -10,7 +10,7 @@
 
 ### 大盘指标 位置：chart/main_chart.jpg
 
-<img width="676" alt="image" src="https://github.com/user-attachments/assets/c73cdcca-264e-48bb-922e-46790c3df8cf" />
+![image](https://github.com/user-attachments/assets/f674885c-64e9-4188-8bff-57a8835553f4)
 
 
 - 左上角各是个资产之间的ρ值（皮尔逊相关系数），用于比较哪些资产适合做对冲
@@ -34,6 +34,7 @@
 ### 正常启动的效果
 
 “所有系统启动，启动启动！”
+
 <img width="676" alt="image" src="https://github.com/user-attachments/assets/dedf2fea-0bac-4ed0-bf58-c90ad136dcec" />
 
 
