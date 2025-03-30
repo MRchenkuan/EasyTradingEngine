@@ -4,47 +4,45 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// 获取 __dirname 的 ES 模块等价物
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// 处理字符串宽度（中文字符占两个位置，忽略颜色控制字符）
+const colors = {
+  reset: '\x1b[0m',
+  gray: '\x1b[90m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+};
+
 function padString(str, length) {
-  // 移除颜色控制字符后计算实际显示宽度
   const visibleStr = str.replace(/\x1b\[\d+m/g, '');
   const strWidth = [...visibleStr].reduce((width, char) => {
     return width + (/[\u4e00-\u9fa5]/.test(char) ? 2 : 1);
   }, 0);
-  
-  // 如果原字符串包含颜色控制，保留颜色并在末尾添加重置颜色
+
   const hasColor = str !== visibleStr;
   const padding = ' '.repeat(Math.max(0, length - strWidth));
   return hasColor ? `${str}${padding}` : str + padding;
 }
 
-const clearFlag = process.argv[2] === 'clear';
-const openPositions = getLastTransactions(100, 'opening');
+function clearScreen() {
+  process.stdout.write('\x1b[2J');
+  process.stdout.write('\x1b[0f');
+}
 
-if (openPositions.length === 0) {
-  console.log('当前没有持仓');
-} else {
-  // 如果带了 clear 参数，清理已平仓数据
-  if (clearFlag) {
-    // 清理 opening 文件中的已平仓交易
-    const openingPath = path.join(__dirname, '../../records/trade-results-opening.json');
-    const activePositions = openPositions.filter(p => !p.closed);
-    fs.writeFileSync(openingPath, JSON.stringify(activePositions, null, 2), 'utf-8');
+function displayPositions(monit = false) {
+  const openPositions = getLastTransactions(100, 'opening');
+  const closingTransactions = getLastTransactions(100, 'closing');
 
-    // 清理 closing 文件中对应的平仓记录
-    const closingPath = path.join(__dirname, '../../records/trade-results-closing.json');
-    if (fs.existsSync(closingPath)) {
-      fs.writeFileSync(closingPath, JSON.stringify([], null, 2), 'utf-8');
-    }
-
-    console.log('已清理平仓数据');
+  if (monit) {
+    clearScreen();
   }
 
-  console.log('当前持仓:');
+  if (openPositions.length === 0) {
+    console.log('当前没有持仓');
+    return;
+  }
+
   const header = [
     padString('交易ID', 12),
     padString('创建时间', 15),
@@ -52,36 +50,40 @@ if (openPositions.length === 0) {
     padString('资金规模', 12),
     padString('盈亏', 10),
     padString('状态', 10),
+    padString('持仓天数', 10),
   ].join('');
   console.log(header);
-  console.log('-'.repeat(73));
-
-  // 添加颜色处理函数
-  const colors = {
-    reset: '\x1b[0m',
-    gray: '\x1b[90m',
-    red: '\x1b[31m',
-    green: '\x1b[32m'
-  };
+  console.log('-'.repeat(83));
 
   openPositions.forEach(({ tradeId, profit, orders, ts, closed }) => {
     const createTime = formatTimestamp(new Date(ts).getTime());
-    const pairs = orders.map(o => o.instId.split('-')[0]).join(':');
+
+    // 重新排序对冲品种，SELL在前，BUY在后
+    const sortedOrders = [...orders].sort((a, b) => {
+      if (a.side.toUpperCase() === 'SELL' && b.side.toUpperCase() === 'BUY') return -1;
+      if (a.side.toUpperCase() === 'BUY' && b.side.toUpperCase() === 'SELL') return 1;
+      return 0;
+    });
+    const pairs = sortedOrders.map(o => o.instId.split('-')[0]).join(':');
+
     const amount = orders.reduce(
       (sum, o) => sum + parseFloat(o.accFillSz) * parseFloat(o.avgPx),
       0
     );
 
-    // 处理状态颜色，未平仓使用默认颜色
-    const status = closed 
-      ? `${colors.gray}已平仓${colors.reset}`
-      : '未平仓';
+    const createTs = new Date(ts).getTime();
+    const closeTs = closed
+      ? closingTransactions.find(t => t.tradeId === tradeId)?.ts || Date.now()
+      : Date.now();
+    const daysHeld = ((closeTs - createTs) / (1000 * 60 * 60 * 24)).toFixed(1);
 
-    // 处理盈亏颜色
+    const status = closed ? `${colors.gray}已平仓${colors.reset}` : '未平仓';
+
     const profitValue = profit?.toFixed(2) || '0';
-    const coloredProfit = parseFloat(profitValue) >= 0
-      ? `${colors.red}${profitValue}${colors.reset}`
-      : `${colors.green}${profitValue}${colors.reset}`;
+    const coloredProfit =
+      parseFloat(profitValue) >= 0
+        ? `${colors.red}${profitValue}${colors.reset}`
+        : `${colors.green}${profitValue}${colors.reset}`;
 
     const row = [
       padString(tradeId.toString(), 12),
@@ -90,8 +92,49 @@ if (openPositions.length === 0) {
       padString(amount.toFixed(2), 12),
       padString(coloredProfit, 10),
       padString(status, 10),
+      padString(daysHeld + '天', 10),
     ].join('');
 
     console.log(row);
   });
+}
+
+function clearPositions() {
+  const openPositions = getLastTransactions(100, 'opening');
+  if (openPositions.length === 0) {
+    console.log('当前没有持仓');
+    return;
+  }
+
+  // 清理 opening 文件中的已平仓交易
+  const openingPath = path.join(__dirname, '../../records/trade-results-opening.json');
+  const activePositions = openPositions.filter(p => !p.closed);
+  fs.writeFileSync(openingPath, JSON.stringify(activePositions, null, 2), 'utf-8');
+
+  // 清理 closing 文件中对应的平仓记录
+  const closingPath = path.join(__dirname, '../../records/trade-results-closing.json');
+  if (fs.existsSync(closingPath)) {
+    fs.writeFileSync(closingPath, JSON.stringify([], null, 2), 'utf-8');
+  }
+
+  console.log('已清理平仓数据');
+}
+
+// 根据命令行参数执行不同功能
+const command = process.argv[2];
+
+switch (command) {
+  case 'monit':
+    // 实时监控模式
+    setInterval(() => displayPositions(true), 1000);
+    displayPositions(true); // 立即显示第一次
+    break;
+  case 'clear':
+    // 清理已平仓数据
+    clearPositions();
+    displayPositions();
+    break;
+  default:
+    // 默认显示一次持仓信息
+    displayPositions();
 }
