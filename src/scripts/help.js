@@ -81,3 +81,11 @@ commands.forEach(cmd => {
   console.log(`    说明: ${cmd.description}`);
   console.log('');
 });
+
+console.log(`
+持仓管理:
+  npm run list              显示当前持仓列表
+  npm run list:clear        清理已平仓数据
+  npm run list:delete ID    删除指定交易ID的所有相关记录
+  npm run monit            实时监控持仓状态
+`);

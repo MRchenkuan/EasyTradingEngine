@@ -112,9 +112,14 @@ export class LocalVariable {
   _loadData() {
     try {
       const content = fs.readFileSync(DATA_FILE, 'utf8');
-      return JSON.parse(content) || {};
+      // 增加空文件检查
+      if (!content.trim()) {
+        return {};
+      }
+      return JSON.parse(content);
     } catch (error) {
-      if (error.code === 'ENOENT') {
+      if (error.code === 'ENOENT' || error instanceof SyntaxError) {
+        // 文件不存在或 JSON 解析错误时，返回空对象
         return {};
       }
       throw error;
@@ -126,8 +131,12 @@ export class LocalVariable {
    * @param {*} data
    */
   _saveData(data) {
-    // 当前实现在多进程环境下可能会有竞态条件
-    fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+    try {
+      fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+      const content = JSON.stringify(data, null, 2);
+      fs.writeFileSync(DATA_FILE, content, 'utf8');
+    } catch (error) {
+      console.error('保存本地变量失败:', error.message);
+    }
   }
 }
