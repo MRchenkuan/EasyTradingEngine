@@ -59,42 +59,24 @@ export { base_url, api_key, api_secret, pass_phrase };
 ## 可用命令
 
 ### 交易相关
-
 - `npm run open [空头资产] [多头资产] [金额]`
-
   - 开仓命令，支持简写币种名称，不区分大小写
   - 示例：`npm run open sol eth 2000`
-
 - `npm run close [交易ID]`
-
   - 平仓命令
   - 示例：`npm run close 318fe6d8`
-
 - `npm run list [clear]`
   - 查看当前持仓列表
   - 可选参数 clear 用于清理已平仓记录
   - 示例：`npm run list clear`
-    <img width="529" alt="image" src="https://github.com/user-attachments/assets/3e72abb8-8c97-4bf7-9943-57eb8d4fee8a" />
 - `npm run list:clear` - 清理已平仓数据
 - `npm run list:delete <tradeId>` - 删除指定交易ID的所有相关记录
 - `npm run monit`
   - 实时监控持仓情况，自动刷新
+<img width="651" alt="image" src="https://github.com/user-attachments/assets/cde8f587-669d-4657-94bf-3b63a20642e5" />
 
+ 
 ### 绘图相关
-
-- `npm run chart`
-  - 启动绘图程序
-  - 示例：`npm run chart`
-    <img width="1136" alt="image" src="h### 绘图相关
-- `npm run chart`
-  - 启动绘图程序
-  - 示例：`npm run chart`
-    <img width="1136" alt="image" src="URL_ADDRESS.com/user-attachments/assets/02847ccb-d633-4091-a197-ac1c5abb7611" />
-
-### 其他命令
-
-- `npm run hide:order` - 在主图上隐藏所有的历史订单记录
-- `npm run hide:trans` - 在主图上隐藏所有的开平仓信息
 - `npm run graph orders` - 切换主图上历史订单记录的显示/隐藏
 - `npm run graph trans` - 切换主图上开平仓信息的显示/隐藏
 
