@@ -49,7 +49,7 @@ function displayPositions(monit = false) {
     padString('交易ID', 12),
     padString('创建时间', 15),
     padString('对冲品种', 14),
-    padString('资金规模', 12),
+    padString('头寸规模', 12),
     padString('盈亏', 10),
     padString('收敛度', 10),
     padString('状态', 10),
@@ -120,6 +120,37 @@ function displayPositions(monit = false) {
 
     console.log(row);
   });
+
+  // 添加汇总信息
+  let totalProfit = 0;
+  let totalAmount = 0;
+
+  openPositions.forEach(({ profit, orders }) => {
+    totalProfit += parseFloat(profit || 0);
+    totalAmount += orders.reduce(
+      (sum, o) => sum + parseFloat(o.accFillSz) * parseFloat(o.avgPx),
+      0
+    );
+  });
+
+  // 打印分隔线和汇总行
+  console.log('-'.repeat(93));
+  const summaryRow = [
+    padString('总计', 41),
+    padString(totalAmount.toFixed(2), 12),
+    padString(
+      totalProfit >= 0
+        ? `${colors.red}${totalProfit.toFixed(2)}${colors.reset}`
+        : `${colors.green}${totalProfit.toFixed(2)}${colors.reset}`,
+      10
+    ),
+    padString('', 30),
+  ].join('');
+  console.log(summaryRow);
+
+  if (!monit) {
+    process.exit(0);
+  }
 }
 
 function clearPositions() {

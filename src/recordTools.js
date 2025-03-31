@@ -248,8 +248,7 @@ export function recordMarketMakerTransactions(tradeId, orders) {
   }
 }
 
-
-export function recordGridTradeOrders(orders) {
+export function recordGridTradeOrders(order) {
   try {
     // 读取现有内容
     let data = [];
@@ -258,10 +257,25 @@ export function recordGridTradeOrders(orders) {
       data = JSON.parse(content);
       if (!Array.isArray(data)) data = [];
     }
-    data.push(orders);
+    data.push(order);
     // 写入文件
     fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
   } catch (error) {
     console.error('订单记录错误:', error);
+  }
+}
+
+export function getGridTradeOrders() {
+  try {
+    // 读取现有内容
+    let data = [];
+    if (fs.existsSync(filePath_trade_results_grid)) {
+      const content = fs.readFileSync(filePath_trade_results_grid, 'utf-8');
+      data = JSON.parse(content);
+      if (!Array.isArray(data)) data = [];
+    }
+    return data;
+  } catch (error) {
+    console.error('订单解析错误:', error);
   }
 }

@@ -283,7 +283,7 @@ export class HedgeProcessor extends AbstractProcessor {
       // 检查是否达到收益拐点
       if (!this._isMeetReturnRequirement(diff_rate)) {
         console.log(
-          `暂不开仓：未达到收益拐点，当前：${(diff_rate * 100).toFixed(2)}%, 要求：${((this._prev_diff_rate - this._return_rate) * 100).toFixed(2)}%，继续等待...`
+          `暂不开仓：未达到收益拐点，当前：${(diff_rate * 100).toFixed(2)}%, 要求：${((this._prev_diff_rate - this._return_rate) * 100).toFixed(2)}%，🐢继续等待...`
         );
         return;
       }

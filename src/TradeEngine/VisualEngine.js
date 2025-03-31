@@ -4,6 +4,7 @@ import { blendColors, createMapFrom, formatTimestamp, hashString } from '../tool
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import {
   getClosingTransaction,
+  getGridTradeOrders,
   getLastTransactions,
   getOpeningTransaction,
 } from '../recordTools.js';
@@ -64,6 +65,7 @@ export class VisualEngine {
     if (status == 2) {
       this.drawMainGraph();
       this.drawTransctionSlices();
+      this.drawGridTrading();
     }
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
@@ -73,6 +75,124 @@ export class VisualEngine {
 
   static stop() {
     clearTimeout(this._timer.start);
+  }
+
+  static drawGridTrading() {
+    const orders = getGridTradeOrders().filter(orderGroup => orderGroup !== null);
+    // 先对order按照instId进行分组
+    const groupedOrders = orders.reduce((acc, orderGroup) => {
+      const instId = orderGroup.instId; // 使用第一个订单的instId作为key
+      if (!acc[instId]) {
+        acc[instId] = [];
+      }
+      acc[instId].push(orderGroup); // 保持订单组的完整性
+      return acc;
+    }, {});
+
+    // 遍历每个分组
+    for (const instId in groupedOrders) {
+      const group_orders = groupedOrders[instId];
+      const themes_map = this.getThemes();
+      const color = themes_map[instId] || '#666666';
+
+      const { prices, id, ts } = TradeEngine.getMarketData(instId);
+      const labels = ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
+      const file_path = path.join('grid', `/${instId}.jpg`);
+
+      // 计算差值并添加注释
+      const configuration = {
+        // type: 'scatter',
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: instId,
+              data: prices,
+              borderColor: color,
+              pointBackgroundColor: color,
+              ...styles,
+            },
+          ],
+        },
+        options: {
+          responsive: true, // 确保响应式布局
+          maintainAspectRatio: false, // 允许自定义宽高比例
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: 'black' } },
+          },
+          scales: {
+            // y: {
+            // ticks: {
+            //   callback: function (value) {
+            //     const baseValue = scaled_prices[0].prices[0];
+            //     return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
+            //   },
+            //   stepSize: value => {
+            //     const baseValue = scaled_prices[0].prices[0];
+            //     return baseValue * 0.025; // 2.5% 的实际价格变化值
+            //   },
+            // },
+            // },
+          },
+          layout: {
+            padding: {
+              top: 140,
+              bottom: 60,
+              left: 60,
+              right: 60,
+            },
+          },
+        },
+        plugins: [
+          {
+            afterDraw: chart => {
+              // 绘制零基准线
+              const baseValue = prices[0];
+              this._drawZeroLine(chart, baseValue);
+
+              // 为了避免标签重叠先搞个位置收集器
+              const collisionAvoidance = createCollisionAvoidance();
+
+              // 绘制实时利润空间表格
+              this._drawProfitTable(chart);
+
+              // 绘制信息表格
+              this._drawInfoTable(chart);
+
+              this._drawRhoTable(chart);
+
+              this._drawDateTime(chart);
+
+              // 绘制历史订单信息
+              group_orders.forEach(order => {
+                const { ts, avgPx, accFillSz, side, gridCount } = order;
+                const time = formatTimestamp(ts, TradeEngine._bar_type);
+                const price = parseFloat(avgPx);
+
+                const xCoord = chart.scales.x.getPixelForValue(time);
+                const yCoord = chart.scales.y.getPixelForValue(price);
+                debugger;
+                // 绘制订单标签
+                const label = `${side === 'buy' ? '买入' : '卖出'}/${accFillSz}(${avgPx})/${gridCount}`;
+                this._paintSingleOrder(chart.ctx, xCoord, yCoord, label, side, collisionAvoidance);
+              });
+            },
+          },
+        ],
+      };
+
+      (async () => {
+        const image = await chartJSNodeCanvas.renderToBuffer(configuration);
+        this.writeChartFile(file_path, image);
+      })();
+    }
+    // orders.forEach(({ instId, side, avgPx, accFillSz, tradeId }) => {
+
+    //   // paintLine(chart, xCoord, yCoord, color, label, collisionAvoidance);
+    // })
   }
 
   /**
@@ -257,6 +377,57 @@ export class VisualEngine {
   }
 
   /**
+   * 绘制单个订单点位及标签
+   * @private
+   */
+  static _paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance) {
+    // 绘制圆点
+    ctx.beginPath();
+    ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = {
+      buy: 'red',
+      sell: 'green',
+    }[side];
+    ctx.fill();
+
+    // 买单向下(1)，卖单向上(-1)
+    const lineLength = 60;
+    const lineDirection = side === 'buy' ? 1 : -1;
+
+    // 绘制垂直虚线
+    ctx.beginPath();
+    ctx.setLineDash([5, 3]);
+    ctx.lineWidth = 1;
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, fy + lineDirection * lineLength);
+    ctx.strokeStyle = ctx.fillStyle;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 绘制文字标签
+    ctx.font = `12px bold ${font_style}`;
+    ctx.textAlign = 'center';
+    const lines = labels.split('/');
+    const lineHeight = 14;
+    const totalHeight = lines.length * lineHeight;
+
+    // sell 方向需要向上偏移文本总高度
+    const labelOffset = side === 'sell' ? -totalHeight : 10;
+    const { x: labelX, y: labelY } = collisionAvoidance(
+      fx,
+      fy + lineDirection * (lineLength + 5) + labelOffset,
+      100,
+      totalHeight
+    );
+
+    // 分行绘制标签
+    lines.forEach((text, index) => {
+      ctx.fillText(text, labelX, labelY + index * lineHeight);
+    });
+    ctx.textAlign = 'start';
+  }
+
+  /**
    * 绘制历史订单
    * @param {*} chart
    * @param {*} beta_map
@@ -323,54 +494,59 @@ export class VisualEngine {
           const srt_px = sideData.avgPrice * a + b;
           const fy = yScale.getPixelForValue(srt_px);
 
-          // 绘制圆点
-          ctx.beginPath();
-          ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
-          ctx.fillStyle = {
-            buy: 'red',
-            sell: 'green',
-          }[side];
-          ctx.fill();
+          // // 绘制圆点
+          // ctx.beginPath();
+          // ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
+          // ctx.fillStyle = {
+          //   buy: 'red',
+          //   sell: 'green',
+          // }[side];
+          // ctx.fill();
 
-          // 买单向下(1)，卖单向上(-1)
-          const lineLength = 60;
-          const lineDirection = side === 'buy' ? 1 : -1;
+          // // 买单向下(1)，卖单向上(-1)
+          // const lineLength = 60;
+          // const lineDirection = side === 'buy' ? 1 : -1;
 
-          // 绘制垂直虚线
-          ctx.beginPath();
-          ctx.setLineDash([5, 3]);
-          ctx.lineWidth = 1;
-          ctx.moveTo(fx, fy);
-          ctx.lineTo(fx, fy + lineDirection * lineLength);
-          ctx.strokeStyle = ctx.fillStyle;
-          ctx.stroke();
-          ctx.setLineDash([]);
+          // // 绘制垂直虚线
+          // ctx.beginPath();
+          // ctx.setLineDash([5, 3]);
+          // ctx.lineWidth = 1;
+          // ctx.moveTo(fx, fy);
+          // ctx.lineTo(fx, fy + lineDirection * lineLength);
+          // ctx.strokeStyle = ctx.fillStyle;
+          // ctx.stroke();
+          // ctx.setLineDash([]);
 
-          // 绘制文字标签
-          ctx.font = `12px bold ${font_style}`;
-          ctx.textAlign = 'center';
-          const label = [
+          // // 绘制文字标签
+          // ctx.font = `12px bold ${font_style}`;
+          // ctx.textAlign = 'center';
+          // const label = [
+          //   `${{ buy: '[B]', sell: '[S]' }[side]}${sideData.totalAmount.toFixed(2)}(${sideData.accFillSz.toFixed(2)})`,
+          //   `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`,
+          // ].join('/');
+          // const lines = label.split('/');
+          // const lineHeight = 14;
+          // const totalHeight = lines.length * lineHeight;
+
+          // // sell 方向需要向上偏移文本总高度
+          // const labelOffset = side === 'sell' ? -totalHeight : 10;
+          // const { x: labelX, y: labelY } = collisionAvoidance(
+          //   fx,
+          //   fy + lineDirection * (lineLength + 5) + labelOffset,
+          //   100,
+          //   totalHeight
+          // );
+
+          // // 分行绘制标签
+          // lines.forEach((text, index) => {
+          //   ctx.fillText(text, labelX, labelY + index * lineHeight);
+          // });
+          // ctx.textAlign = 'start';
+          const labels = [
             `${{ buy: '[B]', sell: '[S]' }[side]}${sideData.totalAmount.toFixed(2)}(${sideData.accFillSz.toFixed(2)})`,
             `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`,
           ].join('/');
-          const lines = label.split('/');
-          const lineHeight = 14;
-          const totalHeight = lines.length * lineHeight;
-
-          // sell 方向需要向上偏移文本总高度
-          const labelOffset = side === 'sell' ? -totalHeight : 10;
-          const { x: labelX, y: labelY } = collisionAvoidance(
-            fx,
-            fy + lineDirection * (lineLength + 5) + labelOffset,
-            100,
-            totalHeight
-          );
-
-          // 分行绘制标签
-          lines.forEach((text, index) => {
-            ctx.fillText(text, labelX, labelY + index * lineHeight);
-          });
-          ctx.textAlign = 'start';
+          this._paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance);
         }
       }
     }

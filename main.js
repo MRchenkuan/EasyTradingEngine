@@ -42,7 +42,7 @@ TradeEngine.setMetaInfo({
   assets,
 }).start();
 
-/** 
+/**
  * 创建对冲交易
  */
 TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
@@ -51,15 +51,14 @@ TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
 TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
 TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 
-
 /**
  * 启动网格交易
  */
 TradeEngine.createGridTrading('SOL-USDT', {
-  _grid_width: 0.0025,
-  _max_drawdown: 0.0012,
-  _max_bounce: 0.0012,
-  _trade_amount: 0.1,
+  _grid_width: 0.005,
+  _max_drawdown: 0.005,
+  _max_bounce: 0.005,
+  _trade_amount: 0.8,
   _max_position: 20,
   _start_position: 0,
   _min_price: 50,
@@ -67,30 +66,30 @@ TradeEngine.createGridTrading('SOL-USDT', {
 });
 
 TradeEngine.createGridTrading('XRP-USDT', {
-  _grid_width: 0.0025,
-  _max_drawdown: 0.0012,
-  _max_bounce: 0.0012,
-  _trade_amount: 100,
+  _grid_width: 0.005,
+  _max_drawdown: 0.005,
+  _max_bounce: 0.005,
+  _trade_amount: 50,
   _max_position: 2000,
   _min_price: 1,
   _max_price: 4,
 });
 
 TradeEngine.createGridTrading('ETH-USDT', {
-  _grid_width: 0.0025,
-  _max_drawdown: 0.0012,
-  _max_bounce: 0.0012,
-  _trade_amount: 0.02,
+  _grid_width: 0.005,
+  _max_drawdown: 0.005,
+  _max_bounce: 0.005,
+  _trade_amount: 0.06,
   _max_position: 1,
   _min_price: 1500,
   _max_price: 2800,
 });
 
 TradeEngine.createGridTrading('BTC-USDT', {
-  _grid_width: 0.0025,
-  _max_drawdown: 0.0012,
-  _max_bounce: 0.0012,
-  _trade_amount: 0.001,
+  _grid_width: 0.005,
+  _max_drawdown: 0.005,
+  _max_bounce: 0.005,
+  _trade_amount: 0.002,
   _max_position: 0.05,
   _min_price: 60000,
   _max_price: 100000,
@@ -117,7 +116,7 @@ const assetIds = assets.map(it => it.id);
 // 添加重试逻辑
 const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
   const results = [];
-  let globalRetries = 0;  // 全局重试次数
+  let globalRetries = 0; // 全局重试次数
 
   for (const id of assetIds) {
     let success = false;
@@ -128,7 +127,7 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
         if (data && data.prices && data.ts) {
           results.push(data);
           success = true;
-          globalRetries = 0;  // 成功后重置重试次数
+          globalRetries = 0; // 成功后重置重试次数
         } else {
           throw new Error('Invalid data received');
         }

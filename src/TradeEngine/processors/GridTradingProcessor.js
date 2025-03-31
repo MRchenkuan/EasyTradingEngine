@@ -315,12 +315,11 @@ export class GridTradingProcessor extends AbstractProcessor {
       true
     );
     let result = await executeOrders([order]);
-    recordGridTradeOrders(result.data);
     if (!result.success) {
       console.error(`⛔交易失败: ${orderType}`);
       return;
     }
-
+    recordGridTradeOrders({...result.data[0], gridCount});
     console.log(`✅交易成功: ${orderType}`);
     // 重置关键参数
     this._last_trade_price = this._current_price;
