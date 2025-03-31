@@ -13,7 +13,7 @@ const colors = {
   gray: '\x1b[90m',
   red: '\x1b[31m',
   green: '\x1b[32m',
-  orange: '\x1b[33m',  // 添加橙色
+  orange: '\x1b[33m', // 添加橙色
 };
 
 function padString(str, length) {
@@ -92,17 +92,19 @@ function displayPositions(monit = false) {
     let diffRate = '-';
     let diffValue = 0;
     const [order1, order2] = sortedOrders;
-    const price1 = TradeEngine.getRealtimePrice(order1.instId);
-    const price2 = TradeEngine.getRealtimePrice(order2.instId);
+    const price1 = closed ? order1.avgPx : TradeEngine.getRealtimePrice(order1.instId);
+    const price2 = closed ? order2.avgPx : TradeEngine.getRealtimePrice(order2.instId);
 
     if (price1 && price2 && order1.beta && order2.beta) {
       const sr_px1 = price1 * order1.beta[0] + order1.beta[1];
       const sr_px2 = price2 * order2.beta[0] + order2.beta[1];
       diffValue = TradeEngine._calcPriceGapProfit(sr_px1, sr_px2, (sr_px1 + sr_px2) / 2);
       const formattedDiff = (diffValue * 100).toFixed(2);
-      diffRate = Math.abs(diffValue) < 0.01 
-        ? `${colors.orange}${formattedDiff}%${colors.reset}`
-        : `${formattedDiff}%`;
+      diffRate = closed
+        ? `${colors.gray}${formattedDiff}%${colors.reset}`
+        : Math.abs(diffValue) < 0.01
+          ? `${colors.orange}${formattedDiff}%${colors.reset}`
+          : `${formattedDiff}%`;
     }
 
     const row = [
@@ -144,7 +146,7 @@ function clearPositions() {
 function deletePosition(tradeId) {
   const openPositions = getLastTransactions(100, 'opening');
   const closingTransactions = getLastTransactions(100, 'closing');
-  
+
   if (openPositions.length === 0) {
     console.log('当前没有持仓');
     return;
@@ -153,13 +155,15 @@ function deletePosition(tradeId) {
   // 清理 opening 文件
   const openingPath = path.join(__dirname, '../../records/trade-results-opening.json');
   const remainingPositions = openPositions.filter(p => p.tradeId.toString() !== tradeId);
-  
+
   // 清理 closing 文件
   const closingPath = path.join(__dirname, '../../records/trade-results-closing.json');
   const remainingClosing = closingTransactions.filter(p => p.tradeId.toString() !== tradeId);
 
-  if (remainingPositions.length === openPositions.length && 
-      remainingClosing.length === closingTransactions.length) {
+  if (
+    remainingPositions.length === openPositions.length &&
+    remainingClosing.length === closingTransactions.length
+  ) {
     console.log(`未找到交易ID: ${tradeId}`);
     return;
   }
@@ -167,7 +171,7 @@ function deletePosition(tradeId) {
   // 保存更新后的数据
   fs.writeFileSync(openingPath, JSON.stringify(remainingPositions, null, 2), 'utf-8');
   fs.writeFileSync(closingPath, JSON.stringify(remainingClosing, null, 2), 'utf-8');
-  
+
   console.log(`已删除交易ID: ${tradeId}`);
 }
 

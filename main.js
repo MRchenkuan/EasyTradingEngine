@@ -17,8 +17,8 @@ const assets = [
   { id: 'ETH-USDT', theme: '#85c1e9' },
   { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
-  // {id: 'OKB-USDT', theme:'#52be80'},
-  // {id: 'ADA-USDT', theme:'#85dfe9'},
+  // { id: 'OKB-USDT', theme: '#52be80' },
+  { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
 const params = {
   bar_type,
@@ -72,7 +72,7 @@ VisualEngine.setMetaInfo({
     'XRP-USDT',
     'SOL-USDT',
     'TRUMP-USDT',
-    // 'ADA-USDT',
+    'ADA-USDT',
     // 'OKB-USDT',
   ],
 }).start();
@@ -80,35 +80,56 @@ VisualEngine.setMetaInfo({
 const assetIds = assets.map(it => it.id);
 
 // 添加重试逻辑
-const getKlinesWithRetry = async (assetIds, params, maxRetries = 3) => {
+const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
   const results = [];
+  let globalRetries = 0;  // 全局重试次数
+
   for (const id of assetIds) {
-    let retries = 0;
-    while (retries < maxRetries) {
+    let success = false;
+
+    while (globalRetries < maxRetries && !success) {
       try {
         const data = await getPrices(id, params);
-        results.push(data);
-        break;
-      } catch (error) {
-        retries++;
-        if (retries === maxRetries) {
-          console.error(`Failed to fetch data for ${id} after ${maxRetries} retries`);
-          results.push({ id, prices: [], ts: [] });
+        if (data && data.prices && data.ts) {
+          results.push(data);
+          success = true;
+          globalRetries = 0;  // 成功后重置重试次数
         } else {
-          console.log(`Retrying ${id}, attempt ${retries + 1}/${maxRetries}`);
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          throw new Error('Invalid data received');
         }
+      } catch (error) {
+        globalRetries++;
+        console.error(`获取 ${id} 数据失败 (${globalRetries}/${maxRetries}):`, error.message);
+
+        if (globalRetries === maxRetries) {
+          console.error(`无法获取 ${id} 数据，已达到最大重试次数`);
+          throw new Error(`Failed to fetch data for ${id} after ${maxRetries} retries`);
+        }
+
+        // 指数退避重试
+        const delay = Math.min((1000 * globalRetries) / 2, 1000);
+        console.log(`等待 ${delay / 1000} 秒后重试...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   return results;
 };
 
-// 修改原有的数据获取逻辑
-const klines = await getKlinesWithRetry(assetIds, params);
-klines.map(({ id, prices, ts }) => {
-  TradeEngine.updatePrices(id, prices, ts, bar_type);
-});
+// 修改数据获取逻辑的错误处理
+try {
+  const klines = await getKlinesWithRetry(assetIds, params);
+  if (klines && klines.length > 0) {
+    klines.forEach(({ id, prices, ts }) => {
+      TradeEngine.updatePrices(id, prices, ts, bar_type);
+    });
+  } else {
+    throw new Error('获取K线数据失败');
+  }
+} catch (error) {
+  console.error('初始化数据失败:', error.message);
+  process.exit(1);
+}
 
 const ws_business = new WebSocket(base_url + '/ws/v5/business');
 storeConnection('ws_business', ws_business);

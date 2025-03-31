@@ -114,7 +114,7 @@ export async function getPrices(
       ts: collections.map(it => parseCandleData(it)['ts']),
     };
   } catch (e) {
-    console.error(e);
+    console.error(e.message);
   }
 }
 

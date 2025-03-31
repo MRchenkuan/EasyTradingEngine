@@ -156,7 +156,10 @@ export class VisualEngine {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { labels: { color: 'black' } },
+            legend: {
+              // position: 'bottom',
+              // display: false,
+            },
           },
           scales: {
             y: {
@@ -174,7 +177,7 @@ export class VisualEngine {
           },
           layout: {
             padding: {
-              top: 140,
+              top: 180,
               bottom: 60,
               left: 60,
               right: 60,
@@ -199,7 +202,7 @@ export class VisualEngine {
               this._drawProfitTable(chart);
 
               const beta_map = TradeEngine._beta_map;
-              if (this._config.show_transactions!==false) {
+              if (this._config.show_transactions !== false) {
                 // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
                 const transactions = [
                   ...getLastTransactions(100, 'opening'),
@@ -215,7 +218,7 @@ export class VisualEngine {
               this._drawDateTime(chart);
 
               // 绘制历史订单信息
-              ;(this._config.show_orders!==false) &&
+              this._config.show_orders !== false &&
                 this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
 
               // 绘制各个品种的成本线

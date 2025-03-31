@@ -28,6 +28,7 @@
     "x": "arch -x86_64 zsh && arch",
     "docker": "npm run docker:stop && npm run docker:rm && npm run docker:build && npm run docker:clean && npm run docker:run",
     "list": "node src/scripts/positions.js",
+    "list:": "node src/scripts/positions.js",
     "monit": "node src/scripts/positions.js monit",
     "help": "node src/scripts/help.js",
     "graph": "node src/scripts/graph.js"

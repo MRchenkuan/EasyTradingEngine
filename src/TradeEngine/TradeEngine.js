@@ -542,25 +542,65 @@ export class TradeEngine {
     });
   }
 
-  /**
-   * 监听
-   */
+  // /**
+  //  * 监听
+  //  */
+  // static _rewriteConsole(statusMessage = '交易引擎启动中...') {
+  //   // 创建一个新的 console 对象而不是直接修改全局 console
+  //   const customConsole = {
+  //     log: (...args) => {
+  //       process.stdout.write('\x1b[2K\r'); // 清除当前行
+  //       process.stdout.write(args.join(' ') + '\n');
+  //       process.stdout.write(statusMessage);
+  //     },
+  //     error: (...args) => {
+  //       process.stdout.write('\x1b[2K\r');
+  //       process.stdout.write('\x1b[31m' + args.join(' ') + '\x1b[0m\n');
+  //       process.stdout.write(statusMessage);
+  //     },
+  //     warn: (...args) => {
+  //       process.stdout.write('\x1b[2K\r');
+  //       process.stdout.write('\x1b[33m' + args.join(' ') + '\x1b[0m\n');
+  //       process.stdout.write(statusMessage);
+  //     }
+  //   };
+
+  //   // 保存原始的 console 对象
+  //   const originalConsole = global.console;
+  //   // 替换全局 console 对象
+  //   global.console = customConsole;
+
+  //   // 显示初始状态信息
+  //   process.stdout.write(statusMessage);
+
+  //   return () => {
+  //     // 恢复原始 console 对象
+  //     global.console = originalConsole;
+  //     process.stdout.write('\x1b[2K\r'); // 清除状态信息
+  //   };
+  // }
+
   static start() {
     const status = this.checkEngine();
-    if (status == 2) {
-      // 更新对冲比
-      this.refreshBeta();
-      // 更新交易记录
-      this.refreshTransactions();
-      // 运行所有的交易处理器
-      this.runAllProcessors();
-    } else if (status == 1) {
-      console.log('启动完成,进行初始化...');
-      this.refreshBeta();
-    } else if (status === 0) {
-      console.log('交易引擎启动中...');
-    } else {
-      throw new Error('启动失败...');
+    // const restore = this._rewriteConsole('交易引擎启动中...');
+
+    try {
+      if (status == 2) {
+        restore(); // 如果完全启动，先恢复console
+        this.refreshBeta();
+        this.refreshTransactions();
+        this.runAllProcessors();
+      } else if (status == 1) {
+        console.log('启动完成,进行初始化...');
+        this.refreshBeta();
+      } else if (status === 0) {
+        console.log('正在启动交易引擎...');
+      } else {
+        restore(); // 出错时恢复console
+        throw new Error('启动失败...');
+      }
+    } finally {
+      // restore(); // 确保一定会恢复console
     }
 
     clearTimeout(this._timer.start);
