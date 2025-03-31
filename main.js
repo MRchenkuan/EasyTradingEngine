@@ -42,23 +42,58 @@ TradeEngine.setMetaInfo({
   assets,
 }).start();
 
+/** 
+ * 创建对冲交易
+ */
 TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
 TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
 TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
 TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
-// 创建对冲交易
 TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
-// 创建网格交易
-// 创建网格交易处理器
+
+
+/**
+ * 启动网格交易
+ */
 TradeEngine.createGridTrading('SOL-USDT', {
   _grid_width: 0.0025,
   _max_drawdown: 0.0012,
   _max_bounce: 0.0012,
   _trade_amount: 0.1,
-  _max_position: 10,
+  _max_position: 20,
   _start_position: 0,
   _min_price: 50,
-  _max_price: 300,
+  _max_price: 250,
+});
+
+TradeEngine.createGridTrading('XRP-USDT', {
+  _grid_width: 0.0025,
+  _max_drawdown: 0.0012,
+  _max_bounce: 0.0012,
+  _trade_amount: 100,
+  _max_position: 2000,
+  _min_price: 1,
+  _max_price: 4,
+});
+
+TradeEngine.createGridTrading('ETH-USDT', {
+  _grid_width: 0.0025,
+  _max_drawdown: 0.0012,
+  _max_bounce: 0.0012,
+  _trade_amount: 0.02,
+  _max_position: 1,
+  _min_price: 1500,
+  _max_price: 2800,
+});
+
+TradeEngine.createGridTrading('BTC-USDT', {
+  _grid_width: 0.0025,
+  _max_drawdown: 0.0012,
+  _max_bounce: 0.0012,
+  _trade_amount: 0.001,
+  _max_position: 0.05,
+  _min_price: 60000,
+  _max_price: 100000,
 });
 
 /**

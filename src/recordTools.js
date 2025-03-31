@@ -17,7 +17,7 @@ const filePath_trade_results_makert_maker = path.join(
   '../records/trade-market-maker.json'
 );
 const filePath_beta_map = path.join(__dirname, '../records/realtime-beta-map.json');
-const filePath_price = path.join(__dirname, '../records/realtime-price.json');
+const filePath_trade_results_grid = path.join(__dirname, '../records/trade-results-grid.json');
 
 export function getOpeningTransaction(transId) {
   const file_path = filePath_trade_results_opening;
@@ -195,38 +195,6 @@ export function readOpeningTransactions(tradeId) {
   }
 }
 
-export function recordPrice(assetId, price) {
-  try {
-    // 读取现有内容
-    let data = {};
-    if (fs.existsSync(filePath_price)) {
-      const content = fs.readFileSync(filePath_price, 'utf-8');
-      data = JSON.parse(content);
-    }
-    data[assetId] = price;
-    // 写入文件
-    fs.writeFileSync(filePath_price, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('价格记录错误:', error);
-  }
-}
-
-export function readPrice(assetId) {
-  try {
-    if (!fs.existsSync(filePath_price)) {
-      console.log('File does not exist.');
-      return null;
-    }
-    // 读取文件内容
-    const content = fs.readFileSync(filePath_price, 'utf-8');
-    const data = JSON.parse(content);
-    return data[assetId];
-  } catch (error) {
-    console.error('订单读取错误:', error);
-    return null;
-  }
-}
-
 export function recordBetaMap(beta_map) {
   try {
     // 写入文件
@@ -275,6 +243,24 @@ export function recordMarketMakerTransactions(tradeId, orders) {
     }
     // 写入文件
     fs.writeFileSync(filePath_trade_results_makert_maker, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('订单记录错误:', error);
+  }
+}
+
+
+export function recordGridTradeOrders(orders) {
+  try {
+    // 读取现有内容
+    let data = [];
+    if (fs.existsSync(filePath_trade_results_grid)) {
+      const content = fs.readFileSync(filePath_trade_results_grid, 'utf-8');
+      data = JSON.parse(content);
+      if (!Array.isArray(data)) data = [];
+    }
+    data.push(orders);
+    // 写入文件
+    fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
   } catch (error) {
     console.error('订单记录错误:', error);
   }

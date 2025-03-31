@@ -28,7 +28,6 @@ import { close_position, open_position } from './trading.js';
 // });
 // debugger
 
-// const profit = await marketMaker('SOL-USDT', readPrice('SOL-USDT'), 100, 0)
 
 // getLastTransactions(100, 'opening').map(it=>{
 //   const orders = it.orders;
