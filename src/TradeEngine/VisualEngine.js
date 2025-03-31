@@ -124,18 +124,18 @@ export class VisualEngine {
             legend: { labels: { color: 'black' } },
           },
           scales: {
-            // y: {
-            // ticks: {
-            //   callback: function (value) {
-            //     const baseValue = scaled_prices[0].prices[0];
-            //     return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
-            //   },
-            //   stepSize: value => {
-            //     const baseValue = scaled_prices[0].prices[0];
-            //     return baseValue * 0.025; // 2.5% 的实际价格变化值
-            //   },
-            // },
-            // },
+            y: {
+              ticks: {
+                callback: function (value) {
+                  const baseValue = prices[0];
+                  return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
+                },
+                stepSize: value => {
+                  const baseValue = prices[0];
+                  return baseValue * 0.025; // 2.5% 的实际价格变化值
+                },
+              },
+            },
           },
           layout: {
             padding: {
@@ -383,7 +383,7 @@ export class VisualEngine {
   static _paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance) {
     // 绘制圆点
     ctx.beginPath();
-    ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
+    ctx.arc(fx, fy, 1.5, 0, 2 * Math.PI);
     ctx.fillStyle = {
       buy: 'red',
       sell: 'green',

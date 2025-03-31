@@ -186,10 +186,67 @@ ws_business.on('message', message => {
   }
 });
 
-ws_business.on('close', (code, reason) => {
+ws_business.on('close', async (code, reason) => {
+  console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
+  
+  // 停止引擎
   TradeEngine.stop();
   VisualEngine.stop();
-  console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
+  
+  // 等待5秒后重新初始化
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  console.log('正在尝试重新连接...');
+  
+  try {
+    // 重新获取数据
+    const klines = await getKlinesWithRetry(assetIds, {
+      ...params,
+      from_when: getLastWholeMinute(new Date()),
+      to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(),
+    });
+    
+    if (klines && klines.length > 0) {
+      // 更新数据
+      klines.forEach(({ id, prices, ts }) => {
+        TradeEngine.updatePrices(id, prices, ts, bar_type);
+      });
+      
+      // 重新启动引擎
+      TradeEngine.start();
+      VisualEngine.start();
+      
+      // 重新建立WebSocket连接
+      const new_ws = new WebSocket(base_url + '/ws/v5/business');
+      storeConnection('ws_business', new_ws);
+      
+      // 重新绑定事件处理
+      new_ws.on('open', () => {
+        console.log('ws_business重新连接成功');
+        assets.map(async it => {
+          await subscribeKlineChanel(new_ws, 'candle' + bar_type, it.id);
+        });
+      });
+      
+      new_ws.on('message', message => {
+        const { arg = {}, data } = JSON.parse(message.toString());
+        const { channel, instId } = arg;
+        if (channel.indexOf('candle') === 0 && data) {
+          const { open, close, ts } = parseCandleData(data[0]);
+          TradeEngine.updatePrice(instId, close, ts, bar_type);
+        }
+      });
+      
+      // 递归绑定close事件
+      new_ws.on('close', ws_business.listeners('close')[0]);
+      
+    } else {
+      throw new Error('获取K线数据失败');
+    }
+  } catch (error) {
+    console.error('重连失败:', error.message);
+    // 递归重试
+    setTimeout(() => ws_business.emit('close', code, reason), 5000);
+  }
 });
 
 // 保存一个ws链接

@@ -40,12 +40,8 @@ function displayGridTrades() {
 
   // 过滤交易记录
   const filteredTrades = filterSymbol
-    ? trades.filter(
-        orderGroup =>
-          orderGroup &&
-          orderGroup.some(order => order.instId.toUpperCase().startsWith(filterSymbol))
-      )
-    : trades.filter(orderGroup => orderGroup !== null); // 过滤掉 null 值
+    ? trades.filter(order => order.instId.toUpperCase().startsWith(filterSymbol))
+    : trades.filter(order => !!order); // 过滤掉 null 值
 
   if (filteredTrades.length === 0) {
     console.log(`没有找到 ${filterSymbol} 的交易记录`);
@@ -105,24 +101,22 @@ function displayGridTrades() {
   let totalQuantity = 0;
   let totalFee = 0;
 
-  filteredTrades.forEach(orderGroup => {
-    orderGroup.forEach(order => {
-      const amount = parseFloat(order.accFillSz);
-      const price = parseFloat(order.avgPx);
-      const orderAmount = amount * price;
+  filteredTrades.forEach(order => {
+    const amount = parseFloat(order.accFillSz);
+    const price = parseFloat(order.avgPx);
+    const orderAmount = amount * price;
 
-      // 买入为负，卖出为正（金额）
-      totalAmount += order.side.toUpperCase() === 'BUY' ? -orderAmount : orderAmount;
-      // 买入为正，卖出为负（数量）
-      totalQuantity += order.side.toUpperCase() === 'BUY' ? amount : -amount;
+    // 买入为负，卖出为正（金额）
+    totalAmount += order.side.toUpperCase() === 'BUY' ? -orderAmount : orderAmount;
+    // 买入为正，卖出为负（数量）
+    totalQuantity += order.side.toUpperCase() === 'BUY' ? amount : -amount;
 
-      // 累加手续费
-      if (order.feeCcy === 'USDT') {
-        totalFee += Math.abs(parseFloat(order.fee));
-      } else {
-        totalFee += Math.abs(parseFloat(order.fee) * price);
-      }
-    });
+    // 累加手续费
+    if (order.feeCcy === 'USDT') {
+      totalFee += Math.abs(parseFloat(order.fee));
+    } else {
+      totalFee += Math.abs(parseFloat(order.fee) * price);
+    }
   });
 
   // 打印分隔线和总结行
