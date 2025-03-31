@@ -7,9 +7,41 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const DATA_FILE = path.join(__dirname, '../records/local-variables.json');
 
 export class LocalVariable {
+  static _memoryCache = null;
+  static _saveTimer = null;
+  static _isDirty = false;
+
   constructor(pathStr) {
+    // 确保存储目录存在
+    try {
+      fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+    } catch (error) {
+      if (error.code !== 'EEXIST') {
+        console.error('创建存储目录失败:', error.message);
+      }
+    }
+
     this._path = this._parsePath(pathStr);
+    this._initCache();
     return this._createProxy();
+  }
+
+  _initCache() {
+    if (LocalVariable._memoryCache === null) {
+      LocalVariable._memoryCache = this._loadData();
+      this._setupAutoSave();
+    }
+  }
+
+  _setupAutoSave() {
+    if (!LocalVariable._saveTimer) {
+      LocalVariable._saveTimer = setInterval(() => {
+        if (LocalVariable._isDirty) {
+          this._forceSave();
+          LocalVariable._isDirty = false;
+        }
+      }, 500);
+    }
   }
 
   _parsePath(pathStr) {
@@ -53,8 +85,7 @@ export class LocalVariable {
         return undefined; // 关键修复：不存在的属性返回undefined
       },
       deleteProperty: (target, prop) => {
-        const data = this._loadData();
-        let current = data;
+        let current = LocalVariable._memoryCache;
         const path = [...this._path];
         // 定位到父节点
         for (let i = 0; i < path.length; i++) {
@@ -66,7 +97,7 @@ export class LocalVariable {
         }
         if (current.hasOwnProperty(prop)) {
           delete current[prop];
-          this._saveData(data);
+          LocalVariable._isDirty = true;
           return true;
         }
         return false;
@@ -76,8 +107,7 @@ export class LocalVariable {
   }
 
   _getCurrentData() {
-    const data = this._loadData();
-    let current = data;
+    let current = LocalVariable._memoryCache;
     for (const key of this._path) {
       if (current && typeof current === 'object' && key in current) {
         current = current[key];
@@ -88,16 +118,10 @@ export class LocalVariable {
     return current;
   }
 
-  _getValue(prop) {
-    const current = this._getCurrentData();
-    return current?.[prop];
-  }
-
   _setValue(prop, value) {
-    const data = this._loadData();
-    let current = data;
+    let current = LocalVariable._memoryCache;
     const path = [...this._path, prop];
-    // 确保路径存在
+
     for (let i = 0; i < path.length - 1; i++) {
       const key = path[i];
       if (typeof current[key] !== 'object') {
@@ -105,8 +129,35 @@ export class LocalVariable {
       }
       current = current[key];
     }
+
     current[path[path.length - 1]] = value;
-    this._saveData(data);
+    LocalVariable._isDirty = true;
+  }
+
+  _forceSave() {
+    try {
+      const content = JSON.stringify(LocalVariable._memoryCache, null, 2)
+      fs.writeFileSync(DATA_FILE, content, 'utf8');
+    } catch (error) {
+      console.error('保存本地变量失败:', error.message);
+    }
+  }
+
+  // 在程序退出时确保数据被保存
+  static cleanup() {
+    if (this._saveTimer) {
+      clearInterval(this._saveTimer);
+      this._saveTimer = null;
+    }
+    if (this._isDirty && this._memoryCache) {
+      const instance = new LocalVariable('');
+      instance._forceSave();
+    }
+  }
+
+  _getValue(prop) {
+    const current = this._getCurrentData();
+    return current?.[prop];
   }
 
   _loadData() {
@@ -125,18 +176,11 @@ export class LocalVariable {
       throw error;
     }
   }
-
-  /**
-   * 需要考虑多进程文件锁
-   * @param {*} data
-   */
-  _saveData(data) {
-    try {
-      fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-      const content = JSON.stringify(data, null, 2);
-      fs.writeFileSync(DATA_FILE, content, 'utf8');
-    } catch (error) {
-      console.error('保存本地变量失败:', error.message);
-    }
-  }
 }
+
+// 添加进程退出时的清理
+process.on('exit', () => LocalVariable.cleanup());
+process.on('SIGINT', () => {
+  LocalVariable.cleanup();
+  process.exit();
+});

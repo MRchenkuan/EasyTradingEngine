@@ -42,6 +42,15 @@ export class HedgeProcessor extends AbstractProcessor {
     this.local_variables._prev_diff_rate = v;
   }
 
+  get _prev_transactions_diff_rate() {
+    this.local_variables.prev_transactions_diff_rate ??= 0;
+    return this.local_variables.prev_transactions_diff_rate;
+  }
+
+  set _prev_transactions_diff_rate(v) {
+    this.local_variables.prev_transactions_diff_rate = v;
+  }
+
   /**
    * 获取两个对冲资产的价格
    * @returns
@@ -197,7 +206,7 @@ export class HedgeProcessor extends AbstractProcessor {
       this._prev_diff_rate ? (this._prev_diff_rate * 100).toFixed(2) + '%' : '无'
     );
     if (!open_gate || diff_rate < open_gate) {
-      console.log(`- 没有达到距离门限，不执行开仓`);
+      console.log(`不执行开仓: 没有达到距离门限`);
       //没有达到门限
       if (this._prev_diff_rate) {
         // 有前次门限
@@ -258,63 +267,42 @@ export class HedgeProcessor extends AbstractProcessor {
         // 如果价格存在则表示开仓订单正常
         const [beta1, beta2] = prev_transactions.orders.map(it => it.beta);
         const [spt_px1, spt_px2] = [pt_px1 * beta1[0] + beta1[1], pt_px2 * beta2[0] + beta2[1]];
-        const prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(
+        this._prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(
           spt_px1,
           spt_px2,
           (spt_px1 + spt_px2) / 2
         );
         console.log(
-          `-- 前次开仓的价差：${(prev_transactions_diff_rate * 100).toFixed(2)} % (${formatTimestamp(ts)})`
+          `-- 前次开仓的价差：${(this._prev_transactions_diff_rate * 100).toFixed(2)} % (${formatTimestamp(ts)})`
         );
         console.log(`-- 前次最大距离：${(this._prev_diff_rate * 100).toFixed(2)} %`);
         // 此处 max 一下是为了避免交易滑点导致成交距离小于预期距离，进而导致下一次重复交易
-        this._prev_diff_rate = Math.max(this._prev_diff_rate, prev_transactions_diff_rate);
+        // this._prev_diff_rate = Math.max(this._prev_diff_rate, this._prev_transactions_diff_rate);
       }
 
-      if (this._prev_diff_rate) {
+      // 检查是否达到收益拐点
+      if (!this._isMeetReturnRequirement(diff_rate)) {
+        console.log(
+          `暂不开仓：未达到收益拐点，当前：${(diff_rate * 100).toFixed(2)}%, 要求：${((this._prev_diff_rate - this._return_rate) * 100).toFixed(2)}%，继续等待...`
+        );
+        return;
+      }
+
+      if (this._prev_transactions_diff_rate) {
         // 前次达到过，再次达到门限，超上次 n 倍
-        if (diff_rate > this._prev_diff_rate * 1.5) {
+        if (diff_rate > this._prev_transactions_diff_rate * 1.5) {
           console.log(`执行开仓：再次到达门限,并超过前次的了1.5倍`);
           console.log(
-            `- ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_diff_rate * 100).toFixed(2)} %`
+            `- ${(diff_rate * 100).toFixed(2)} % > 1.5 * ${(this._prev_transactions_diff_rate * 100).toFixed(2)} %`
           );
-          
 
-
-
-
-
-
-
-
-
-          // 判断是否从最高点回落了指定比例
-          const max_diff_rate = Math.max(this._prev_diff_rate, diff_rate);
-          const pullback_rate = (max_diff_rate - diff_rate) / max_diff_rate;
-          
-          if (pullback_rate < this._return_rate) {
-            console.log(`- 当前回落幅度(${(pullback_rate * 100).toFixed(2)}%)未达到要求(${(this._return_rate * 100).toFixed(2)}%)，暂不开仓`);
-            return;
-          }
-          
-          console.log(`- 价格已回落${(pullback_rate * 100).toFixed(2)}%，满足开仓条件`);
-
-
-
-
-
-
-
-
-
-
+          // 开仓
           spx1 > spx2
             ? open_position(instId1, instId2, this._position_size)
             : open_position(instId2, instId1, this._position_size);
           console.log(
-            `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
+            `- 执行开仓，买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
           );
-          this._prev_diff_rate = diff_rate;
           return;
         } else {
           // 没超则过
@@ -324,54 +312,50 @@ export class HedgeProcessor extends AbstractProcessor {
           return;
         }
       } else {
-        console.log(`首次到达门限：${(this._prev_diff_rate * 100).toFixed(2)}% 直接开仓`);
+        console.log(`首次到达门限：${(this.diff_rate * 100).toFixed(2)}% 直接开仓`);
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
-
-
-
-
-
-
-
-
-
-
-
-
-        
-        // 判断是否从最高点回落了指定比例
-        const max_diff_rate = diff_rate;
-        const pullback_rate = (max_diff_rate - diff_rate) / max_diff_rate;
-        
-        if (pullback_rate < this._return_rate) {
-          console.log(`- 当前回落幅度(${(pullback_rate * 100).toFixed(2)}%)未达到要求(${(this._return_rate * 100).toFixed(2)}%)，暂不开仓`);
-          return;
-        }
-        
-        console.log(`- 价格已回落${(pullback_rate * 100).toFixed(2)}%，满足开仓条件`);
-
-
-
-
-
-
-
-
-
-
-
         spx1 > spx2
           ? open_position(instId1, instId2, this._position_size)
           : open_position(instId2, instId1, this._position_size);
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
-        this._prev_diff_rate = diff_rate;
         return;
       }
     }
+  }
+
+  /**
+   * 检查是否满足回落要求
+   * @returns {boolean} 是否满足回落条件
+   * @private
+   */
+  _isMeetReturnRequirement(diff_rate) {
+    // 先判断当前价差率与前次记录的最大值相比是不是减小了，如果没有减少反而增加，就不管，继续等待，每次价差率突破新高则需要记录
+    // 前次价差率 _prev_diff_rate， 当前价差率 diff_rate
+    // 如果 _prev_diff_rate 不存在，则直接开仓
+    // 然后判断当前价差率的回撤距离是否满足 return_rate的要求
+    // 如果满足则开仓，否则继续等待
+
+    // 如果没有前次记录，说明是首次开仓，需要记录当前价差率
+    if (!this._prev_diff_rate) {
+      this._prev_diff_rate = diff_rate;
+      return true;
+    }
+
+    // 如果当前价差率比前次记录的更大，更新记录并继续等待
+    if (diff_rate > this._prev_diff_rate) {
+      this._prev_diff_rate = diff_rate;
+      return false;
+    }
+
+    // 计算回撤比例
+    const pullback_rate = this._prev_diff_rate - diff_rate;
+
+    // 判断回撤是否达到要求
+    return pullback_rate >= this._return_rate;
   }
 
   /**

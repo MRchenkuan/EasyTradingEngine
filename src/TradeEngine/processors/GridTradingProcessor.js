@@ -42,12 +42,85 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables = new LocalVariable(`GridTradingProcessor/${this.asset_name}`);
     
     // 从本地变量恢复状态
+    this._loadState();
+    
+    // 如果本地没有网格数据，则初始化
+    if (!this._grid.length) {
+      this._initPriceGrid();
+    }
+  }
+
+  _loadState() {
     this._is_position_created = this.local_variables.is_position_created || false;
     this._last_trade_price = this.local_variables.last_trade_price || 1;
     this._last_turning_price = this.local_variables.last_turning_price || null;
+    this._prev_price = this.local_variables.prev_price || 1;
+    this._current_price = this.local_variables.current_price || 1;
+    this._tendency = this.local_variables.tendency || 0;
+    this._direction = this.local_variables.direction || 0;
+  }
+
+  _saveState() {
+    this.local_variables.is_position_created = this._is_position_created;
+    this.local_variables.last_trade_price = this._last_trade_price;
+    this.local_variables.last_turning_price = this._last_turning_price;
+    this.local_variables.prev_price = this._prev_price;
+    this.local_variables.current_price = this._current_price;
+    this.local_variables.tendency = this._tendency;
+    this.local_variables.direction = this._direction;
+  }
+
+  tick() {
+    this._current_price = this.engine.getRealtimePrice(this.asset_name);
+    if (!this._current_price) return;
+
+    this._direction = this._findPriceDirection();
+    this._tendency = this._findPriceTendency();
+
+    if (!this._is_position_created) {
+      this._initializePosition();
+      return;
+    }
+
+    // 价格超出范围检查
+    if (this._current_price < this._min_price || this._current_price > this._max_price) {
+      console.log(`当前价格${this._current_price}超出设定区间，暂停交易`);
+      return;
+    }
+
+    // 计算网格数量
+    const gridCount = this._countGridNumber(this._current_price, this._last_trade_price);
+
+    // 更新拐点价格
+    this._refreshTurningPoint();
+
+    // 执行交易策略
+    this._orderStrategy(gridCount);
+
+    // 更新历史价格并保存状态
+    this._prev_price = this._current_price;
+    this._saveState();
+  }
+
+  _initializePosition() {
+    this._is_position_created = true;
+    this._last_trade_price = this._current_price;
+    this._last_turning_price = this._current_price;
+    this._prev_price = this._current_price;
+    this._saveState();
+  }
+
+  async _placeOrder(gridCount, type) {
+    const amount = -gridCount * this._trade_amount;
+    console.log(`💰${type}：${this._current_price} ${amount} 个`);
     
-    // 初始化网格
-    this._initPriceGrid();
+    const order = createOrder_market(this.asset_name, Math.abs(amount), amount/Math.abs(amount), true);
+    let result = await executeOrders([order]);
+    
+    this._last_turning_price = this._current_price;
+    this._last_trade_price = this._current_price;
+    
+    this._saveState();
   }
 
   _initPriceGrid() {
@@ -76,6 +149,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     this._grid = grid;
+    // 保存网格到本地
+    // this.local_variables.grid = this._grid;
     console.log('网格初始化完成：', this._grid);
   }
 
@@ -169,11 +244,19 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 首次建仓
     if (!this._is_position_created) {
-      // TODO: 实现建仓逻辑
       this._is_position_created = true;
       this._last_trade_price = this._current_price;
       this._last_turning_price = this._current_price;
       this._prev_price = this._current_price;
+      
+      // 保存初始状态
+      this.local_variables.is_position_created = this._is_position_created;
+      this.local_variables.last_trade_price = this._last_trade_price;
+      this.local_variables.last_turning_price = this._last_turning_price;
+      this.local_variables.prev_price = this._prev_price;
+      this.local_variables.current_price = this._current_price;
+      this.local_variables.tendency = this._tendency;
+      this.local_variables.direction = this._direction;
       return;
     }
 
@@ -194,6 +277,13 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 更新历史价格
     this._prev_price = this._current_price;
+    
+    // 每次 tick 结束时保存状态
+    this.local_variables.prev_price = this._prev_price;
+    this.local_variables.current_price = this._current_price;
+    this.local_variables.tendency = this._tendency;
+    this.local_variables.direction = this._direction;
+    this.local_variables.last_turning_price = this._last_turning_price;
   }
 
   _orderStrategy(gridCount) {
@@ -233,23 +323,5 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._placeOrder(gridCount, '反弹下单');
       }
     }
-  }
-
-  async _placeOrder(gridCount, type) {
-    const amount = -gridCount * this._trade_amount;
-    console.log(`💰${type}：${this._current_price} ${amount} 个`);
-    
-    const order = createOrder_market(this.asset_name, Math.abs(amount), amount/Math.abs(amount), true);
-    // 下单
-    let result = await executeOrders([order]);
-    
-    // 更新价格
-    this._last_turning_price = this._current_price;
-    this._last_trade_price = this._current_price;
-    
-    // 保存状态到本地变量
-    this.local_variables.is_position_created = this._is_position_created;
-    this.local_variables.last_trade_price = this._last_trade_price;
-    this.local_variables.last_turning_price = this._last_turning_price;
   }
 }

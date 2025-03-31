@@ -42,10 +42,10 @@ TradeEngine.setMetaInfo({
   assets,
 }).start();
 
-// TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
-// TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
-// TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
-// TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
+TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
+TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
+TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
 // 创建对冲交易
 TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 // 创建网格交易

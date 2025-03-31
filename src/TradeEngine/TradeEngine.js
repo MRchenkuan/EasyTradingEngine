@@ -198,7 +198,7 @@ export class TradeEngine {
         this._lastCacheTime[cacheKey] = Date.now();
       }
     } catch (error) {
-      console.error('更新订单历史缓存失败:', error);
+      console.error('更新订单历史缓存失败:', error.message);
     }
   }
 
@@ -586,7 +586,7 @@ export class TradeEngine {
 
     try {
       if (status == 2) {
-        restore(); // 如果完全启动，先恢复console
+        // restore(); // 如果完全启动，先恢复console
         this.refreshBeta();
         this.refreshTransactions();
         this.runAllProcessors();
