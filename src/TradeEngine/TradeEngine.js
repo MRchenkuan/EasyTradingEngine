@@ -16,6 +16,7 @@ export class TradeEngine {
   static processors = [];
   static market_data = {}; // 行情数据
   static realtime_price = new LocalVariable('TradeEngine/realtime_price');
+  static realtime_price_ts = new LocalVariable('TradeEngine/realtime_price_ts');
   static _main_asset = ''; // 主资产
   static _timer = {};
   static _bar_type = '';
@@ -370,6 +371,7 @@ export class TradeEngine {
 
     // 更新实时价格
     this.realtime_price[assetId] = sorted_prices.at(-1);
+    this.realtime_price_ts[assetId] = sortedTimestamps.at(-1);
     // recordPrice(assetId, this.realtime_price[assetId]);
     // this._status
   }
@@ -435,6 +437,7 @@ export class TradeEngine {
     }
     // 更新实时价格
     this.realtime_price[assetId] = existingPrices.at(-1);
+    this.realtime_price_ts[assetId] = existingTs.at(-1);
     // recordPrice(assetId, this.realtime_price[assetId]);
   }
 
@@ -541,44 +544,6 @@ export class TradeEngine {
       });
     });
   }
-
-  // /**
-  //  * 监听
-  //  */
-  // static _rewriteConsole(statusMessage = '交易引擎启动中...') {
-  //   // 创建一个新的 console 对象而不是直接修改全局 console
-  //   const customConsole = {
-  //     log: (...args) => {
-  //       process.stdout.write('\x1b[2K\r'); // 清除当前行
-  //       process.stdout.write(args.join(' ') + '\n');
-  //       process.stdout.write(statusMessage);
-  //     },
-  //     error: (...args) => {
-  //       process.stdout.write('\x1b[2K\r');
-  //       process.stdout.write('\x1b[31m' + args.join(' ') + '\x1b[0m\n');
-  //       process.stdout.write(statusMessage);
-  //     },
-  //     warn: (...args) => {
-  //       process.stdout.write('\x1b[2K\r');
-  //       process.stdout.write('\x1b[33m' + args.join(' ') + '\x1b[0m\n');
-  //       process.stdout.write(statusMessage);
-  //     }
-  //   };
-
-  //   // 保存原始的 console 对象
-  //   const originalConsole = global.console;
-  //   // 替换全局 console 对象
-  //   global.console = customConsole;
-
-  //   // 显示初始状态信息
-  //   process.stdout.write(statusMessage);
-
-  //   return () => {
-  //     // 恢复原始 console 对象
-  //     global.console = originalConsole;
-  //     process.stdout.write('\x1b[2K\r'); // 清除状态信息
-  //   };
-  // }
 
   static start() {
     const status = this.checkEngine();

@@ -13,6 +13,9 @@ if (type === 'orders') {
   config.show_orders = config.show_orders === false ? true : false;
   console.log(`已${config.show_orders ? '显示' : '隐藏'}主图上的历史订单记录`);
 } else {
-  config.show_transactions = config.show_transactions === false? true : false;
+  config.show_transactions = config.show_transactions === false ? true : false;
   console.log(`已${config.show_transactions ? '显示' : '隐藏'}主图上的开平仓信息`);
 }
+
+// 强制保存后再退出
+process.exit(0);

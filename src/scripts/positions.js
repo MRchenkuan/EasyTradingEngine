@@ -45,21 +45,27 @@ function displayPositions(monit = false) {
     return;
   }
 
+  // 修改表头
   const header = [
     padString('交易ID', 12),
     padString('创建时间', 15),
-    padString('对冲品种', 14),
+    padString('对冲品种', 12),
     padString('头寸规模', 12),
-    padString('盈亏', 10),
-    padString('收敛度', 10),
-    padString('状态', 10),
-    padString('持仓天数', 10),
+    padString('盈亏', 9),
+    padString('收敛度', 9),
+    padString('平仓时间', 15),
+    padString('持仓', 6),
   ].join('');
   console.log(header);
-  console.log('-'.repeat(93));
+  console.log('-'.repeat(89)); // 增加分隔线长度
 
   openPositions.forEach(({ tradeId, profit, orders, ts, closed }) => {
     const createTime = formatTimestamp(new Date(ts).getTime());
+
+    // 获取平仓时间
+    const closeTime = closed
+      ? formatTimestamp(closingTransactions.find(t => t.tradeId === tradeId)?.ts || Date.now())
+      : '-';
 
     // 重新排序对冲品种，SELL在前，BUY在后
     const sortedOrders = [...orders].sort((a, b) => {
@@ -80,7 +86,7 @@ function displayPositions(monit = false) {
       : Date.now();
     const daysHeld = ((closeTs - createTs) / (1000 * 60 * 60 * 24)).toFixed(1);
 
-    const status = closed ? `${colors.gray}已平仓${colors.reset}` : '未平仓';
+    const status = closed ? `${colors.gray}${closeTime}${colors.reset}` : '未平仓';
 
     const profitValue = profit?.toFixed(2) || '0';
     const coloredProfit =
@@ -110,12 +116,12 @@ function displayPositions(monit = false) {
     const row = [
       padString(tradeId.toString(), 12),
       padString(createTime, 15),
-      padString(pairs, 14),
+      padString(pairs, 12),
       padString(amount.toFixed(2), 12),
-      padString(coloredProfit, 10),
-      padString(diffRate, 10),
-      padString(status, 10),
-      padString(daysHeld + '天', 10),
+      padString(coloredProfit, 9),
+      padString(diffRate, 9),
+      padString(status, 15),
+      padString(daysHeld + '天', 6),
     ].join('');
 
     console.log(row);
@@ -134,9 +140,9 @@ function displayPositions(monit = false) {
   });
 
   // 打印分隔线和汇总行
-  console.log('-'.repeat(93));
+  console.log('-'.repeat(89));
   const summaryRow = [
-    padString('总计', 41),
+    padString('总计', 39), // 调整总计的宽度
     padString(totalAmount.toFixed(2), 12),
     padString(
       totalProfit >= 0
@@ -144,7 +150,7 @@ function displayPositions(monit = false) {
         : `${colors.green}${totalProfit.toFixed(2)}${colors.reset}`,
       10
     ),
-    padString('', 30),
+    padString('', 26),
   ].join('');
   console.log(summaryRow);
 
@@ -220,6 +226,7 @@ switch (command) {
     // 清理已平仓数据
     clearPositions();
     displayPositions();
+    process.exit(0);
     break;
   case 'delete':
     // 删除指定交易ID的数据
@@ -229,8 +236,10 @@ switch (command) {
     }
     deletePosition(tradeId);
     displayPositions();
+    process.exit(0);
     break;
   default:
     // 默认显示一次持仓信息
     displayPositions();
+    process.exit(0);
 }

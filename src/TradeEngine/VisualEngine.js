@@ -12,6 +12,7 @@ import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js'
 import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
+import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 
 const width = 1600,
   height = 900;
@@ -78,7 +79,9 @@ export class VisualEngine {
   }
 
   static drawGridTrading() {
-    const orders = getGridTradeOrders().filter(orderGroup => orderGroup !== null);
+    const orders = getGridTradeOrders().filter(
+      orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId)
+    );
     // 先对order按照instId进行分组
     const groupedOrders = orders.reduce((acc, orderGroup) => {
       const instId = orderGroup.instId; // 使用第一个订单的instId作为key
@@ -95,7 +98,31 @@ export class VisualEngine {
       const themes_map = this.getThemes();
       const color = themes_map[instId] || '#666666';
 
-      const { prices, id, ts } = TradeEngine.getMarketData(instId);
+      const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
+      const {
+        _grid_base_price,
+        _grid_base_price_ts,
+        last_lower_turning_price_ts,
+        last_lower_turning_price,
+        last_upper_turning_price_ts,
+        last_upper_turning_price,
+        current_price,
+        current_price_ts,
+        tendency,
+        direction,
+        _max_price,
+        _min_price,
+        _grid_width,
+      } = new LocalVariable(`GridTradingProcessor/${instId}`) || {};
+
+      if (!(_grid_base_price && _min_price && _max_price && _grid_width)) continue;
+      const grid_lines = GridTradingProcessor._initPriceGrid(
+        _grid_base_price,
+        _min_price,
+        _max_price,
+        _grid_width
+      );
+
       const labels = ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
       const file_path = path.join('grid', `/${instId}.jpg`);
 
@@ -149,9 +176,45 @@ export class VisualEngine {
         plugins: [
           {
             afterDraw: chart => {
+              const yAxias = chart.scales.y;
+              const xAxias = chart.scales.x;
+              // 绘制转折点 - 下
+              if (last_lower_turning_price) {
+                const y = yAxias.getPixelForValue(last_lower_turning_price);
+                const x = xAxias.getPixelForValue(
+                  formatTimestamp(last_lower_turning_price_ts, TradeEngine._bar_type)
+                );
+                this._drawIndicator(chart, x, y, '下拐点');
+              }
+              // 绘制转折点 - 上
+              if (last_upper_turning_price) {
+                const y = yAxias.getPixelForValue(last_upper_turning_price);
+                const x = xAxias.getPixelForValue(
+                  formatTimestamp(last_upper_turning_price_ts, TradeEngine._bar_type)
+                );
+                this._drawIndicator(chart, x, y, '上拐点');
+              }
+              // 绘制基准点
+              if (_grid_base_price) {
+                const base_point_y = yAxias.getPixelForValue(_grid_base_price);
+                const base_point_x = xAxias.getPixelForValue(
+                  formatTimestamp(_grid_base_price_ts, TradeEngine._bar_type)
+                );
+                this._drawIndicator(chart, base_point_x, base_point_y, '基准点');
+              }
+
+              const current_point_y = yAxias.getPixelForValue(current_price);
+              const current_point_x = xAxias.getPixelForValue(
+                formatTimestamp(current_price_ts, TradeEngine._bar_type)
+              );
+              // 绘制趋势箭头
+              this._drawTrendArrow(chart, current_point_x, current_point_y, tendency, 'bold');
+              this._drawTrendArrow(chart, current_point_x, current_point_y, direction, 'thin');
+
               // 绘制零基准线
               const baseValue = prices[0];
-              this._drawZeroLine(chart, baseValue);
+              // 绘制起点基线
+              this._drawHorizontalLine(chart, baseValue);
 
               // 为了避免标签重叠先搞个位置收集器
               const collisionAvoidance = createCollisionAvoidance();
@@ -170,14 +233,27 @@ export class VisualEngine {
               group_orders.forEach(order => {
                 const { ts, avgPx, accFillSz, side, gridCount } = order;
                 const time = formatTimestamp(ts, TradeEngine._bar_type);
+                // 超出时间范围的订单不绘制
+                const labels = chart.data.labels;
+                if (!labels.includes(time)) {
+                  return; // 跳过超出范围的订单
+                }
                 const price = parseFloat(avgPx);
-
                 const xCoord = chart.scales.x.getPixelForValue(time);
                 const yCoord = chart.scales.y.getPixelForValue(price);
-                debugger;
                 // 绘制订单标签
-                const label = `${side === 'buy' ? '买入' : '卖出'}/${accFillSz}(${avgPx})/${gridCount}`;
+                const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${avgPx})/${-gridCount} 倍`;
                 this._paintSingleOrder(chart.ctx, xCoord, yCoord, label, side, collisionAvoidance);
+              });
+
+              // 绘制网格线
+              grid_lines.forEach((grid, index) => {
+                // 绘制网格线，但不能超过图表区域
+                const yCoord = yAxias.getPixelForValue(grid);
+                if (yCoord >= chart.chartArea.top && yCoord <= chart.chartArea.bottom) {
+                  // 绘制网格线
+                  this._drawHorizontalLine(chart, grid, [2, 5]);
+                }
               });
             },
           },
@@ -189,10 +265,120 @@ export class VisualEngine {
         this.writeChartFile(file_path, image);
       })();
     }
-    // orders.forEach(({ instId, side, avgPx, accFillSz, tradeId }) => {
+  }
 
-    //   // paintLine(chart, xCoord, yCoord, color, label, collisionAvoidance);
-    // })
+  static _drawTrendArrow(chart, x, y, trend, style = 'default') {
+    if (!trend && trend !== 0) return;
+
+    const ctx = chart.ctx;
+    const styles = {
+      default: {
+        arrowLength: 20,
+        arrowWidth: 6,
+        offset: 30,
+        colors: {
+          up: '#229954',
+          down: '#c0392b',
+          neutral: '#808b96',
+        },
+      },
+      thin: {
+        arrowLength: 15,
+        arrowWidth: 4,
+        offset: 25,
+        colors: {
+          up: '#27ae60',
+          down: '#e74c3c',
+          neutral: '#95a5a6',
+        },
+      },
+      bold: {
+        arrowLength: 25,
+        arrowWidth: 8,
+        offset: 35,
+        colors: {
+          up: '#145a32',
+          down: '#922b21',
+          neutral: '#566573',
+        },
+      },
+    };
+
+    const currentStyle = styles[style] || styles.default;
+    const { arrowLength, arrowWidth, offset, colors } = currentStyle;
+
+    // 保存当前上下文状态
+    ctx.save();
+
+    // 设置箭头样式
+    ctx.beginPath();
+    ctx.strokeStyle = trend > 0 ? colors.up : trend < 0 ? colors.down : colors.neutral;
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineWidth = style === 'bold' ? 2 : 1;
+
+    if (trend === 0) {
+      // 水平箭头
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + offset, y);
+      // 箭头头部
+      ctx.moveTo(x + offset, y);
+      ctx.lineTo(x + offset - arrowLength, y - arrowWidth);
+      ctx.moveTo(x + offset, y);
+      ctx.lineTo(x + offset - arrowLength, y + arrowWidth);
+    } else {
+      // 垂直箭头
+      const endY = y + (trend > 0 ? -offset : offset);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, endY);
+
+      if (trend > 0) {
+        ctx.moveTo(x - arrowWidth, endY + arrowLength);
+        ctx.lineTo(x, endY);
+        ctx.lineTo(x + arrowWidth, endY + arrowLength);
+      } else {
+        ctx.moveTo(x - arrowWidth, endY - arrowLength);
+        ctx.lineTo(x, endY);
+        ctx.lineTo(x + arrowWidth, endY - arrowLength);
+      }
+    }
+
+    // 描边
+    ctx.stroke();
+
+    // 恢复上下文状态
+    ctx.restore();
+  }
+
+  /**
+   * 绘制拐点指示器
+   * @param {*} chart Chart对象
+   * @param {number} y 拐点的Y轴坐标
+   * @private
+   */
+  static _drawIndicator(chart, x, y, label) {
+    const ctx = chart.ctx;
+
+    // 保存当前上下文状态
+    ctx.save();
+
+    // 设置指示器样式
+    ctx.beginPath();
+    ctx.strokeStyle = '#8b32a8';
+    ctx.lineWidth = 0.5;
+
+    // 在图表右侧绘制指示线
+    ctx.moveTo(x, y);
+    ctx.lineTo(chart.chartArea.right + 20, y);
+    ctx.stroke();
+
+    // 显示拐点数值
+    const value = chart.scales.y.getValueForPixel(y);
+    ctx.font = `12px ${font_style}`;
+    ctx.fillStyle = '#8b32a8';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${label}(${value.toFixed(2)})`, chart.chartArea.right + 40, y - 10);
+    // 恢复上下文状态
+    ctx.restore();
   }
 
   /**
@@ -309,7 +495,7 @@ export class VisualEngine {
             afterDraw: async chart => {
               const baseValue = scaled_prices[0].prices[0];
 
-              this._drawZeroLine(chart, baseValue);
+              this._drawHorizontalLine(chart, baseValue);
               const collisionAvoidance = createCollisionAvoidance();
 
               // 绘制相关性表格
@@ -361,13 +547,13 @@ export class VisualEngine {
    * 绘制0%参考线
    * @private
    */
-  static _drawZeroLine(chart, baseValue) {
+  static _drawHorizontalLine(chart, baseValue, dash = [5, 5]) {
     const ctx = chart.ctx;
     const yPixel = chart.scales.y.getPixelForValue(baseValue);
 
     // 绘制 0% 参考线
     ctx.beginPath();
-    ctx.setLineDash([5, 5]);
+    ctx.setLineDash(dash);
     ctx.strokeStyle = '#aaaaaa';
     ctx.lineWidth = 1.5;
     ctx.moveTo(chart.chartArea.left, yPixel);
@@ -410,13 +596,15 @@ export class VisualEngine {
     const lines = labels.split('/');
     const lineHeight = 14;
     const totalHeight = lines.length * lineHeight;
-
+    const maxWidth = Math.max(...lines.map(line => ctx.measureText(line).width));
+    // 添加一些padding，使文本不会太贴近边缘
+    const textBoxWidth = maxWidth + 10;
     // sell 方向需要向上偏移文本总高度
     const labelOffset = side === 'sell' ? -totalHeight : 10;
     const { x: labelX, y: labelY } = collisionAvoidance(
       fx,
       fy + lineDirection * (lineLength + 5) + labelOffset,
-      100,
+      textBoxWidth,
       totalHeight
     );
 
@@ -493,55 +681,6 @@ export class VisualEngine {
           const [a, b] = beta_map[instId];
           const srt_px = sideData.avgPrice * a + b;
           const fy = yScale.getPixelForValue(srt_px);
-
-          // // 绘制圆点
-          // ctx.beginPath();
-          // ctx.arc(fx, fy, 3, 0, 2 * Math.PI);
-          // ctx.fillStyle = {
-          //   buy: 'red',
-          //   sell: 'green',
-          // }[side];
-          // ctx.fill();
-
-          // // 买单向下(1)，卖单向上(-1)
-          // const lineLength = 60;
-          // const lineDirection = side === 'buy' ? 1 : -1;
-
-          // // 绘制垂直虚线
-          // ctx.beginPath();
-          // ctx.setLineDash([5, 3]);
-          // ctx.lineWidth = 1;
-          // ctx.moveTo(fx, fy);
-          // ctx.lineTo(fx, fy + lineDirection * lineLength);
-          // ctx.strokeStyle = ctx.fillStyle;
-          // ctx.stroke();
-          // ctx.setLineDash([]);
-
-          // // 绘制文字标签
-          // ctx.font = `12px bold ${font_style}`;
-          // ctx.textAlign = 'center';
-          // const label = [
-          //   `${{ buy: '[B]', sell: '[S]' }[side]}${sideData.totalAmount.toFixed(2)}(${sideData.accFillSz.toFixed(2)})`,
-          //   `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`,
-          // ].join('/');
-          // const lines = label.split('/');
-          // const lineHeight = 14;
-          // const totalHeight = lines.length * lineHeight;
-
-          // // sell 方向需要向上偏移文本总高度
-          // const labelOffset = side === 'sell' ? -totalHeight : 10;
-          // const { x: labelX, y: labelY } = collisionAvoidance(
-          //   fx,
-          //   fy + lineDirection * (lineLength + 5) + labelOffset,
-          //   100,
-          //   totalHeight
-          // );
-
-          // // 分行绘制标签
-          // lines.forEach((text, index) => {
-          //   ctx.fillText(text, labelX, labelY + index * lineHeight);
-          // });
-          // ctx.textAlign = 'start';
           const labels = [
             `${{ buy: '[B]', sell: '[S]' }[side]}${sideData.totalAmount.toFixed(2)}(${sideData.accFillSz.toFixed(2)})`,
             `[${sideData.orders.length}]${sideData.avgPrice.toFixed(2)}`,
@@ -763,7 +902,6 @@ export class VisualEngine {
       const label_1 = formatTimestamp(ts1, bar_type);
       const label_2 = formatTimestamp(ts2, bar_type);
       if (!labels.includes(label_1) || !labels.includes(label_2)) {
-        console.warn('开平仓记号已经超出图标的绘制范围', label_1, label_2);
         return;
       }
       if (xScale && yScale) {
@@ -1076,6 +1214,8 @@ export class VisualEngine {
         };
       });
 
+    if (!scaled_prices.length) return;
+
     // 计算差值并添加注释
     const configuration = {
       // type: 'scatter',
@@ -1128,7 +1268,7 @@ export class VisualEngine {
           afterDraw: chart => {
             // 绘制零基准线
             const baseValue = scaled_prices[0].prices[0];
-            this._drawZeroLine(chart, baseValue);
+            this._drawHorizontalLine(chart, baseValue);
 
             // 为了避免标签重叠先搞个位置收集器
             const collisionAvoidance = createCollisionAvoidance();

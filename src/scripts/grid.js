@@ -60,7 +60,7 @@ function displayGridTrades() {
   ].join('');
 
   console.log(header);
-  console.log('-'.repeat(93)); // 增加分隔线长度
+  console.log('-'.repeat(91)); // 增加分隔线长度
 
   filteredTrades.forEach(order => {
     const tradeId = order.clOrdId;
@@ -120,7 +120,7 @@ function displayGridTrades() {
   });
 
   // 打印分隔线和总结行
-  console.log('-'.repeat(93));
+  console.log('-'.repeat(91));
   const summaryRow = [
     padString('总计', 47),
     padString(filterSymbol ? totalQuantity.toFixed(4) : '', 10),

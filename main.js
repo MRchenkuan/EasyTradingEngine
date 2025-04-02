@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '15m';
+const bar_type = '1m';
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
@@ -17,7 +17,7 @@ const assets = [
   { id: 'ETH-USDT', theme: '#85c1e9' },
   { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
-  // { id: 'OKB-USDT', theme: '#52be80' },
+  { id: 'OKB-USDT', theme: '#52be80' },
   { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
 const params = {
@@ -28,7 +28,7 @@ const params = {
   // from_when: new Date(2025,2,7,0,0,0).getTime(), // 指定结束时间
   // to_when:new Date(2025,2,15,0,0,0).getTime(), // 指定起始时间
   from_when: getLastWholeMinute(new Date()), // 最近时间
-  to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(), // 12天前
+  to_when: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).getTime(), // 12天前
 };
 
 /**
@@ -48,16 +48,16 @@ TradeEngine.setMetaInfo({
 TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
 TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
 TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
-TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
 TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 
 /**
  * 启动网格交易
  */
 TradeEngine.createGridTrading('SOL-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.005,
-  _max_bounce: 0.005,
+  _grid_width: 0.003,
+  _max_drawdown: 0.003,
+  _max_bounce: 0.003,
   _trade_amount: 0.8,
   _max_position: 20,
   _start_position: 0,
@@ -66,9 +66,10 @@ TradeEngine.createGridTrading('SOL-USDT', {
 });
 
 TradeEngine.createGridTrading('XRP-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.005,
-  _max_bounce: 0.005,
+  // _grid_base_price: 2.0, //建仓基准价
+  _grid_width: 0.003,
+  _max_drawdown: 0.003,
+  _max_bounce: 0.003,
   _trade_amount: 50,
   _max_position: 2000,
   _min_price: 1,
@@ -76,9 +77,9 @@ TradeEngine.createGridTrading('XRP-USDT', {
 });
 
 TradeEngine.createGridTrading('ETH-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.005,
-  _max_bounce: 0.005,
+  _grid_width: 0.003,
+  _max_drawdown: 0.003,
+  _max_bounce: 0.003,
   _trade_amount: 0.06,
   _max_position: 1,
   _min_price: 1500,
@@ -86,9 +87,9 @@ TradeEngine.createGridTrading('ETH-USDT', {
 });
 
 TradeEngine.createGridTrading('BTC-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.005,
-  _max_bounce: 0.005,
+  _grid_width: 0.003,
+  _max_drawdown: 0.003,
+  _max_bounce: 0.003,
   _trade_amount: 0.002,
   _max_position: 0.05,
   _min_price: 60000,
@@ -107,7 +108,7 @@ VisualEngine.setMetaInfo({
     'SOL-USDT',
     'TRUMP-USDT',
     'ADA-USDT',
-    // 'OKB-USDT',
+    'OKB-USDT',
   ],
 }).start();
 
@@ -188,15 +189,15 @@ ws_business.on('message', message => {
 
 ws_business.on('close', async (code, reason) => {
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
-  
+
   // 停止引擎
   TradeEngine.stop();
   VisualEngine.stop();
-  
+
   // 等待5秒后重新初始化
   await new Promise(resolve => setTimeout(resolve, 5000));
   console.log('正在尝试重新连接...');
-  
+
   try {
     // 重新获取数据
     const klines = await getKlinesWithRetry(assetIds, {
@@ -204,21 +205,21 @@ ws_business.on('close', async (code, reason) => {
       from_when: getLastWholeMinute(new Date()),
       to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(),
     });
-    
+
     if (klines && klines.length > 0) {
       // 更新数据
       klines.forEach(({ id, prices, ts }) => {
         TradeEngine.updatePrices(id, prices, ts, bar_type);
       });
-      
+
       // 重新启动引擎
       TradeEngine.start();
       VisualEngine.start();
-      
+
       // 重新建立WebSocket连接
       const new_ws = new WebSocket(base_url + '/ws/v5/business');
       storeConnection('ws_business', new_ws);
-      
+
       // 重新绑定事件处理
       new_ws.on('open', () => {
         console.log('ws_business重新连接成功');
@@ -226,7 +227,7 @@ ws_business.on('close', async (code, reason) => {
           await subscribeKlineChanel(new_ws, 'candle' + bar_type, it.id);
         });
       });
-      
+
       new_ws.on('message', message => {
         const { arg = {}, data } = JSON.parse(message.toString());
         const { channel, instId } = arg;
@@ -235,10 +236,9 @@ ws_business.on('close', async (code, reason) => {
           TradeEngine.updatePrice(instId, close, ts, bar_type);
         }
       });
-      
+
       // 递归绑定close事件
       new_ws.on('close', ws_business.listeners('close')[0]);
-      
     } else {
       throw new Error('获取K线数据失败');
     }
