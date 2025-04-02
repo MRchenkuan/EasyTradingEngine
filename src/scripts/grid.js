@@ -88,7 +88,7 @@ function displayGridTrades() {
       padString(symbol, 12),
       padString(side, 8),
       padString(' ' + amount, 10),
-      padString(price, 12),
+      padString(parseFloat(price).toFixed(2), 12),
       padString(' ' + total, 12),
       padString(feeInUsdt.toFixed(4), 12),
     ].join('');

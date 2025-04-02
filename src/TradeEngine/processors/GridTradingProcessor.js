@@ -121,6 +121,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         (this._current_price - this._last_upper_turning_price) / this._last_upper_turning_price
       );
     }
+    return 0;
   }
 
   /**
@@ -220,6 +221,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 处理网格交易逻辑
+    //  todo 不论是回撤还是反弹，都不能超过一个格子，否则会过度反弹高位买入
     if (Math.abs(gridCount) >= 1) {
       console.log(`${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`);
       this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
@@ -227,15 +229,15 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 处理拐点交易逻辑
-    if (this._direction < 0 && Math.abs(gridTurningCount_upper) >= 1) {
+    if (this._direction < 0 && Math.abs(gridTurningCount_upper) < 1) {
       console.log(`↪️${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`);
-      this._placeOrder(-1, '- 上拐点下单');
+      this._placeOrder(1, '- 格内上穿拐点下单');
       return;
     }
 
-    if (this._direction > 0 && Math.abs(gridTurningCount_lower) >= 1) {
+    if (this._direction > 0 && Math.abs(gridTurningCount_lower) < 1) {
       console.log(`↩️${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`);
-      this._placeOrder(1, '- 下拐点下单');
+      this._placeOrder(-1, '- 格内下穿拐点下单');
       return;
     }
 
@@ -318,6 +320,11 @@ export class GridTradingProcessor extends AbstractProcessor {
     return current > prev ? count - 1 : -(count - 1);
   }
 
+  /**
+   * 下单
+   * @param {number} gridCount 跨越的网格数量
+   * @param {string} orderType 订单类型
+   */ 
   async _placeOrder(gridCount, orderType) {
     const amount = -gridCount * this._trade_amount;
 
@@ -335,20 +342,23 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
     let result = await executeOrders([order]);
     if (!result.success) {
-      console.error(`⛔交易失败: ${orderType}`);
+      console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
       return;
     }
     recordGridTradeOrders({ ...result.data[0], gridCount });
-    console.log(`✅交易成功: ${orderType}`);
+    console.log(`✅${this.asset_name} 交易成功: ${orderType}`);
     // 重置关键参数
     this._last_trade_price = this._current_price;
-    this.last_trade_price_ts = this._current_price_ts;
+    this._last_trade_price_ts = this._current_price_ts;
     // 下单之后重置拐点
-    this.last_lower_turning_price = this._current_price;
-    this.last_upper_turning_price = this._current_price;
+    this._last_lower_turning_price = this._current_price;
+    this._last_upper_turning_price = this._current_price;
+    // 重置基准点
+    // this._grid_base_price = this._current_price;
+    // this._grid_base_price_ts = this._current_price_ts;
     // this._last_turning_price = this._current_price; // 重置拐点价格为当前价格
     this._prev_price = this._current_price; // 重置前一价格
-    this._prev_price_ts = this.current_price_ts;
+    this._prev_price_ts = this._current_price_ts;
     this._saveState(); // 立即保存状态
   }
 }

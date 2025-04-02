@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '1m';
+const bar_type = '5m';
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
@@ -28,7 +28,7 @@ const params = {
   // from_when: new Date(2025,2,7,0,0,0).getTime(), // 指定结束时间
   // to_when:new Date(2025,2,15,0,0,0).getTime(), // 指定起始时间
   from_when: getLastWholeMinute(new Date()), // 最近时间
-  to_when: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).getTime(), // 12天前
+  to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(), // 12天前
 };
 
 /**
@@ -55,9 +55,9 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
  * 启动网格交易
  */
 TradeEngine.createGridTrading('SOL-USDT', {
-  _grid_width: 0.003,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
+  _grid_width: 0.01,
+  _max_drawdown: 0.004,
+  _max_bounce: 0.004,
   _trade_amount: 0.8,
   _max_position: 20,
   _start_position: 0,
@@ -67,9 +67,9 @@ TradeEngine.createGridTrading('SOL-USDT', {
 
 TradeEngine.createGridTrading('XRP-USDT', {
   // _grid_base_price: 2.0, //建仓基准价
-  _grid_width: 0.003,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
+  _grid_width: 0.01,
+  _max_drawdown: 0.004,
+  _max_bounce: 0.004,
   _trade_amount: 50,
   _max_position: 2000,
   _min_price: 1,
@@ -77,9 +77,9 @@ TradeEngine.createGridTrading('XRP-USDT', {
 });
 
 TradeEngine.createGridTrading('ETH-USDT', {
-  _grid_width: 0.003,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
+  _grid_width: 0.01,
+  _max_drawdown: 0.004,
+  _max_bounce: 0.004,
   _trade_amount: 0.06,
   _max_position: 1,
   _min_price: 1500,
@@ -87,9 +87,9 @@ TradeEngine.createGridTrading('ETH-USDT', {
 });
 
 TradeEngine.createGridTrading('BTC-USDT', {
-  _grid_width: 0.003,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
+  _grid_width: 0.01,
+  _max_drawdown: 0.004,
+  _max_bounce: 0.004,
   _trade_amount: 0.002,
   _max_position: 0.05,
   _min_price: 60000,
