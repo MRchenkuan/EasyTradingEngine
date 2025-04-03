@@ -219,28 +219,36 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 回撤/反弹幅度不足时不交易
     if (Math.abs(correction) <= threshold) {
-      console.log(`[${this.asset_name}]当前回撤/反弹幅度${(correction * 100).toFixed(2)}%，🐢继续等待...`);
+      console.log(
+        `[${this.asset_name}]当前回撤/反弹幅度${(correction * 100).toFixed(2)}%，🐢继续等待...`
+      );
       return;
     }
 
     // 处理网格交易逻辑
     //  todo 不论是回撤还是反弹，都不能超过一个格子，否则会过度反弹高位买入
     if (Math.abs(gridCount) >= 1) {
-      console.log(`[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`);
+      console.log(
+        `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`
+      );
       this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
       return;
     }
 
     // 处理拐点交易逻辑
     if (this._direction < 0 && Math.abs(gridTurningCount_upper) >= 1) {
-      console.log(`↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`);
+      console.log(
+        `↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`
+      );
       this._placeOrder(1, '- 格内上穿拐点下单');
       return;
     }
 
     if (this._direction > 0 && Math.abs(gridTurningCount_lower) >= 1) {
       // 这里应该使用 gridTurningCount_lower
-      console.log(`↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`);
+      console.log(
+        `↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`
+      );
       this._placeOrder(-1, '- 格内下穿拐点下单');
       return;
     }
@@ -253,10 +261,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     const basePrice = base_price;
 
     if (_min_price >= _max_price) {
-      throw new Error(`[${this.asset_name}]最低价必须小于最高价`);
+      throw new Error(`[网格生成]最低价必须小于最高价`);
     }
     if (!(_min_price <= basePrice && basePrice <= _max_price)) {
-      throw new Error(`[${this.asset_name}]基准价格必须在最低价和最高价之间`);
+      throw new Error(`[网格生成]基准价格必须在最低价和最高价之间`);
     }
 
     // 向上生成网格
@@ -360,7 +368,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 重置基准点
     // this._grid_base_price = this._current_price;
     // this._grid_base_price_ts = this._current_price_ts;
-    // this._last_turning_price = this._current_price; // 重置拐点价格为当前价格
     this._prev_price = this._current_price; // 重置前一价格
     this._prev_price_ts = this._current_price_ts;
     this._saveState(); // 立即保存状态
