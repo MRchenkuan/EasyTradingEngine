@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '5m';
+const bar_type = '15m';
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;

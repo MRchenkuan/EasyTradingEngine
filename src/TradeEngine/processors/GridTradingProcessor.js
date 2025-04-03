@@ -180,7 +180,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 计算当前价格横跨网格
-    const gridCount = this._countGridNumber(this._current_price, this._last_trade_price || this._grid_base_price);
+    const gridCount = this._countGridNumber(
+      this._current_price,
+      this._last_trade_price || this._grid_base_price
+    );
     // 计算上拐点价横跨网格数量
     const gridTurningCount_upper = this._countGridNumber(
       this._current_price,
@@ -207,7 +210,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower) {
     // 趋势和方向一致时不交易
     if (this._direction / this._tendency > 0) {
-      console.log('价格趋势与方向一致，不进行交易');
+      console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
       return;
     }
 
@@ -216,32 +219,33 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 回撤/反弹幅度不足时不交易
     if (Math.abs(correction) <= threshold) {
-      console.log(`当前回撤/反弹幅度${(correction * 100).toFixed(2)}%，🐢继续等待...`);
+      console.log(`[${this.asset_name}]当前回撤/反弹幅度${(correction * 100).toFixed(2)}%，🐢继续等待...`);
       return;
     }
 
     // 处理网格交易逻辑
     //  todo 不论是回撤还是反弹，都不能超过一个格子，否则会过度反弹高位买入
     if (Math.abs(gridCount) >= 1) {
-      console.log(`${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`);
+      console.log(`[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`);
       this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
       return;
     }
 
     // 处理拐点交易逻辑
-    if (this._direction < 0 && Math.abs(gridTurningCount_upper) < 1) {
-      console.log(`↪️${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`);
+    if (this._direction < 0 && Math.abs(gridTurningCount_upper) >= 1) {
+      console.log(`↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`);
       this._placeOrder(1, '- 格内上穿拐点下单');
       return;
     }
 
-    if (this._direction > 0 && Math.abs(gridTurningCount_lower) < 1) {
-      console.log(`↩️${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`);
+    if (this._direction > 0 && Math.abs(gridTurningCount_lower) >= 1) {
+      // 这里应该使用 gridTurningCount_lower
+      console.log(`↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`);
       this._placeOrder(-1, '- 格内下穿拐点下单');
       return;
     }
 
-    console.log(`未触发任何交易条件，继续等待...`);
+    console.log(`[${this.asset_name}]未触发任何交易条件，继续等待...`);
   }
 
   static _initPriceGrid(base_price, _min_price, _max_price, _grid_width) {
@@ -249,10 +253,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     const basePrice = base_price;
 
     if (_min_price >= _max_price) {
-      throw new Error('最低价必须小于最高价');
+      throw new Error(`[${this.asset_name}]最低价必须小于最高价`);
     }
     if (!(_min_price <= basePrice && basePrice <= _max_price)) {
-      throw new Error('基准价格必须在最低价和最高价之间');
+      throw new Error(`[${this.asset_name}]基准价格必须在最低价和最高价之间`);
     }
 
     // 向上生成网格
@@ -324,7 +328,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * 下单
    * @param {number} gridCount 跨越的网格数量
    * @param {string} orderType 订单类型
-   */ 
+   */
   async _placeOrder(gridCount, orderType) {
     const amount = -gridCount * this._trade_amount;
 

@@ -79,6 +79,7 @@ export class VisualEngine {
   }
 
   static drawGridTrading() {
+    const assets = this._asset_names;
     const orders = getGridTradeOrders().filter(
       orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId)
     );
@@ -92,8 +93,7 @@ export class VisualEngine {
       return acc;
     }, {});
 
-    // 遍历每个分组
-    for (const instId in groupedOrders) {
+    assets.forEach(instId => {
       const group_orders = groupedOrders[instId];
       const themes_map = this.getThemes();
       const color = themes_map[instId] || '#666666';
@@ -115,7 +115,7 @@ export class VisualEngine {
         _grid_width,
       } = new LocalVariable(`GridTradingProcessor/${instId}`) || {};
 
-      if (!(_grid_base_price && _min_price && _max_price && _grid_width)) continue;
+      if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
       const grid_lines = GridTradingProcessor._initPriceGrid(
         _grid_base_price,
         _min_price,
@@ -230,21 +230,29 @@ export class VisualEngine {
               this._drawDateTime(chart);
 
               // 绘制历史订单信息
-              group_orders.forEach(order => {
-                const { ts, avgPx, accFillSz, side, gridCount } = order;
-                const time = formatTimestamp(ts, TradeEngine._bar_type);
-                // 超出时间范围的订单不绘制
-                const labels = chart.data.labels;
-                if (!labels.includes(time)) {
-                  return; // 跳过超出范围的订单
-                }
-                const price = parseFloat(avgPx);
-                const xCoord = chart.scales.x.getPixelForValue(time);
-                const yCoord = chart.scales.y.getPixelForValue(price);
-                // 绘制订单标签
-                const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${avgPx})/${-gridCount} 倍`;
-                this._paintSingleOrder(chart.ctx, xCoord, yCoord, label, side, collisionAvoidance);
-              });
+              if (group_orders && group_orders.length)
+                group_orders.forEach(order => {
+                  const { ts, avgPx, accFillSz, side, gridCount } = order;
+                  const time = formatTimestamp(ts, TradeEngine._bar_type);
+                  // 超出时间范围的订单不绘制
+                  const labels = chart.data.labels;
+                  if (!labels.includes(time)) {
+                    return; // 跳过超出范围的订单
+                  }
+                  const price = parseFloat(avgPx);
+                  const xCoord = chart.scales.x.getPixelForValue(time);
+                  const yCoord = chart.scales.y.getPixelForValue(price);
+                  // 绘制订单标签
+                  const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${avgPx})/${-gridCount} 倍`;
+                  this._paintSingleOrder(
+                    chart.ctx,
+                    xCoord,
+                    yCoord,
+                    label,
+                    side,
+                    collisionAvoidance
+                  );
+                });
 
               // 绘制网格线
               grid_lines.forEach((grid, index) => {
@@ -264,7 +272,7 @@ export class VisualEngine {
         const image = await chartJSNodeCanvas.renderToBuffer(configuration);
         this.writeChartFile(file_path, image);
       })();
-    }
+    });
   }
 
   static _drawTrendArrow(chart, x, y, trend, style = 'default') {
