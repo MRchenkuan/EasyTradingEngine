@@ -14,8 +14,8 @@ import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 
-const width = 3000,
-  height = 1000;
+const width = 2000,
+  height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
 const font_style = 'Monaco, Menlo, Consolas, monospace';
 
@@ -108,6 +108,8 @@ export class VisualEngine {
         last_upper_turning_price,
         current_price,
         current_price_ts,
+        last_trade_price,
+        last_trade_price_ts,
         tendency,
         direction,
         _max_price,
@@ -169,7 +171,7 @@ export class VisualEngine {
               top: 140,
               bottom: 60,
               left: 60,
-              right: 60,
+              right: 200,
             },
           },
         },
@@ -180,27 +182,36 @@ export class VisualEngine {
               const xAxias = chart.scales.x;
               // 绘制转折点 - 下
               if (last_lower_turning_price) {
-                const y = yAxias.getPixelForValue(last_lower_turning_price);
-                const x = xAxias.getPixelForValue(
-                  formatTimestamp(last_lower_turning_price_ts, TradeEngine._bar_type)
+                this._drawIndicator(
+                  chart,
+                  last_lower_turning_price_ts,
+                  last_lower_turning_price,
+                  '下拐点',
+                  -1
                 );
-                this._drawIndicator(chart, x, y, '下拐点');
               }
               // 绘制转折点 - 上
               if (last_upper_turning_price) {
-                const y = yAxias.getPixelForValue(last_upper_turning_price);
-                const x = xAxias.getPixelForValue(
-                  formatTimestamp(last_upper_turning_price_ts, TradeEngine._bar_type)
+                this._drawIndicator(
+                  chart,
+                  last_upper_turning_price_ts,
+                  last_upper_turning_price,
+                  '上拐点',
+                  1
                 );
-                this._drawIndicator(chart, x, y, '上拐点');
               }
               // 绘制基准点
               if (_grid_base_price) {
-                const base_point_y = yAxias.getPixelForValue(_grid_base_price);
-                const base_point_x = xAxias.getPixelForValue(
-                  formatTimestamp(_grid_base_price_ts, TradeEngine._bar_type)
-                );
-                this._drawIndicator(chart, base_point_x, base_point_y, '基准点');
+                this._drawIndicator(chart, chart.chartArea.right, _grid_base_price, '基准点');
+              }
+              // 绘制最近成交点
+              if (last_trade_price) {
+                this._drawIndicator(chart, last_trade_price_ts, last_trade_price, '最近成交点');
+              }
+
+              // 绘制当前价格
+              if (current_price) {
+                this._drawIndicator(chart, current_price_ts, current_price, '当前价格');
               }
 
               const current_point_y = yAxias.getPixelForValue(current_price);
@@ -219,13 +230,8 @@ export class VisualEngine {
               // 为了避免标签重叠先搞个位置收集器
               const collisionAvoidance = createCollisionAvoidance();
 
-              // 绘制实时利润空间表格
-              this._drawProfitTable(chart);
-
               // 绘制信息表格
-              this._drawInfoTable(chart);
-
-              this._drawRhoTable(chart);
+              this._drawInfoTable(chart, width * 0.01, height * 0.01);
 
               this._drawDateTime(chart);
 
@@ -243,7 +249,7 @@ export class VisualEngine {
                   const xCoord = chart.scales.x.getPixelForValue(time);
                   const yCoord = chart.scales.y.getPixelForValue(price);
                   // 绘制订单标签
-                  const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${avgPx})/${-gridCount} 倍`;
+                  const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${price.toFixed(2)})/${-gridCount} 倍`;
                   this._paintSingleOrder(
                     chart.ctx,
                     xCoord,
@@ -358,14 +364,17 @@ export class VisualEngine {
   }
 
   /**
-   * 绘制拐点指示器
+   * 绘制指示器
    * @param {*} chart Chart对象
    * @param {number} y 拐点的Y轴坐标
    * @private
    */
-  static _drawIndicator(chart, x, y, label) {
+  static _drawIndicator(chart, ts, price, label, direction=0) {
     const ctx = chart.ctx;
-
+    const yAxias = chart.scales.y;
+    const xAxias = chart.scales.x;
+    const y = yAxias.getPixelForValue(price);
+    const x = xAxias.getPixelForValue(formatTimestamp(ts, TradeEngine._bar_type));
     // 保存当前上下文状态
     ctx.save();
 
@@ -376,7 +385,12 @@ export class VisualEngine {
 
     // 在图表右侧绘制指示线
     ctx.moveTo(x, y);
-    ctx.lineTo(chart.chartArea.right + 20, y);
+    ctx.lineTo(chart.chartArea.right + 40, y);
+    if (direction === 0) {
+      ctx.lineTo(chart.chartArea.right + 40 + 5, y - 10 * direction);
+    } else {
+      ctx.lineTo(chart.chartArea.right + 40 + 10, y - 10 * direction);
+    }
     ctx.stroke();
 
     // 显示拐点数值
@@ -384,7 +398,13 @@ export class VisualEngine {
     ctx.font = `12px ${font_style}`;
     ctx.fillStyle = '#8b32a8';
     ctx.textAlign = 'right';
-    ctx.fillText(`${label}(${value.toFixed(2)})`, chart.chartArea.right + 40, y - 10);
+    // 测试文字宽度
+    const textWidth = ctx.measureText(`${label}(${value.toFixed(2)})`).width;
+    ctx.fillText(
+      `${label}(${value.toFixed(2)})`,
+      chart.chartArea.right + 40 + 10 + textWidth,
+      y - direction * 10
+    );
     // 恢复上下文状态
     ctx.restore();
   }
@@ -1072,7 +1092,7 @@ export class VisualEngine {
   /**
    * 绘制价格、对冲比信息表格
    */
-  static _drawInfoTable(chart) {
+  static _drawInfoTable(chart, left=width*0.35, top=height*0.01) {
     const ctx = chart.ctx;
     const headers = ['β(对冲比)', '价格', '涨跌幅'];
     const themes = this._asset_themes;
@@ -1088,8 +1108,6 @@ export class VisualEngine {
       return [beta_map[assetId][0].toFixed(6), price, rate];
     });
 
-    const left = width * 0.35;
-    const top = height * 0.01;
     const cellWidth = 90; // 单元格宽度
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距

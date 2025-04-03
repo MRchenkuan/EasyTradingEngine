@@ -186,13 +186,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
     // 计算上拐点价横跨网格数量
     const gridTurningCount_upper = this._countGridNumber(
-      this._current_price,
-      this._last_upper_turning_price
+      this._last_upper_turning_price,
+      this._last_trade_price || this._grid_base_price
     );
     // 计算下拐点价横跨网格数量
     const gridTurningCount_lower = this._countGridNumber(
-      this._current_price,
-      this._last_lower_turning_price
+      this._last_lower_turning_price,
+      this._last_trade_price || this._grid_base_price
     );
 
     // 更新拐点价格
@@ -235,6 +235,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       return;
     }
 
+    /** todo 做个开关是否开放格内交易 */
     // 处理拐点交易逻辑
     if (this._direction < 0 && Math.abs(gridTurningCount_upper) >= 1) {
       console.log(
