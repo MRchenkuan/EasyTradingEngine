@@ -68,7 +68,7 @@ function displayGridTrades(monit = false) {
 
   console.log('\n=== 盈亏统计 ===');
   console.log(header);
-  console.log('-'.repeat(90));
+  console.log('-'.repeat(80));
 
   let totalNetProfit = 0;
   let totalRealizedProfit = 0;
@@ -97,7 +97,10 @@ function displayGridTrades(monit = false) {
       padString(netProfitStr, 10),
       padString(realizedProfitStr, 10),
       padString(unrealizedProfitStr, 10),
-      padString(result.totalFee >= 0 ? ' ' + result.totalFee.toFixed(2) : result.totalFee.toFixed(2), 9),
+      padString(
+        result.totalFee >= 0 ? ' ' + result.totalFee.toFixed(2) : result.totalFee.toFixed(2),
+        9
+      ),
       padString(
         result.openPosition >= 0
           ? `${colors.red} ${result.openPosition.toFixed(2)}${colors.reset}`
@@ -129,7 +132,7 @@ function displayGridTrades(monit = false) {
   }
 
   // 打印总计行
-  console.log('-'.repeat(90));
+  console.log('-'.repeat(80));
   // 总计行
   const totalRow = [
     padString('总计', 10),

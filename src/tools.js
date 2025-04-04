@@ -261,7 +261,6 @@ export function createMapFrom(arr1, arr2) {
   }, {});
 }
 
-
 export function calculateGridProfit(trades) {
   if (!trades || trades.length === 0) return {};
 
@@ -276,35 +275,35 @@ export function calculateGridProfit(trades) {
   }, {});
 
   const results = {};
-  
+
   for (const [instId, symbolTrades] of Object.entries(groupedTrades)) {
-    let totalAmount = 0;  // 金额加和（买入为负，卖出为正）
-    let totalQuantity = 0;  // 数量加和（买入为正，卖出为负）
-    let totalFee = 0;  // 手续费加和
-    
+    let totalAmount = 0; // 金额加和（买入为负，卖出为正）
+    let totalQuantity = 0; // 数量加和（买入为正，卖出为负）
+    let totalFee = 0; // 手续费加和
+
     // 获取最新成交价格（最后一笔订单的价格）
     const lastPrice = parseFloat(symbolTrades[symbolTrades.length - 1].avgPx);
-    
+
     for (const trade of symbolTrades) {
       const side = trade.side;
       const price = parseFloat(trade.avgPx);
       const size = parseFloat(trade.accFillSz);
       const amount = price * size;
-      
+
       // 计算金额（买入为负，卖出为正）
       if (side === 'buy') {
         totalAmount -= amount;
       } else {
         totalAmount += amount;
       }
-      
+
       // 计算数量（买入为正，卖出为负）
       if (side === 'buy') {
         totalQuantity += size;
       } else {
         totalQuantity -= size;
       }
-      
+
       // 计算手续费（统一转换为USDT）
       const fee = Math.abs(parseFloat(trade.fee));
       if (trade.feeCcy === 'USDT') {
@@ -313,20 +312,18 @@ export function calculateGridProfit(trades) {
         totalFee += fee * price;
       }
     }
-    
+
     // 计算未平仓头寸的价值
     const positionValue = totalQuantity * lastPrice;
-    
+
     // 计算总盈亏
-    const realizedProfit = totalAmount;  // 已实现盈亏
-    const unrealizedProfit = positionValue;  // 未实现盈亏
-    const netProfit = realizedProfit + unrealizedProfit - totalFee;  // 净盈亏
-    
+    const realizedProfit = totalAmount; // 已实现盈亏
+    const unrealizedProfit = positionValue; // 未实现盈亏
+    const netProfit = realizedProfit + unrealizedProfit - totalFee; // 净盈亏
+
     // 计算持仓均价（如果有持仓）
-    const avgCost = totalQuantity !== 0 ? 
-      Math.abs(totalAmount / totalQuantity) : 
-      0;
-    
+    const avgCost = Math.abs(totalQuantity) >= 0.000001 ? Math.abs(totalAmount) / totalQuantity : 0;
+
     results[instId] = {
       realizedProfit: Number(realizedProfit.toFixed(4)),
       unrealizedProfit: Number(unrealizedProfit.toFixed(4)),
@@ -334,9 +331,9 @@ export function calculateGridProfit(trades) {
       netProfit: Number(netProfit.toFixed(4)),
       openPosition: Number(totalQuantity.toFixed(4)),
       avgCost: Number(avgCost.toFixed(4)),
-      positionValue: Number((totalQuantity * lastPrice).toFixed(4))  // 添加未平仓价值
+      positionValue: Number((totalQuantity * lastPrice).toFixed(4)), // 添加未平仓价值
     };
   }
-  
+
   return results;
 }
