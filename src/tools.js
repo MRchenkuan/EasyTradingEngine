@@ -263,76 +263,80 @@ export function createMapFrom(arr1, arr2) {
 
 
 export function calculateGridProfit(trades) {
-  const groupedTrades = {};
-  for (const trade of trades) {
+  if (!trades || trades.length === 0) return {};
+
+  // 按交易对分组
+  const groupedTrades = trades.reduce((acc, trade) => {
     const instId = trade.instId;
-    if (!groupedTrades[instId]) {
-      groupedTrades[instId] = [];
+    if (!acc[instId]) {
+      acc[instId] = [];
     }
-    groupedTrades[instId].push(trade);
-  }
+    acc[instId].push(trade);
+    return acc;
+  }, {});
 
   const results = {};
+  
   for (const [instId, symbolTrades] of Object.entries(groupedTrades)) {
-    let position = 0;
-    let totalProfit = 0;
-    let totalFee = 0;
-    let lastBuyOrder = null;
-
+    let totalAmount = 0;  // 金额加和（买入为负，卖出为正）
+    let totalQuantity = 0;  // 数量加和（买入为正，卖出为负）
+    let totalFee = 0;  // 手续费加和
+    
+    // 获取最新成交价格（最后一笔订单的价格）
+    const lastPrice = parseFloat(symbolTrades[symbolTrades.length - 1].avgPx);
+    
     for (const trade of symbolTrades) {
-      const size = parseFloat(trade.accFillSz);
-      const price = parseFloat(trade.avgPx);
       const side = trade.side;
-
-      // 计算手续费
-      const fee = Math.abs(parseFloat(trade.fee));
-      const feeUsdt = trade.feeCcy !== 'USDT' ? fee * price : fee;
-      totalFee += feeUsdt;
-
+      const price = parseFloat(trade.avgPx);
+      const size = parseFloat(trade.accFillSz);
+      const amount = price * size;
+      
+      // 计算金额（买入为负，卖出为正）
       if (side === 'buy') {
-        lastBuyOrder = {
-          size,
-          price,
-          fee: feeUsdt
-        };
-        position += size;
-      } else { // sell
-        if (lastBuyOrder) {
-          // 只与最近的买单配对
-          const matchSize = Math.min(size, lastBuyOrder.size);
-          
-          // 计算这部分的盈利
-          const profit = matchSize * (price - lastBuyOrder.price);
-          // 分摊买入手续费
-          const buyFeePortion = lastBuyOrder.fee * (matchSize / lastBuyOrder.size);
-          // 分摊卖出手续费
-          const sellFeePortion = feeUsdt * (matchSize / size);
-
-          totalProfit += profit - buyFeePortion - sellFeePortion;
-
-          // 更新剩余买单数量
-          if (matchSize === lastBuyOrder.size) {
-            lastBuyOrder = null;
-          } else {
-            lastBuyOrder.size -= matchSize;
-            lastBuyOrder.fee *= (lastBuyOrder.size / (lastBuyOrder.size + matchSize));
-          }
-        }
-        position -= size;
+        totalAmount -= amount;
+      } else {
+        totalAmount += amount;
+      }
+      
+      // 计算数量（买入为正，卖出为负）
+      if (side === 'buy') {
+        totalQuantity += size;
+      } else {
+        totalQuantity -= size;
+      }
+      
+      // 计算手续费（统一转换为USDT）
+      const fee = Math.abs(parseFloat(trade.fee));
+      if (trade.feeCcy === 'USDT') {
+        totalFee += fee;
+      } else {
+        totalFee += fee * price;
       }
     }
-
-    // 计算未平仓均价
-    const avgCost = lastBuyOrder ? lastBuyOrder.price : 0;
-
+    
+    // 计算未平仓头寸的价值
+    const positionValue = totalQuantity * lastPrice;
+    
+    // 计算总盈亏
+    const realizedProfit = totalAmount;  // 已实现盈亏
+    const unrealizedProfit = positionValue;  // 未实现盈亏
+    const netProfit = realizedProfit + unrealizedProfit - totalFee;  // 净盈亏
+    
+    // 计算持仓均价（如果有持仓）
+    const avgCost = totalQuantity !== 0 ? 
+      Math.abs(totalAmount / totalQuantity) : 
+      0;
+    
     results[instId] = {
-      realizedProfit: Number(totalProfit.toFixed(4)),
+      realizedProfit: Number(realizedProfit.toFixed(4)),
+      unrealizedProfit: Number(unrealizedProfit.toFixed(4)),
       totalFee: Number(totalFee.toFixed(4)),
-      netProfit: Number((totalProfit - totalFee).toFixed(4)),
-      openPosition: Number(position.toFixed(4)),
-      avgCost: position > 0 ? Number(avgCost.toFixed(4)) : 0
+      netProfit: Number(netProfit.toFixed(4)),
+      openPosition: Number(totalQuantity.toFixed(4)),
+      avgCost: Number(avgCost.toFixed(4)),
+      positionValue: Number((totalQuantity * lastPrice).toFixed(4))  // 添加未平仓价值
     };
   }
-
+  
   return results;
 }

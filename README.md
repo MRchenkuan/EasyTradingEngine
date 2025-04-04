@@ -134,6 +134,25 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
   - 第三个参数：触发门限
 
 ## 网格交易
+```bash
+# 查看网格交易盈亏统计
+npm run grid
+
+# 实时监控网格交易盈亏
+npm run grid monit
+
+# 查看指定币种的网格交易盈亏
+npm run grid monit BTC
+```
+统计信息包含：
+
+- 净盈亏：当前总盈亏（已实现 + 未实现 - 手续费）
+- 已实现：已完成交易的盈亏
+- 未实现：未平仓头寸的浮动盈亏
+- 手续费：累计交易手续费
+- 持仓数量：当前未平仓数量
+- 持仓价值：未平仓头寸按最新价计算的市值
+- 持仓均价：当前持仓的平均成本
 
 ```javascript
 TradeEngine.createGridTrading('SOL-USDT', {
