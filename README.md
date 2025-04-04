@@ -145,6 +145,7 @@ npm run grid monit
 npm run grid monit BTC
 ```
 统计信息包含：
+<img width="587" alt="image" src="https://github.com/user-attachments/assets/0164dc43-628e-41db-8575-c08991dbc270" />
 
 - 净盈亏：当前总盈亏（已实现 + 未实现 - 手续费）
 - 已实现：已完成交易的盈亏
