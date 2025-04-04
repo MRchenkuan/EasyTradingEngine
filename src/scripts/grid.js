@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { formatTimestamp } from '../tools.js';
+import { calculateGridProfit, formatTimestamp } from '../tools.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -119,6 +119,7 @@ function displayGridTrades() {
     }
   });
 
+
   // 打印分隔线和总结行
   console.log('-'.repeat(91));
   const summaryRow = [
@@ -130,6 +131,22 @@ function displayGridTrades() {
   ].join('');
   console.log(summaryRow);
   console.log('');
+
+  const results = calculateGridProfit(filteredTrades);
+  // 打印结果
+  console.log('=== 网格交易盈亏统计 ===');
+  for (const [instId, result] of Object.entries(results)) {
+    console.log(`\n${instId}:`);
+    console.log(`已实现盈利: ${result.realizedProfit} USDT`);
+    console.log(`总手续费: ${result.totalFee} USDT`);
+    console.log(`净盈利: ${result.netProfit} USDT`);
+    if (result.openPosition !== 0) {
+      console.log(`未平仓数量: ${result.openPosition}`);
+      if (result.avgCost > 0) {
+        console.log(`持仓均价: ${result.avgCost} USDT`);
+      }
+    }
+  }
 
   process.exit(0);
 }

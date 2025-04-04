@@ -260,3 +260,79 @@ export function createMapFrom(arr1, arr2) {
     return obj;
   }, {});
 }
+
+
+export function calculateGridProfit(trades) {
+  const groupedTrades = {};
+  for (const trade of trades) {
+    const instId = trade.instId;
+    if (!groupedTrades[instId]) {
+      groupedTrades[instId] = [];
+    }
+    groupedTrades[instId].push(trade);
+  }
+
+  const results = {};
+  for (const [instId, symbolTrades] of Object.entries(groupedTrades)) {
+    let position = 0;
+    let totalProfit = 0;
+    let totalFee = 0;
+    let lastBuyOrder = null;
+
+    for (const trade of symbolTrades) {
+      const size = parseFloat(trade.accFillSz);
+      const price = parseFloat(trade.avgPx);
+      const side = trade.side;
+
+      // 计算手续费
+      const fee = Math.abs(parseFloat(trade.fee));
+      const feeUsdt = trade.feeCcy !== 'USDT' ? fee * price : fee;
+      totalFee += feeUsdt;
+
+      if (side === 'buy') {
+        lastBuyOrder = {
+          size,
+          price,
+          fee: feeUsdt
+        };
+        position += size;
+      } else { // sell
+        if (lastBuyOrder) {
+          // 只与最近的买单配对
+          const matchSize = Math.min(size, lastBuyOrder.size);
+          
+          // 计算这部分的盈利
+          const profit = matchSize * (price - lastBuyOrder.price);
+          // 分摊买入手续费
+          const buyFeePortion = lastBuyOrder.fee * (matchSize / lastBuyOrder.size);
+          // 分摊卖出手续费
+          const sellFeePortion = feeUsdt * (matchSize / size);
+
+          totalProfit += profit - buyFeePortion - sellFeePortion;
+
+          // 更新剩余买单数量
+          if (matchSize === lastBuyOrder.size) {
+            lastBuyOrder = null;
+          } else {
+            lastBuyOrder.size -= matchSize;
+            lastBuyOrder.fee *= (lastBuyOrder.size / (lastBuyOrder.size + matchSize));
+          }
+        }
+        position -= size;
+      }
+    }
+
+    // 计算未平仓均价
+    const avgCost = lastBuyOrder ? lastBuyOrder.price : 0;
+
+    results[instId] = {
+      realizedProfit: Number(totalProfit.toFixed(4)),
+      totalFee: Number(totalFee.toFixed(4)),
+      netProfit: Number((totalProfit - totalFee).toFixed(4)),
+      openPosition: Number(position.toFixed(4)),
+      avgCost: position > 0 ? Number(avgCost.toFixed(4)) : 0
+    };
+  }
+
+  return results;
+}
