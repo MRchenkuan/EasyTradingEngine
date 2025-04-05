@@ -171,13 +171,74 @@ function displayGridTrades(monit = false) {
   }
 }
 
+function displayGridTradeList(filterSymbol) {
+  const gridPath = path.join(__dirname, '../../records/trade-results-grid.json');
+  if (!fs.existsSync(gridPath)) {
+    console.log('没有网格交易记录');
+    return;
+  }
+
+  const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8'));
+  const filteredTrades = filterSymbol
+    ? trades.filter(order => order.instId.toUpperCase().startsWith(filterSymbol.toUpperCase()))
+    : trades;
+
+  if (filteredTrades.length === 0) {
+    console.log(`没有找到 ${filterSymbol} 的交易记录`);
+    return;
+  }
+
+  // 打印交易记录表格
+  const header = [
+    padString('时间', 16),
+    padString('品种', 10),
+    padString('方向', 6),
+    padString(' 数量', 10),
+    padString(' 价格', 10),
+    padString(' 金额', 12),
+    padString(' 手续费', 10),
+  ].join('');
+
+  console.log('\n=== 网格交易记录 ===');
+  console.log(header);
+  console.log('-'.repeat(74));
+
+  filteredTrades.forEach(trade => {
+    const amount = (parseFloat(trade.accFillSz) * parseFloat(trade.avgPx)).toFixed(2);
+    const quantity = parseFloat(trade.accFillSz).toFixed(2);
+    const price = parseFloat(trade.avgPx).toFixed(2);
+    
+    // 计算手续费（USDT）
+    const feeInUSDT = trade.feeCcy === 'USDT' 
+      ? Math.abs(parseFloat(trade.fee))
+      : Math.abs(parseFloat(trade.fee) * parseFloat(trade.avgPx));
+    
+    const row = [
+      padString(formatTimestamp(trade.ts), 16),
+      padString(trade.instId, 10),
+      padString(trade.side === 'buy' ? `${colors.red}买入${colors.reset}` : `${colors.green}卖出${colors.reset}`, 6),
+      padString(trade.side === 'buy' ? ` ${quantity}` : `-${quantity}`, 10),
+      padString(` ${price}`, 10),
+      padString(trade.side === 'buy' ? ` ${amount}` : `-${amount}`, 12),
+      padString(` ${feeInUSDT.toFixed(2)}`, 10),
+    ].join('');
+    console.log(row);
+  });
+
+  process.exit(0);
+}
+
 // 修改主函数逻辑
 const command = process.argv[2];
+const symbol = process.argv[3];
 
 switch (command) {
   case 'monit':
     setInterval(() => displayGridTrades(true), 1000);
     displayGridTrades(true);
+    break;
+  case 'list':
+    displayGridTradeList(symbol);
     break;
   default:
     displayGridTrades();

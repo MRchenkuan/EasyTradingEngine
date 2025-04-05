@@ -66,7 +66,10 @@ export class VisualEngine {
     if (status == 2) {
       this.drawMainGraph();
       this.drawTransctionSlices();
-      this.drawGridTrading();
+      this.drawGridTrading(TradeEngine._bar_type);
+      // TradeEngine.processors.forEach(it => {
+      //   it.display();
+      // });
     }
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
@@ -369,7 +372,7 @@ export class VisualEngine {
    * @param {number} y 拐点的Y轴坐标
    * @private
    */
-  static _drawIndicator(chart, ts, price, label, direction=0) {
+  static _drawIndicator(chart, ts, price, label, direction = 0) {
     const ctx = chart.ctx;
     const yAxias = chart.scales.y;
     const xAxias = chart.scales.x;
@@ -1092,7 +1095,7 @@ export class VisualEngine {
   /**
    * 绘制价格、对冲比信息表格
    */
-  static _drawInfoTable(chart, left=width*0.35, top=height*0.01) {
+  static _drawInfoTable(chart, left = width * 0.35, top = height * 0.01) {
     const ctx = chart.ctx;
     const headers = ['β(对冲比)', '价格', '涨跌幅'];
     const themes = this._asset_themes;
