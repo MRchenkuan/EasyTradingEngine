@@ -307,6 +307,7 @@ export class TradeEngine {
    * @returns
    */
   static getRealtimePrice(assetId) {
+    // if()
     return this.realtime_price[assetId];
   }
 

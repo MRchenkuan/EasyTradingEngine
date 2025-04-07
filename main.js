@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '15m';
+const bar_type = '1m';
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
@@ -45,56 +45,56 @@ TradeEngine.setMetaInfo({
 /**
  * 创建对冲交易
  */
-TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
-TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['BTC-USDT', 'ETH-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['OKB-USDT', 'ETH-USDT'], 200, 0.02);
+// TradeEngine.createHedge(['OKB-USDT', 'BTC-USDT'], 200, 0.02);
 // TradeEngine.createHedge(['SOL-USDT', 'BTC-USDT'], 200, 0.02);
-TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
+// TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
 
 /**
  * 启动网格交易
  */
-TradeEngine.createGridTrading('SOL-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
-  _trade_amount: 0.8,
-  _max_position: 20,
-  _start_position: 0,
-  _min_price: 50,
-  _max_price: 250,
-});
+// TradeEngine.createGridTrading('SOL-USDT', {
+//   _grid_width: 0.005,
+//   _max_drawdown: 0.003,
+//   _max_bounce: 0.003,
+//   _trade_amount: 0.8,
+//   _max_position: 20,
+//   _start_position: 0,
+//   _min_price: 50,
+//   _max_price: 250,
+// });
 
 TradeEngine.createGridTrading('XRP-USDT', {
   // _grid_base_price: 2.0, //建仓基准价
   _grid_width: 0.005,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
-  _trade_amount: 50,
+  _max_drawdown: 0.005,
+  _max_bounce: 0.005,
+  _trade_amount: 30,
   _max_position: 2000,
   _min_price: 1,
   _max_price: 4,
 });
 
-TradeEngine.createGridTrading('ETH-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
-  _trade_amount: 0.06,
-  _max_position: 1,
-  _min_price: 1500,
-  _max_price: 2800,
-});
+// TradeEngine.createGridTrading('ETH-USDT', {
+//   _grid_width: 0.005,
+//   _max_drawdown: 0.003,
+//   _max_bounce: 0.003,
+//   _trade_amount: 0.06,
+//   _max_position: 1,
+//   _min_price: 1500,
+//   _max_price: 2800,
+// });
 
-TradeEngine.createGridTrading('BTC-USDT', {
-  _grid_width: 0.005,
-  _max_drawdown: 0.003,
-  _max_bounce: 0.003,
-  _trade_amount: 0.002,
-  _max_position: 0.05,
-  _min_price: 60000,
-  _max_price: 100000,
-});
+// TradeEngine.createGridTrading('BTC-USDT', {
+//   _grid_width: 0.005,
+//   _max_drawdown: 0.003,
+//   _max_bounce: 0.003,
+//   _trade_amount: 0.002,
+//   _max_position: 0.05,
+//   _min_price: 60000,
+//   _max_price: 100000,
+// });
 
 /**
  * 启动图像引擎

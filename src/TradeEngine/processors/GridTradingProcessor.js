@@ -36,6 +36,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _grid_base_price_ts = null;
   _tendency = 0;
   _direction = 0;
+  _enable_none_grid_trading = false; // 是否启用无网格交易
 
   constructor(asset_name, params = {}, engine) {
     super();
@@ -124,7 +125,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     return 0;
   }
 
-  display(){
+  display() {
     this._drawGridTrading(this.engine._bar_type);
   }
 
@@ -444,7 +445,11 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     /** todo 做个开关是否开放格内交易 */
     // 处理拐点交易逻辑
-    if (this._direction < 0 && Math.abs(gridTurningCount_upper) >= 1) {
+    if (
+      this._enable_none_grid_trading &&
+      this._direction < 0 &&
+      Math.abs(gridTurningCount_upper) >= 1
+    ) {
       console.log(
         `↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`
       );
@@ -452,7 +457,11 @@ export class GridTradingProcessor extends AbstractProcessor {
       return;
     }
 
-    if (this._direction > 0 && Math.abs(gridTurningCount_lower) >= 1) {
+    if (
+      this._enable_none_grid_trading &&
+      this._direction > 0 &&
+      Math.abs(gridTurningCount_lower) >= 1
+    ) {
       // 这里应该使用 gridTurningCount_lower
       console.log(
         `↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`

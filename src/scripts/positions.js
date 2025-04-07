@@ -100,8 +100,10 @@ function displayPositions(monit = false) {
     const [order1, order2] = sortedOrders;
     const price1 = closed ? order1.avgPx : TradeEngine.getRealtimePrice(order1.instId);
     const price2 = closed ? order2.avgPx : TradeEngine.getRealtimePrice(order2.instId);
-
     if (price1 && price2 && order1.beta && order2.beta) {
+      if (tradeId === '622623fa') {
+        console.log(price1, price2);
+      }
       const sr_px1 = price1 * order1.beta[0] + order1.beta[1];
       const sr_px2 = price2 * order2.beta[0] + order2.beta[1];
       diffValue = TradeEngine._calcPriceGapProfit(sr_px1, sr_px2, (sr_px1 + sr_px2) / 2);

@@ -14,7 +14,7 @@ export async function marketCandles(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 5000,  // 设置5秒超时
+    timeout: 5000, // 设置5秒超时
   });
   return data;
 }
@@ -28,7 +28,7 @@ export async function marketCandlesHistory(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 5000,  // 设置5秒超时
+    timeout: 5000, // 设置5秒超时
   });
 }
 
@@ -87,19 +87,22 @@ export async function batchOrders(orders) {
     clOrdId: order.clOrdId || hashString(`${Date.now()}${Math.random()}`),
   }));
 
+  const security = firm;
+  // const security = mimic;
+
   const timestamp = new Date().toISOString();
   const method = 'POST';
   const requestPath = '/api/v5/trade/batch-orders';
   const body = JSON.stringify(ordersWithId);
-  const sign = generateSignature(timestamp, method, requestPath, body, mimic.api_secret);
+  const sign = generateSignature(timestamp, method, requestPath, body, security.api_secret);
 
   const headers = {
     'Content-Type': 'application/json',
-    'OK-ACCESS-KEY': mimic.api_key,
+    'OK-ACCESS-KEY': security.api_key,
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    'x-simulated-trading': 1,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    // 'x-simulated-trading': 1,
   };
 
   try {
@@ -227,19 +230,21 @@ export async function batchCancelOrders(orders) {
     console.error(orders);
     throw new Error('订单参数格式错误：每个订单必须包含 instId 和 ordId/clOrdId 中的至少一个');
   }
+  const security = firm;
+  // const security = mimic;
 
   const timestamp = new Date().toISOString();
   const method = 'POST';
   const requestPath = '/api/v5/trade/cancel-batch-orders';
   const body = JSON.stringify(orders);
-  const sign = generateSignature(timestamp, method, requestPath, body, mimic.api_secret);
+  const sign = generateSignature(timestamp, method, requestPath, body, security.api_secret);
   const headers = {
     'Content-Type': 'application/json',
-    'OK-ACCESS-KEY': mimic.api_key,
+    'OK-ACCESS-KEY': security.api_key,
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    'x-simulated-trading': 1,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    // 'x-simulated-trading': 1,
   };
   const { data } = await axios.post(base_url + requestPath, orders, {
     headers,
@@ -249,23 +254,34 @@ export async function batchCancelOrders(orders) {
 
 // 获取订单信息
 export async function getOrderInfo(instId, ordId) {
+  const security = firm;
+  // const security = mimic;
+
   const timestamp = new Date().toISOString();
   const method = 'GET';
   const requestPath = `/api/v5/trade/order?ordId=${ordId}&instId=${instId}`;
-  const sign = generateSignature(timestamp, method, requestPath, '', mimic.api_secret);
+  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
 
   const headers = {
-    'OK-ACCESS-KEY': mimic.api_key,
+    'OK-ACCESS-KEY': security.api_key,
     'OK-ACCESS-SIGN': sign,
     'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': mimic.pass_phrase,
-    'x-simulated-trading': 1,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    // 'x-simulated-trading': 1,
   };
-  const { data } = await axios.get(base_url + requestPath, {
-    headers,
-  });
-
-  return data;
+  
+  try {
+    const { data } = await axios.get(base_url + requestPath, { headers });
+    // 确保返回的数据格式正确
+    if (!data.data || !data.data.length) {
+      console.error(`获取订单信息失败: ${instId} ${ordId}`);
+      return { data: [] };
+    }
+    return data;
+  } catch (error) {
+    console.error('获取订单信息失败:', error.response?.data || error.message);
+    return { data: [] };
+  }
 }
 
 // 登录函数

@@ -16,6 +16,7 @@ export class HedgeProcessor extends AbstractProcessor {
   _timer = {};
   _position_size = 10; // 10 usdt
   _return_rate = 0.005; // 开仓-平仓 最大回撤 5%
+  _enable_trade = false;
   /**
    *
    * @param {*} assetNames
@@ -163,7 +164,7 @@ export class HedgeProcessor extends AbstractProcessor {
         // 平仓
         const profit = this.engine._calcRealtimeProfit(orders);
         if (profit > 0) {
-          close_position(tradeId);
+          if(this._enable_trade) close_position(tradeId);
         } else {
           console.log(
             `[${tradeId}][${orders.map(it => it.instId).join('->')}]满足平仓条件：固定${(diff_rate_fixed * 100).toFixed(2)}% or 实时${(diff_rate_realtime * 100).toFixed(2)}% <= 门限${(close_gate * 100).toFixed(2)}% 但利润为负:$${profit.toFixed(2)}`
@@ -297,7 +298,7 @@ export class HedgeProcessor extends AbstractProcessor {
           );
 
           // 开仓
-          spx1 > spx2
+          if(this._enable_trade)  spx1 > spx2
             ? open_position(instId1, instId2, this._position_size)
             : open_position(instId2, instId1, this._position_size);
           console.log(
@@ -316,7 +317,7 @@ export class HedgeProcessor extends AbstractProcessor {
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
-        spx1 > spx2
+        if(this._enable_trade)  spx1 > spx2
           ? open_position(instId1, instId2, this._position_size)
           : open_position(instId2, instId1, this._position_size);
         console.log(
