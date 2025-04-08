@@ -252,7 +252,7 @@ export class VisualEngine {
                   const xCoord = chart.scales.x.getPixelForValue(time);
                   const yCoord = chart.scales.y.getPixelForValue(price);
                   // 绘制订单标签
-                  const label = `${side === 'buy' ? '买入' : '卖出'} ${accFillSz} 份/(${price.toFixed(2)})/${-gridCount} 倍`;
+                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(2)})/${-gridCount} 倍`;
                   this._paintSingleOrder(
                     chart.ctx,
                     xCoord,
@@ -323,7 +323,7 @@ export class VisualEngine {
 
     const currentStyle = styles[style] || styles.default;
     const { arrowLength, arrowWidth, offset, colors } = currentStyle;
-
+    ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
     // 保存当前上下文状态
     ctx.save();
 

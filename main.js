@@ -13,12 +13,12 @@ const once_limit = 300;
 const candle_limit = 2000;
 const assets = [
   { id: 'BTC-USDT', theme: '#f0b27a' },
-  { id: 'SOL-USDT', theme: '#ad85e9' },
+  // { id: 'SOL-USDT', theme: '#ad85e9' },
   { id: 'ETH-USDT', theme: '#85c1e9' },
-  { id: 'TRUMP-USDT', theme: '#90a4ae' },
+  // { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
-  { id: 'OKB-USDT', theme: '#52be80' },
-  { id: 'ADA-USDT', theme: '#85dfe9' },
+  // { id: 'OKB-USDT', theme: '#52be80' },
+  // { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
 const params = {
   bar_type,
