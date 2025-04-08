@@ -70,7 +70,7 @@ TradeEngine.createGridTrading('XRP-USDT', {
   _grid_width: 0.005,
   _max_drawdown: 0.005,
   _max_bounce: 0.005,
-  _trade_amount: 30,
+  _trade_amount: 20,
   _max_position: 2000,
   _min_price: 1,
   _max_price: 4,

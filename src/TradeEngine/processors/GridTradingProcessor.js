@@ -36,7 +36,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _grid_base_price_ts = null;
   _tendency = 0;
   _direction = 0;
-  _enable_none_grid_trading = false; // 是否启用无网格交易
+  _enable_none_grid_trading = true; // 是否启用无网格交易
 
   constructor(asset_name, params = {}, engine) {
     super();
