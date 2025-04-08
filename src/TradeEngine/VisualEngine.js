@@ -14,7 +14,7 @@ import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 
-const width = 4000,
+const width = 3000,
   height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
 const font_style = 'Monaco, Menlo, Consolas, monospace';
@@ -586,7 +586,7 @@ export class VisualEngine {
     ctx.beginPath();
     ctx.setLineDash(dash);
     ctx.strokeStyle = '#aaaaaa';
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 0.5;
     ctx.moveTo(chart.chartArea.left, yPixel);
     ctx.lineTo(chart.chartArea.right, yPixel);
     ctx.stroke();
