@@ -424,9 +424,15 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     const correction = this._correction();
     const threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
+    const grid_count_abs = Math.abs(gridCount);
+    // 如果超过两格则回撤判断减半，快速锁定空间
+    // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
+    const is_return_arrived = grid_count_abs >= 2 
+      ? correction > threshold/2 
+      : correction > threshold
 
-    // 回撤/反弹幅度不足时不交易
-    if (Math.abs(correction) <= threshold) {
+    // 回撤/反弹条件是否满足
+    if (!is_return_arrived) {
       console.log(
         `[${this.asset_name}]当前回撤/反弹幅度${(correction * 100).toFixed(2)}%，🐢继续等待...`
       );
@@ -435,7 +441,8 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 处理网格交易逻辑
     //  todo 不论是回撤还是反弹，都不能超过一个格子，否则会过度反弹高位买入
-    if (Math.abs(gridCount) >= 1) {
+    // 网格数量是否满足条件
+    if (grid_count_abs >= 1) {
       console.log(
         `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`
       );
@@ -443,7 +450,6 @@ export class GridTradingProcessor extends AbstractProcessor {
       return;
     }
 
-    /** todo 做个开关是否开放格内交易 */
     // 处理拐点交易逻辑
     if (
       this._enable_none_grid_trading &&

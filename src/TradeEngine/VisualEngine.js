@@ -586,7 +586,7 @@ export class VisualEngine {
     ctx.beginPath();
     ctx.setLineDash(dash);
     ctx.strokeStyle = '#aaaaaa';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1;
     ctx.moveTo(chart.chartArea.left, yPixel);
     ctx.lineTo(chart.chartArea.right, yPixel);
     ctx.stroke();
