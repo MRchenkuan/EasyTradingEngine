@@ -235,7 +235,7 @@ export async function marketMaker(assetId, price, size, dir) {
 //     return await fetchOrders(orders);
 //   }
 // }
-async function fetchOrders(orders, initialDelay = 3000, maxRetries = 5) {
+export async function fetchOrders(orders, initialDelay = 3000, maxRetries = 5) {
   let retryCount = 0;
   let currentDelay = initialDelay;
   const completedOrders = new Map();

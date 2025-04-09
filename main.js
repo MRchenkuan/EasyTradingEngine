@@ -17,7 +17,7 @@ const assets = [
   { id: 'ETH-USDT', theme: '#85c1e9' },
   // { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
-  // { id: 'OKB-USDT', theme: '#52be80' },
+  { id: 'OKB-USDT', theme: '#52be80' },
   // { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
 const params = {

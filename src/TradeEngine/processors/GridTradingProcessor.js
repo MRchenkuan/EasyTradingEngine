@@ -1,8 +1,7 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
-import { createOrder_market, executeOrders } from '../../trading.js';
+import { createOrder_market, executeOrders, fetchOrders } from '../../trading.js';
 import { getGridTradeOrders, recordGridTradeOrders } from '../../recordTools.js';
-
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -36,7 +35,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _grid_base_price_ts = null;
   _tendency = 0;
   _direction = 0;
-  _enable_none_grid_trading = false; // 是否启用无网格交易,网格内跨线回撤
+  _enable_none_grid_trading = true; // 是否启用无网格交易,网格内跨线回撤
 
   constructor(asset_name, params = {}, engine) {
     super();
@@ -427,9 +426,9 @@ export class GridTradingProcessor extends AbstractProcessor {
     const grid_count_abs = Math.abs(gridCount);
     // 如果超过两格则回撤判断减半，快速锁定空间
     // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
-    const is_return_arrived = grid_count_abs >= 2 
-      ? correction > threshold/2 
-      : correction > threshold
+    // const is_return_arrived =
+    //   grid_count_abs >= 2 ? Math.abs(correction) > threshold / 2 : correction > threshold;
+    const is_return_arrived = Math.abs(correction) > threshold;
 
     // 回撤/反弹条件是否满足
     if (!is_return_arrived) {
@@ -583,16 +582,44 @@ export class GridTradingProcessor extends AbstractProcessor {
     recordGridTradeOrders({ ...result.data[0], gridCount });
     console.log(`✅${this.asset_name} 交易成功: ${orderType}`);
     // 重置关键参数
-    this._last_trade_price = this._current_price;
-    this._last_trade_price_ts = this._current_price_ts;
-    // 下单之后重置拐点
-    this._last_lower_turning_price = this._current_price;
-    this._last_upper_turning_price = this._current_price;
+    this._resetKeyPrices(this._current_price, this._current_price_ts);
+    this._saveState(); // 立即保存状态
+    try {
+      const [o] = (await fetchOrders(result.data)) || [];
+      if (o && o.avgPx && o.fillTime) {
+        this._resetKeyPrices(parseFloat(o.avgPx), parseFloat(o.fillTime));
+        console.log(
+          `✅${this.asset_name} 远程重置关键参数成功`,
+          parseFloat(o.avgPx),
+          parseFloat(o.fillTime)
+        );
+      } else {
+        console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
+      }
+    } catch (e) {
+      console.error(`⛔${this.asset_name} 远程重置关键参数失败: ${e.message}`);
+    }
+  }
+
+  /**
+   * 重置关键参数
+   * @param {number} price 最新价格
+   * @param {number} ts 最新价格时间戳
+   */
+  _resetKeyPrices(price, ts) {
+    // 重置关键参数
+    this._last_trade_price = price;
+    this._last_trade_price_ts = ts;
+    // 重置拐点
+    this._last_lower_turning_price = price;
+    this._last_lower_turning_price_ts = ts;
+
+    this._last_upper_turning_price = price;
+    this._last_upper_turning_price_ts = ts;
     // 重置基准点
     // this._grid_base_price = this._current_price;
     // this._grid_base_price_ts = this._current_price_ts;
-    this._prev_price = this._current_price; // 重置前一价格
-    this._prev_price_ts = this._current_price_ts;
-    this._saveState(); // 立即保存状态
+    this._prev_price = price; // 重置前一价格
+    this._prev_price_ts = ts;
   }
 }
