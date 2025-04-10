@@ -32,7 +32,7 @@ export class VisualEngine {
   static _asset_themes = [];
   static _asset_names = [];
   static _show_order_his = [];
-  static _painting_interval = 2000; //
+  static _painting_interval = 1000; //
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
   static _config = new LocalVariable('config');

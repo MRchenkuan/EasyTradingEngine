@@ -572,7 +572,7 @@ export class TradeEngine {
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
       this.start();
-    }, 3000);
+    }, 1000);
   }
 
   static stop() {

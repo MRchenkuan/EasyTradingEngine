@@ -11,6 +11,7 @@ const colors = {
   gray: '\x1b[90m',
   red: '\x1b[31m',
   green: '\x1b[32m',
+  orange: '\x1b[33m', // 添加橙色
 };
 
 function padString(str, length) {
@@ -93,12 +94,14 @@ function displayGridTrades(monit = false) {
         : `${colors.green}${result.unrealizedProfit.toFixed(2)}${colors.reset}`;
 
     const row = [
-      padString(instId, 10),
+      padString(`${colors.orange}${instId}${colors.reset}`, 10),
       padString(netProfitStr, 10),
       padString(realizedProfitStr, 10),
       padString(unrealizedProfitStr, 10),
       padString(
-        result.totalFee >= 0 ? ' ' + result.totalFee.toFixed(2) : result.totalFee.toFixed(2),
+        result.totalFee >= 0
+          ? `${colors.gray} ${result.totalFee.toFixed(2)}${colors.reset}`
+          : `${colors.gray}${result.totalFee.toFixed(2)}${colors.reset}`,
         9
       ),
       padString(
@@ -135,7 +138,7 @@ function displayGridTrades(monit = false) {
   console.log('-'.repeat(80));
   // 总计行
   const totalRow = [
-    padString('总计', 10),
+    padString(`总计`, 10),
     padString(
       totalNetProfit >= 0
         ? `${colors.red} ${totalNetProfit.toFixed(2)}${colors.reset}`
@@ -154,7 +157,12 @@ function displayGridTrades(monit = false) {
         : `${colors.green}${totalUnrealizedProfit.toFixed(2)}${colors.reset}`,
       10
     ),
-    padString(totalFee.toFixed(2) >= 0 ? ' ' + totalFee.toFixed(2) : totalFee.toFixed(2), 9),
+    padString(
+      totalFee.toFixed(2) >= 0
+        ? `${colors.gray} ${totalFee.toFixed(2)}${colors.reset}`
+        : `${colors.gray}${totalFee.toFixed(2)}${colors.reset}`,
+      9
+    ),
     padString('', 10),
     padString(
       totalPositionValue >= 0
@@ -207,16 +215,22 @@ function displayGridTradeList(filterSymbol) {
     const amount = (parseFloat(trade.accFillSz) * parseFloat(trade.avgPx)).toFixed(2);
     const quantity = parseFloat(trade.accFillSz).toFixed(2);
     const price = parseFloat(trade.avgPx).toFixed(2);
-    
+
     // 计算手续费（USDT）
-    const feeInUSDT = trade.feeCcy === 'USDT' 
-      ? Math.abs(parseFloat(trade.fee))
-      : Math.abs(parseFloat(trade.fee) * parseFloat(trade.avgPx));
-    
+    const feeInUSDT =
+      trade.feeCcy === 'USDT'
+        ? Math.abs(parseFloat(trade.fee))
+        : Math.abs(parseFloat(trade.fee) * parseFloat(trade.avgPx));
+
     const row = [
       padString(formatTimestamp(trade.ts), 16),
       padString(trade.instId, 10),
-      padString(trade.side === 'buy' ? `${colors.red}买入${colors.reset}` : `${colors.green}卖出${colors.reset}`, 6),
+      padString(
+        trade.side === 'buy'
+          ? `${colors.red}买入${colors.reset}`
+          : `${colors.green}卖出${colors.reset}`,
+        6
+      ),
       padString(trade.side === 'buy' ? ` ${quantity}` : `-${quantity}`, 10),
       padString(` ${price}`, 10),
       padString(trade.side === 'buy' ? ` ${amount}` : `-${amount}`, 12),
