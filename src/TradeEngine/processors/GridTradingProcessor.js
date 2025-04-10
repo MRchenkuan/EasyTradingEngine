@@ -37,7 +37,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _direction = 0;
   _enable_none_grid_trading = false; // 是否启用无网格交易,网格内跨线回撤
   _last_grid_count = 0;
-  _last_grid_count_overtime_reset_ts = null
+  _last_grid_count_overtime_reset_ts = null;
   // 外部因子
   factor_is_people_bullish = false;
 
@@ -66,7 +66,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._last_upper_turning_price_ts = this.local_variables.last_upper_turning_price_ts;
 
     // 初始化重置时间
-    this._last_grid_count_overtime_reset_ts = this._last_trade_price_ts
+    this._last_grid_count_overtime_reset_ts = this._last_trade_price_ts;
     // this._current_price = this.local_variables.current_price;
     // this._current_price_ts = this.local_variables.current_price_ts;
     // this._tendency = this.local_variables.tendency || 0;
@@ -141,8 +141,8 @@ export class GridTradingProcessor extends AbstractProcessor {
    */
   tick() {
     // 获取最新价格
-    this._current_price = this.engine.getRealtimePrice(this.asset_name);
-    this._current_price_ts = this.engine.realtime_price_ts[this.asset_name];
+    this._current_price = this.engine.getRealtimePrice(this.asset_name) || this._prev_price;
+    this._current_price_ts = this.engine.realtime_price_ts[this.asset_name] || this._prev_price_ts;
 
     if (!this._current_price) {
       this._saveState(); // 使用统一的状态保存方法
@@ -187,19 +187,16 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 计算当前价格横跨网格
-    const gridCount = this._countGridNumber(
-      this._current_price,
-      this._last_trade_price || this._grid_base_price
-    );
+    const gridCount = this._countGridNumber(this._current_price, this._last_trade_price);
     // 计算上拐点价横跨网格数量
     const gridTurningCount_upper = this._countGridNumber(
       this._last_upper_turning_price,
-      this._last_trade_price || this._grid_base_price
+      this._last_trade_price
     );
     // 计算下拐点价横跨网格数量
     const gridTurningCount_lower = this._countGridNumber(
       this._last_lower_turning_price,
-      this._last_trade_price || this._grid_base_price
+      this._last_trade_price
     );
 
     // 更新拐点价格
@@ -218,23 +215,24 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 检查网格数量变化并处理超时重置
     const currentGridCountAbs = Math.abs(gridCount);
     const lastGridCountAbs = Math.abs(this._last_grid_count);
-    
+
     // 当网格数量增加时重置超时时间
     if (currentGridCountAbs > 1 && currentGridCountAbs > lastGridCountAbs) {
       this._last_grid_count_overtime_reset_ts = this._current_price_ts;
-      console.log(`[${this.asset_name}]网格数量从${lastGridCountAbs}增加到${currentGridCountAbs}，重置超时时间`);
+      console.log(
+        `[${this.asset_name}]网格数量从${lastGridCountAbs}增加到${currentGridCountAbs}，重置超时时间`
+      );
     }
-    
+
     const timeDiff = (this._current_price_ts - this._last_grid_count_overtime_reset_ts) / 1000;
     // 更新最新网格数量
     this._last_grid_count = gridCount;
-    
+
     // 趋势和方向一致时不交易
     if (this._tendency == 0 || this._direction / this._tendency >= 0) {
       console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
       return;
     }
-
 
     const correction = this._correction();
     let threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
@@ -244,7 +242,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 不论如何都需要获取 lasttradeorder
     // const lastTradeOrder = getGridTradeOrders(this.asset_name);
     // 计算当前价格与上一次交易价格的时间差
-  
+
     // if (timeDiff > 10 * 60) {
     //   // 如果大于 5 分钟,则减少回撤门限使其尽快平仓
     //   // 减少回撤门限，仅限于平仓
@@ -267,22 +265,24 @@ export class GridTradingProcessor extends AbstractProcessor {
     //   );
     // }
     if (timeDiff > 20 * 60) {
+      console.log(`[${this.asset_name}]距离上一次交易时间超过 20 分钟`);
+      const diff_rate =
+        this._direction > 0
+          ? Math.abs(this._current_price - this._last_trade_price) /
+            Math.min(this._current_price, this._last_trade_price)
+          : Math.abs(this._current_price - this._last_trade_price) /
+            Math.max(this._current_price, this._last_trade_price);
+      if (diff_rate > this._grid_width * 0.9) {
+        threshold *= 0.5;
+        console.log(
+          `- 价距 ${(diff_rate * 100).toFixed(2)}% 大于安全距离，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
+        );
+      }
       threshold *= 0.5;
       if (grid_count_abs < 1) {
         // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
         // 如果距离上次成交价超过1格宽度则直接平仓
-        const diff_rate =
-          this._direction > 0
-            ? Math.abs(this._current_price - this._last_trade_price) /
-              Math.min(this._current_price, this._last_trade_price)
-            : Math.abs(this._current_price - this._last_trade_price) /
-              Math.max(this._current_price, this._last_trade_price);
-        console.log(
-          `[${this.asset_name}]时间超过 15 分钟, 若格内距离上次成交价超过1.5格则直接平仓`
-        );
-        console.log(
-          `- 当前回撤门限${(threshold * 100).toFixed(2)}%, 价差 ${(diff_rate / this._grid_width).toFixed(2)} 格`
-        );
+        console.log(`- 价差 ${(diff_rate / this._grid_width).toFixed(2)} 格`);
         if (diff_rate > this._grid_width * 1.5 && this._direction / this._tendency < 0) {
           if (this._direction > 0) this._placeOrder(-1, '- 超时直接平仓');
           if (this._direction < 0) this._placeOrder(1, '- 超时直接平仓');
@@ -443,6 +443,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     let result = await executeOrders([order]);
     if (!result.success) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
+      this._resetKeyPrices(this.last_trade_price, this.last_trade_price_ts);
       return;
     }
     recordGridTradeOrders({ ...result.data[0], gridCount });
