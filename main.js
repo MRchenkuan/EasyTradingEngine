@@ -102,13 +102,13 @@ TradeEngine.createGridTrading('XRP-USDT', {
 VisualEngine.setMetaInfo({
   assets,
   show_order_his: [
-    'BTC-USDT',
-    'ETH-USDT',
-    'XRP-USDT',
-    'SOL-USDT',
-    'TRUMP-USDT',
-    'ADA-USDT',
-    'OKB-USDT',
+    // 'BTC-USDT',
+    // 'ETH-USDT',
+    // 'XRP-USDT',
+    // 'SOL-USDT',
+    // 'TRUMP-USDT',
+    // 'ADA-USDT',
+    // 'OKB-USDT',
   ],
 }).start();
 
