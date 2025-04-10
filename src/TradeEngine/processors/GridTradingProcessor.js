@@ -443,7 +443,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     let result = await executeOrders([order]);
     if (!result.success) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
-      this._resetKeyPrices(this.last_trade_price, this.last_trade_price_ts);
+      this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       return;
     }
     recordGridTradeOrders({ ...result.data[0], gridCount });
