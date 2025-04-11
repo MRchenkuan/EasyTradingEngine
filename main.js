@@ -104,7 +104,7 @@ VisualEngine.setMetaInfo({
   show_order_his: [
     // 'BTC-USDT',
     // 'ETH-USDT',
-    // 'XRP-USDT',
+    'XRP-USDT',
     // 'SOL-USDT',
     // 'TRUMP-USDT',
     // 'ADA-USDT',

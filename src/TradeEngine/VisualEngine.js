@@ -14,7 +14,7 @@ import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 
-const width = 3000,
+const width = 2000,
   height = 900;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
 const font_style = 'Monaco, Menlo, Consolas, monospace';

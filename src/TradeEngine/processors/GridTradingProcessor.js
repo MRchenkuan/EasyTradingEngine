@@ -474,6 +474,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {number} ts 最新价格时间戳
    */
   _resetKeyPrices(price, ts) {
+
     // 重置关键参数
     this._last_trade_price = price;
     this._last_trade_price_ts = ts;
