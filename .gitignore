@@ -16,4 +16,5 @@ okx-trading.tar
 
 # 忽略所有图表文件
 /chart/*
-!chart/.gitkeep
+!chart/.gitkeep.DS_Store
+.DS_Store
