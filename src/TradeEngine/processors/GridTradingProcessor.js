@@ -16,6 +16,9 @@ export class GridTradingProcessor extends AbstractProcessor {
   _max_position = 100000; // 最大持仓
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
+  _backoff_1st_time = 30 * 60; // 15 分钟
+  _backoff_2nd_time = 40 * 60; // 25 分钟
+  _backoff_3nd_time = 60 * 60; // 30 分钟
 
   // 全局变量
   // 全局变量部分添加新的变量
@@ -203,7 +206,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._refreshTurningPoint();
 
     // 执行交易策略
-    this._orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower);
+    
+    // this._orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower);
 
     // 更新历史价格
     this._prev_price = this._current_price;
@@ -239,51 +243,54 @@ export class GridTradingProcessor extends AbstractProcessor {
     const grid_count_abs = Math.abs(gridCount);
 
     // 退避机制 ---- 在一个格子内做文章
-    // 不论如何都需要获取 lasttradeorder
-    // const lastTradeOrder = getGridTradeOrders(this.asset_name);
-    // 计算当前价格与上一次交易价格的时间差
+    // 如果大于 5 分钟,则减少回撤门限使其尽快平仓
+    // 减少回撤门限，仅限于平仓
+    // 通过当前持仓方向与价格趋势方向是否一致来判断是否平仓
+    // 持仓方向判断很重要，不能盲目加仓
+    // 判断动量，如果涨跌速度过快则不能盲目减少回撤门限
 
-    // if (timeDiff > 10 * 60) {
-    //   // 如果大于 5 分钟,则减少回撤门限使其尽快平仓
-    //   // 减少回撤门限，仅限于平仓
-    //   // 通过当前持仓方向与价格趋势方向是否一致来判断是否平仓
-    //   // 持仓方向判断很重要，不能盲目加仓
-    //   // 判断动量，如果涨跌速度过快则不能盲目减少回撤门限
-
-    //   // if(isCloseing){
-    //   threshold *= 0.5;
-    //   // }
-    //   console.log(
-    //     `[${this.asset_name}]距离上一次交易时间超过 10 分钟，减少回撤门限，尽快平仓，当前回撤门限${(threshold * 100).toFixed(2)}%`
-    //   );
-    // }
-
-    // if (timeDiff > 15 * 60) {
-    //   threshold *= 0.5;
-    //   console.log(
-    //     `[${this.asset_name}]距离上一次交易时间超过 15 分钟，减少回撤门限，尽快平仓，当前回撤门限${(threshold * 100).toFixed(2)}%`
-    //   );
-    // }
-    if (timeDiff > 20 * 60) {
-      console.log(`[${this.asset_name}]距离上一次交易时间超过 20 分钟`);
+    if (timeDiff > this._backoff_1st_time) {
+      threshold *= 0.5;
+      console.log(
+        `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_1st_time / 60} 分钟，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
+      );
       const diff_rate =
         this._direction > 0
           ? Math.abs(this._current_price - this._last_trade_price) /
             Math.min(this._current_price, this._last_trade_price)
           : Math.abs(this._current_price - this._last_trade_price) /
             Math.max(this._current_price, this._last_trade_price);
-      if (diff_rate > this._grid_width * 0.9) {
+      const price_distance_grid = diff_rate / this._grid_width;
+      // if (diff_rate > this._grid_width * 0.9) {
+      //   threshold *= 0.5;
+      //   console.log(
+      //     `- 价距 ${(diff_rate * 100).toFixed(2)}% 大于安全距离，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
+      //   );
+      // }
+
+      if (timeDiff > this._backoff_2nd_time) {
         threshold *= 0.5;
         console.log(
-          `- 价距 ${(diff_rate * 100).toFixed(2)}% 大于安全距离，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
+          `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
         );
       }
-      threshold *= 0.5;
+
+      if (timeDiff > this._backoff_3nd_time) {
+        console.log(
+          `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，超时直接平仓价差1.1格`
+        );
+        if (price_distance_grid > 1.1 && this._direction / this._tendency < 0) {
+          if (this._direction > 0) this._placeOrder(-1, '- 超时直接平仓');
+          if (this._direction < 0) this._placeOrder(1, '- 超时直接平仓');
+          return;
+        }
+      }
+
+      console.log(`- 当前价差 ${price_distance_grid.toFixed(2)} 格`);
       if (grid_count_abs < 1) {
         // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
         // 如果距离上次成交价超过1格宽度则直接平仓
-        console.log(`- 价差 ${(diff_rate / this._grid_width).toFixed(2)} 格`);
-        if (diff_rate > this._grid_width * 1.5 && this._direction / this._tendency < 0) {
+        if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
           if (this._direction > 0) this._placeOrder(-1, '- 超时直接平仓');
           if (this._direction < 0) this._placeOrder(1, '- 超时直接平仓');
           return;
@@ -291,10 +298,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       }
     }
 
-    // 如果超过两格则回撤判断减半，快速锁定空间
+    // 如果超过两格则回撤判断减半，快速锁定利润
     // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
-    // const is_return_arrived =
-    //   grid_count_abs >= 2 ? Math.abs(correction) > threshold / 2 : correction > threshold;
     const is_return_arrived = Math.abs(correction) > threshold;
 
     // 回撤/反弹条件是否满足
@@ -474,7 +479,6 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {number} ts 最新价格时间戳
    */
   _resetKeyPrices(price, ts) {
-
     // 重置关键参数
     this._last_trade_price = price;
     this._last_trade_price_ts = ts;

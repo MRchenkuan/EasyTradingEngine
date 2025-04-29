@@ -17,7 +17,7 @@ const assets = [
   { id: 'ETH-USDT', theme: '#85c1e9' },
   // { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
-  { id: 'OKB-USDT', theme: '#52be80' },
+  // { id: 'OKB-USDT', theme: '#52be80' },
   // { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
 const params = {
@@ -71,9 +71,9 @@ TradeEngine.createGridTrading('XRP-USDT', {
   _max_drawdown: 0.005,
   _max_bounce: 0.005,
   _trade_amount: 20,
-  _max_position: 2000,
-  _min_price: 1,
-  _max_price: 4,
+  _max_position: 100,
+  _min_price: 1.5,
+  _max_price: 2.5,
 });
 
 // TradeEngine.createGridTrading('ETH-USDT', {
