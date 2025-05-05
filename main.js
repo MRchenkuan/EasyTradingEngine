@@ -7,13 +7,14 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '1m';
+const bar_type = '5m';
+const duration = 22; // 12天前
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
 const assets = [
   { id: 'BTC-USDT', theme: '#f0b27a' },
-  // { id: 'SOL-USDT', theme: '#ad85e9' },
+  { id: 'SOL-USDT', theme: '#ad85e9' },
   { id: 'ETH-USDT', theme: '#85c1e9' },
   // { id: 'TRUMP-USDT', theme: '#90a4ae' },
   { id: 'XRP-USDT', theme: '#ffafde' },
@@ -28,7 +29,7 @@ const params = {
   // from_when: new Date(2025,2,7,0,0,0).getTime(), // 指定结束时间
   // to_when:new Date(2025,2,15,0,0,0).getTime(), // 指定起始时间
   from_when: getLastWholeMinute(new Date()), // 最近时间
-  to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(), // 12天前
+  to_when: new Date(Date.now() - duration * 24 * 60 * 60 * 1000).getTime(),
 };
 
 /**

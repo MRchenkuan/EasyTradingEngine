@@ -5,4 +5,16 @@ export class TrendFollowing extends AbstractProcessor {
   // 计算MA
   //
   tick() {}
+
+  open_position() {
+
+  }
+
+  close_position(percent) {
+
+  }
+
+  display() {
+
+  }
 }

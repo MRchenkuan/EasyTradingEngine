@@ -19,7 +19,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _backoff_1st_time = 30 * 60; // 15 分钟
   _backoff_2nd_time = 40 * 60; // 25 分钟
   _backoff_3nd_time = 60 * 60; // 30 分钟
-
+  // 风险控制
+  _max_trade_grid_count = 8; // 最大网格数量
   // 全局变量
   // 全局变量部分添加新的变量
   _grid = [];
@@ -190,7 +191,9 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 计算当前价格横跨网格
-    const gridCount = this._countGridNumber(this._current_price, this._last_trade_price);
+    const gridCount = this._last_trade_price
+      ? this._countGridNumber(this._current_price, this._last_trade_price)
+      : Math.min(this._countGridNumber(this._current_price, this._grid_base_price), 2);
     // 计算上拐点价横跨网格数量
     const gridTurningCount_upper = this._countGridNumber(
       this._last_upper_turning_price,
@@ -206,8 +209,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._refreshTurningPoint();
 
     // 执行交易策略
-    
-    // this._orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower);
+
+    this._orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower);
 
     // 更新历史价格
     this._prev_price = this._current_price;
@@ -422,7 +425,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     let count = this._grid.filter(price => price >= lowerPrice && price <= upperPrice).length;
 
     if (count <= 1) return 0;
-    return current > prev ? count - 1 : -(count - 1);
+    const result = current > prev ? count - 1 : -(count - 1);
+    return Math.min(result, this._max_trade_grid_count);
   }
 
   /**
