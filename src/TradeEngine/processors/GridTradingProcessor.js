@@ -290,8 +290,8 @@ export class GridTradingProcessor extends AbstractProcessor {
             `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，超时直接平仓价差1.1格`
           );
           if (price_distance_grid > 1.1 && this._direction / this._tendency < 0) {
-            if (this._direction > 0) this._placeOrder(-1, '- 超时直接平仓');
-            if (this._direction < 0) this._placeOrder(1, '- 超时直接平仓');
+            if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
+            if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
             return;
           }
         }
@@ -301,8 +301,8 @@ export class GridTradingProcessor extends AbstractProcessor {
           // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
           // 如果距离上次成交价超过1格宽度则直接平仓
           if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
-            if (this._direction > 0) this._placeOrder(-1, '- 超时直接平仓');
-            if (this._direction < 0) this._placeOrder(1, '- 超时直接平仓');
+            if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
+            if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
             return;
           }
         }
@@ -326,7 +326,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，触发策略`
         );
-        this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
+        await this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
         return;
       }
 
@@ -339,7 +339,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`
         );
-        this._placeOrder(1, '- 格内上穿拐点下单');
+        await this._placeOrder(1, '- 格内上穿拐点下单');
         return;
       }
 
@@ -352,7 +352,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`
         );
-        this._placeOrder(-1, '- 格内下穿拐点下单');
+        await this._placeOrder(-1, '- 格内下穿拐点下单');
         return;
       }
 
