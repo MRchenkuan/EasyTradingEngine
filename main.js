@@ -7,7 +7,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '5m';
+const bar_type = '1m';
 const duration = 22; // 12天前
 const price_type = 'close';
 const once_limit = 300;
