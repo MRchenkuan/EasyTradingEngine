@@ -36,7 +36,7 @@
 
 “所有系统启动，启动启动！”
 
-<img width="676" alt="image" src="https://github.com/user-attachments/assets/dedf2fea-0bac-4ed0-bf58-c90ad136dcec" />
+![image](https://github.com/user-attachments/assets/dedf2fea-0bac-4ed0-bf58-c90ad136dcec)
 
 
 # NOTICE
