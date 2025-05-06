@@ -1,6 +1,6 @@
-# 一句话简介
-
-拟合两个资产价格，通过多空对冲实现套利💰
+# 两个主要策略
+策略1 - 多空对冲：💰拟合两个资产价格，通过多空对冲实现套利
+策略2 - 趋势网格：💰结合网格交易策略，在趋势中控仓，并在回撤时平仓，实现风险和收益控制
 
 # ONE MORE THING
 
@@ -134,6 +134,8 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
   - 第三个参数：触发门限
 
 ## 网格交易
+![c23a576fc3a9701935b957e6cde69dbc](https://github.com/user-attachments/assets/a949b332-ca94-4ac4-8dad-8ca9c35ddf17)
+
 ```bash
 # 查看网格交易盈亏统计
 npm run grid
