@@ -17,8 +17,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
   _backoff_1st_time = 30 * 60; // 15 分钟
-  _backoff_2nd_time = 40 * 60; // 25 分钟
-  _backoff_3nd_time = 60 * 60; // 30 分钟
+  _backoff_2nd_time = 60 * 60; // 25 分钟
+  _backoff_3nd_time = 90 * 60; // 30 分钟
   // 风险控制
   _max_trade_grid_count = 8; // 最大网格数量
   // 策略锁
@@ -244,7 +244,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       // 趋势和方向一致时不交易
       if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
         return;
       }
 
@@ -287,25 +287,33 @@ export class GridTradingProcessor extends AbstractProcessor {
 
         if (timeDiff > this._backoff_3nd_time) {
           console.log(
-            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，超时直接平仓价差1.1格`
+            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，超时直接平仓价差1.5格`
           );
-          if (price_distance_grid > 1.1 && this._direction / this._tendency < 0) {
-            if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
-            if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
-            return;
+
+          // TODO 将来只有针对平仓才做
+          if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
+            // 直接平仓会错过收益，所以需要继续减少容限
+            if (Math.abs(correction) > threshold * 0.5) {
+              console.log(
+                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 大于阈值 ${(threshold * 100).toFixed(2)}%，直接平仓`
+              );
+              if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
+              if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
+              return;
+            }
           }
         }
 
         console.log(`- 当前价差 ${price_distance_grid.toFixed(2)} 格`);
-        if (grid_count_abs < 1) {
-          // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
-          // 如果距离上次成交价超过1格宽度则直接平仓
-          if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
-            if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
-            if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
-            return;
-          }
-        }
+        // if (grid_count_abs < 1) {
+        //   // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
+        //   // 如果距离上次成交价超过1格宽度则直接平仓
+        //   if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
+        //     if (this._direction > 0) await this._placeOrder(-1, '- 超时格内直接平仓');
+        //     if (this._direction < 0) await this._placeOrder(1, '- 超时格内直接平仓');
+        //     return;
+        //   }
+        // }
       }
 
       // 如果超过两格则回撤判断减半，快速锁定利润

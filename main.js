@@ -1,3 +1,4 @@
+import './src/utils/logger.js';
 import WebSocket from 'ws';
 import { getPrices, parseCandleData, getLastWholeMinute } from './src/tools.js';
 import { base_url } from './src/config.security.js';
