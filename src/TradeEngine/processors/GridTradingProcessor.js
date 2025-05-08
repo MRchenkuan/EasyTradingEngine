@@ -17,8 +17,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
   _backoff_1st_time = 30 * 60; // 15 分钟
-  _backoff_2nd_time = 60 * 60; // 25 分钟
-  _backoff_3nd_time = 90 * 60; // 30 分钟
+  _backoff_2nd_time = 40 * 60; // 25 分钟
+  _backoff_3nd_time = 60 * 60; // 30 分钟
   // 风险控制
   _max_trade_grid_count = 8; // 最大网格数量
   // 策略锁
@@ -44,6 +44,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _enable_none_grid_trading = false; // 是否启用无网格交易,网格内跨线回撤
   _last_grid_count = 0;
   _last_grid_count_overtime_reset_ts = null;
+  _last_reset_grid_count = 0;
   // 外部因子
   factor_is_people_bullish = false;
 
@@ -80,6 +81,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 修改网格数据加载逻辑
     // this._grid_base_price = this.local_variables._grid_base_price;
+    this._last_reset_grid_count = this.local_variables._last_reset_grid_count || 0;
   }
 
   _saveState() {
@@ -100,6 +102,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables._min_price = this._min_price;
     this.local_variables._max_price = this._max_price;
     this.local_variables._grid_width = this._grid_width;
+    this.local_variables._last_reset_grid_count = this._last_reset_grid_count;
   }
 
   _refreshTurningPoint() {
@@ -230,12 +233,13 @@ export class GridTradingProcessor extends AbstractProcessor {
       const currentGridCountAbs = Math.abs(gridCount);
       const lastGridCountAbs = Math.abs(this._last_grid_count);
 
-      // 当网格数量增加时重置超时时间
-      if (currentGridCountAbs > 1 && currentGridCountAbs > lastGridCountAbs) {
-        this._last_grid_count_overtime_reset_ts = this._current_price_ts;
+      // 当网格数量增加且超过上次重置的网格数时重置超时时间
+      if (currentGridCountAbs > 1 && currentGridCountAbs > this._last_reset_grid_count) {
         console.log(
-          `[${this.asset_name}]网格数量从${lastGridCountAbs}增加到${currentGridCountAbs}，重置超时时间`
+          `[${this.asset_name}]网格突破新高点：从${this._last_reset_grid_count}增加到${currentGridCountAbs}，重置超时间`
         );
+        this._last_grid_count_overtime_reset_ts = this._current_price_ts;
+        this._last_reset_grid_count = currentGridCountAbs;
       }
 
       const timeDiff = (this._current_price_ts - this._last_grid_count_overtime_reset_ts) / 1000;
@@ -295,7 +299,7 @@ export class GridTradingProcessor extends AbstractProcessor {
             // 直接平仓会错过收益，所以需要继续减少容限
             if (Math.abs(correction) > threshold * 0.5) {
               console.log(
-                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 大于阈值 ${(threshold * 100).toFixed(2)}%，直接平仓`
+                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 大于阈值 ${(threshold * 100 * 0.5).toFixed(2)}%，直接平仓`
               );
               if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
               if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
@@ -364,7 +368,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      console.log(`[${this.asset_name}]未触发任何交易条件，继续等待...`);
+      // console.log(`[${this.asset_name}]未触发任何交易条件，继续等待...`);
     } finally {
       // 解锁策略
       this._stratage_locked = false;
@@ -517,5 +521,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     // this._grid_base_price_ts = this._current_price_ts;
     this._prev_price = price; // 重置前一价格
     this._prev_price_ts = ts;
+    // 交易成功后重置标记，允许下一轮首次突破重置
+    // 重置网格计数
+    this._last_reset_grid_count = 0;
   }
 }
