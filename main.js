@@ -9,7 +9,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 const ws_connection_pool = {};
 
 const bar_type = '1m';
-const duration = 22; // 12天前
+const duration = 32; // 12天前
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;

@@ -17,12 +17,13 @@ export class GridTradingProcessor extends AbstractProcessor {
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
   _backoff_1st_time = 30 * 60; // 15 分钟
-  _backoff_2nd_time = 40 * 60; // 25 分钟
-  _backoff_3nd_time = 60 * 60; // 30 分钟
+  _backoff_2nd_time = 60 * 60; // 25 分钟
+  _backoff_3nd_time = 90 * 60; // 30 分钟
   // 风险控制
   _max_trade_grid_count = 8; // 最大网格数量
   // 策略锁
   _stratage_locked = false;
+  _recent_prices = []; // 最近价格，用于计算波动率
   // 全局变量
   // 全局变量部分添加新的变量
   _grid = [];
@@ -144,6 +145,20 @@ export class GridTradingProcessor extends AbstractProcessor {
     // this._drawGridTrading(this.engine._bar_type);
   }
 
+  // 计算波动率的方法
+  _calculateVolatility(recentPrices) {
+    const returns = [];
+    for (let i = 1; i < recentPrices.length; i++) {
+      const return_rate = (recentPrices[i] - recentPrices[i - 1]) / recentPrices[i - 1];
+      returns.push(return_rate);
+    }
+
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+
+    return Math.sqrt(variance);
+  }
+
   /**
    * 时间触发器
    * @implements
@@ -153,6 +168,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._current_price = this.engine.getRealtimePrice(this.asset_name) || this._prev_price;
     this._current_price_ts = this.engine.realtime_price_ts[this.asset_name] || this._prev_price_ts;
 
+    const volatility = this._calculateVolatility(this.engine.getMarketData(this.asset_name).prices.slice(-30));
+    console.log(`[${this.asset_name}] 当前波动率: ${(volatility * 100).toFixed(2)}%`);
+
+    // 检查是否需要重置网格
     if (!this._current_price) {
       this._saveState(); // 使用统一的状态保存方法
       return;
@@ -283,10 +302,12 @@ export class GridTradingProcessor extends AbstractProcessor {
         // }
 
         if (timeDiff > this._backoff_2nd_time) {
-          threshold *= 0.5;
-          console.log(
-            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
-          );
+          if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
+            threshold *= 0.5;
+            console.log(
+              `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
+            );
+          }
         }
 
         if (timeDiff > this._backoff_3nd_time) {
