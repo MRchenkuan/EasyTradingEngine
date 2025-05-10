@@ -459,12 +459,6 @@ export class GridTradingProcessor extends AbstractProcessor {
             : Math.abs(this._current_price - this._last_trade_price) /
               Math.max(this._current_price, this._last_trade_price);
         const price_distance_grid = diff_rate / this._grid_width;
-        // if (diff_rate > this._grid_width * 0.9) {
-        //   threshold *= 0.5;
-        //   console.log(
-        //     `- 价距 ${(diff_rate * 100).toFixed(2)}% 大于安全距离，回撤门限减少为：${(threshold * 100).toFixed(2)}%`
-        //   );
-        // }
 
         if (timeDiff > this._backoff_2nd_time) {
           if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
@@ -479,7 +473,6 @@ export class GridTradingProcessor extends AbstractProcessor {
           console.log(
             `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，超时直接平仓价差1.5格`
           );
-
           // TODO 将来只有针对平仓才做
           if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
             // 直接平仓会错过收益，所以需要继续减少容限
@@ -493,8 +486,9 @@ export class GridTradingProcessor extends AbstractProcessor {
               return;
             } else {
               console.log(
-                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 小于平均振幅的一半: ${(atr * 100 * 0.5).toFixed(2)}%，继续等待回撤`
+                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 小于平均振幅的一半: ${(atr * 100 * 0.5).toFixed(2)}%，回撤门限减少为：${(threshold * 100).toFixed(2)}%, 继续等待回撤`
               );
+              threshold *= 0.5;
             }
           }
         }
