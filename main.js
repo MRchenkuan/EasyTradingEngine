@@ -157,7 +157,9 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
 try {
   const klines = await getKlinesWithRetry(assetIds, params);
   if (klines && klines.length > 0) {
-    klines.forEach(({ id, prices, ts }) => {
+    klines.forEach(it => {
+      const { id, prices, ts, orign_data } = it;
+      TradeEngine.updateCandleDates(id, bar_type, orign_data);
       TradeEngine.updatePrices(id, prices, ts, bar_type);
     });
   } else {
@@ -184,6 +186,7 @@ ws_business.on('message', message => {
   if (channel.indexOf('candle') === 0) {
     if (data) {
       const { open, close, ts } = parseCandleData(data[0]);
+      TradeEngine.updateCandleData(instId, bar_type, data[0]);
       TradeEngine.updatePrice(instId, close, ts, bar_type);
     }
   }
@@ -210,7 +213,9 @@ ws_business.on('close', async (code, reason) => {
 
     if (klines && klines.length > 0) {
       // 更新数据
-      klines.forEach(({ id, prices, ts }) => {
+      klines.forEach(it => {
+        const { id, prices, ts, orign_data } = it;
+        TradeEngine.updateCandleDates(id, bar_type, orign_data);
         TradeEngine.updatePrices(id, prices, ts, bar_type);
       });
 
@@ -235,6 +240,7 @@ ws_business.on('close', async (code, reason) => {
         const { channel, instId } = arg;
         if (channel.indexOf('candle') === 0 && data) {
           const { open, close, ts } = parseCandleData(data[0]);
+          TradeEngine.updateCandleData(instId, bar_type, data[0]);
           TradeEngine.updatePrice(instId, close, ts, bar_type);
         }
       });

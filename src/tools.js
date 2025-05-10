@@ -112,6 +112,7 @@ export async function getPrices(
       id: assetId,
       prices: collections.map(it => safeParseFloat(parseCandleData(it)[feild])),
       ts: collections.map(it => parseCandleData(it)['ts']),
+      orign_data:collections,
     };
   } catch (e) {
     console.error(e.message);

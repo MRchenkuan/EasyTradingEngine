@@ -145,18 +145,163 @@ export class GridTradingProcessor extends AbstractProcessor {
     // this._drawGridTrading(this.engine._bar_type);
   }
 
-  // 计算波动率的方法
+  /**
+   * 瞬时波动率计算函数
+   * @param {*} recentPrices 秒级价格
+   * @returns
+   */
+  /**
+   * 波动率计算函数
+   * @param {Array} recentPrices 价格序列
+   * @param {number} p 计算周期，默认14
+   * @returns {number} 分钟级波动率
+   */
   _calculateVolatility(recentPrices) {
+    // 检查输入数据
+    if (!recentPrices || recentPrices.length < 2) {
+      return 0;
+    }
+
+    // 确保使用最新的p个数据点
+    const prices = recentPrices;
+
+    // 计算对数收益率
     const returns = [];
-    for (let i = 1; i < recentPrices.length; i++) {
-      const return_rate = (recentPrices[i] - recentPrices[i - 1]) / recentPrices[i - 1];
+    for (let i = 1; i < prices.length; i++) {
+      // 使用对数收益率
+      const return_rate = Math.log(prices[i] / prices[i - 1]);
       returns.push(return_rate);
     }
 
-    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
-    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+    if (returns.length === 0) {
+      return 0;
+    }
 
-    return Math.sqrt(variance);
+    // 计算收益率的均值
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+
+    // 计算方差（使用无偏估计）
+    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (returns.length - 1);
+
+    // 转换为分钟级波动率
+    // 假设输入的价格序列是秒级的，需要转换为分钟级
+    // 使用时间缩放因子：sqrt(60)，因为波动率与时间的平方根成正比
+    return Math.sqrt(variance) * Math.sqrt(60);
+  }
+
+  // 计算真实移动平均
+  _calculateATR(highs, lows, closes, period = 14) {
+    if (highs.length !== lows.length || highs.length !== closes.length) {
+      throw new Error('数据长度不一致');
+    }
+    if (highs.length < period) {
+      return []; // 数据不足时返回空数组
+    }
+
+    const trs = []; // 存储真实波幅（True Range）
+    for (let i = 0; i < highs.length; i++) {
+      if (i === 0) {
+        // 第一天的 TR 为当日最高价 - 当日最低价
+        trs.push(highs[i] - lows[i]);
+      } else {
+        const tr1 = highs[i] - lows[i]; // 当日最高价 - 当日最低价
+        const tr2 = Math.abs(highs[i] - closes[i - 1]); // 当日最高价 - 前日收盘价
+        const tr3 = Math.abs(lows[i] - closes[i - 1]); // 当日最低价 - 前日收盘价
+        trs.push(Math.max(tr1, tr2, tr3));
+      }
+    }
+
+    // 计算 ATR（简单移动平均）
+    const atr = [];
+    for (let i = period - 1; i < trs.length; i++) {
+      const sum = trs.slice(i - period + 1, i + 1).reduce((a, b) => a + b, 0);
+      atr.push(sum / period);
+    }
+
+    // 对齐数据长度（前 period-1 个位置填充 null）
+    return new Array(period - 1).fill(null).concat(atr);
+  }
+
+  getAtr(p = 14) {
+    const candles = this.engine.getCandleData(this.asset_name);
+    if (candles.length > 14) {
+      const highs = candles.map(candle => candle.high);
+      const lows = candles.map(candle => candle.low);
+      const closes = candles.map(candle => candle.close);
+      // 计算ATR
+      const atr = this._calculateATR(highs, lows, closes, p);
+      return atr[atr.length - 1];
+    }
+  }
+
+  getVolatility(p = 14) {
+    // const prices = this.engine.getCandleData(this.asset_name).map(candle => candle.close);
+    const prices = this._recent_prices;
+    return this._calculateVolatility(prices.slice(-p));
+  }
+
+  getVolume(acc = false) {
+    const candles = this.engine.getCandleData(this.asset_name);
+    if (acc) {
+      return candles.map(candle => candle.vol).reduce((a, b) => a + b, 0);
+    }
+    return parseFloat(candles.map(candle => candle.vol).at(-1));
+  }
+
+  _recordMomentPrice() {
+    this._recent_prices.push(this._current_price);
+    if (this._recent_prices.length > 60) {
+      this._recent_prices = this._recent_prices.slice(-60);
+    }
+  }
+
+  _calculateMovingAverage(volumeArray, windowSize) {
+    // 参数校验：确保输入合法
+    if (!Array.isArray(volumeArray) || windowSize <= 0 || windowSize > volumeArray.length) {
+      return [];
+    }
+
+    const result = [];
+    let sum = 0;
+
+    // 计算初始窗口（前 windowSize 个元素）的和
+    for (let i = 0; i < windowSize; i++) {
+      sum += volumeArray[i];
+    }
+    result.push(sum / windowSize); // 添加第一个移动平均值
+
+    // 滑动窗口，依次计算后续的移动平均
+    for (let i = windowSize; i < volumeArray.length; i++) {
+      sum += volumeArray[i] - volumeArray[i - windowSize]; // 更新总和：加上新元素，减去旧元素
+      result.push(sum / windowSize); // 添加当前窗口的平均值
+    }
+    return result;
+  }
+
+  getVolumeStandard() {
+    const candles = this.engine.getCandleData(this.asset_name);
+    const volumeArray = candles
+      .filter(candle => candle.confirm > 0)
+      .map(candle => parseFloat(candle.vol));
+
+    // 获取最后一根K线数据
+    const lastCandle = candles.at(-1);
+    const { vol, ts } = lastCandle;
+
+    // 计算移动平均
+    const windowSize = 30;
+    const movingAverages = this._calculateMovingAverage(volumeArray, windowSize);
+    const lastMovingAverage = movingAverages[movingAverages.length - 1] || 0;
+
+    // 计算当前分钟已经过去的时间（秒）
+    const currentTime = Math.floor(Date.now() / 1000);
+    const elapsedSeconds = Math.max(1, currentTime - ts / 1000); // 防止除零
+
+    return {
+      vol: parseFloat(vol), // 当前分钟已成交量
+      avgVol: lastMovingAverage, // 移动平均成交量
+      second: elapsedSeconds, // 已经过去的秒数
+    };
   }
 
   /**
@@ -168,8 +313,21 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._current_price = this.engine.getRealtimePrice(this.asset_name) || this._prev_price;
     this._current_price_ts = this.engine.realtime_price_ts[this.asset_name] || this._prev_price_ts;
 
-    const volatility = this._calculateVolatility(this.engine.getMarketData(this.asset_name).prices.slice(-30));
-    console.log(`[${this.asset_name}] 当前波动率: ${(volatility * 100).toFixed(2)}%`);
+    // 保存价格记录
+    this._recordMomentPrice();
+
+    // 计算波动率
+    const volatility = this.getVolatility(30);
+
+    // 计算ATR
+    const atr = this.getAtr(14);
+
+    const vs = this.getVolumeStandard();
+
+    const vol_power = ((60 / vs.second) * vs.vol - vs.avgVol) / vs.avgVol;
+    console.log(
+      `[${this.asset_name}] ATR: ${(atr * 100).toFixed(2)}%; 瞬时波动率: ${(volatility * 100).toFixed(2)}%; VOL(预估/MA): ${vs.vol.toFixed(0)}/${vs.avgVol.toFixed(0)}; 量能: ${(vol_power * 100).toFixed(2)}%;剩余: ${60 - vs.second}s`
+    );
 
     // 检查是否需要重置网格
     if (!this._current_price) {
@@ -240,6 +398,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._prev_price = this._current_price;
     this._prev_price_ts = this._current_price_ts;
     this._saveState(); // 使用统一的状态保存方法
+    // console.log(this.engine.market_candle['1m']['XRP-USDT']);
   }
 
   async _orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower) {
@@ -318,33 +477,29 @@ export class GridTradingProcessor extends AbstractProcessor {
           // TODO 将来只有针对平仓才做
           if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
             // 直接平仓会错过收益，所以需要继续减少容限
-            if (Math.abs(correction) > threshold * 0.5) {
+            const atr = this.getAtr();
+            if (Math.abs(correction) > atr * 0.5) {
               console.log(
-                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 大于阈值 ${(threshold * 100 * 0.5).toFixed(2)}%，直接平仓`
+                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 大于平均振幅的一半: ${(atr * 100 * 0.5).toFixed(2)}%，直接平仓`
               );
               if (this._direction > 0) await this._placeOrder(-1, '- 超时直接平仓');
               if (this._direction < 0) await this._placeOrder(1, '- 超时直接平仓');
               return;
+            } else {
+              console.log(
+                `- 回撤 ${(Math.abs(correction) * 100).toFixed(2)}% 小于平均振幅的一半: ${(atr * 100 * 0.5).toFixed(2)}%，继续等待回撤`
+              );
             }
           }
         }
 
         console.log(`- 当前价差 ${price_distance_grid.toFixed(2)} 格`);
-        // if (grid_count_abs < 1) {
-        //   // 如果距离上次交易时间超过 10 分钟，减少回撤门限，尽快平仓
-        //   // 如果距离上次成交价超过1格宽度则直接平仓
-        //   if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
-        //     if (this._direction > 0) await this._placeOrder(-1, '- 超时格内直接平仓');
-        //     if (this._direction < 0) await this._placeOrder(1, '- 超时格内直接平仓');
-        //     return;
-        //   }
-        // }
       }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
-      const is_return_arrived = Math.abs(correction) > threshold;
-
+      const atr = this.getAtr();
+      const is_return_arrived = Math.abs(correction) > Math.min(threshold, atr * 1.5);
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
         console.log(

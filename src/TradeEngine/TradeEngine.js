@@ -7,7 +7,7 @@ import {
   updateTransaction,
 } from '../recordTools.js';
 import { findBestFitLine } from '../regression.js';
-import { formatTimestamp } from '../tools.js';
+import { formatTimestamp, parseCandleData } from '../tools.js';
 import { HedgeProcessor } from './processors/HedgeProcessor.js';
 import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
@@ -15,6 +15,7 @@ import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 export class TradeEngine {
   static processors = [];
   static market_data = {}; // 行情数据
+  static market_candle = {};
   static realtime_price = new LocalVariable('TradeEngine/realtime_price');
   static realtime_price_ts = new LocalVariable('TradeEngine/realtime_price_ts');
   static _main_asset = ''; // 主资产
@@ -318,6 +319,74 @@ export class TradeEngine {
    */
   static getRealtimePrices() {
     return this.realtime_price;
+  }
+
+  static getCandleData(assetId, bar_type) {
+    const barType = bar_type ?? this._bar_type;
+    return this.market_candle?.[barType]?.[assetId];
+  }
+
+  static updateCandleData(assetId, bar_type, candle_data) {
+    // 设置默认资产
+    if (!this._main_asset) this._main_asset = assetId;
+    // 设置默认k线粒度
+    if (!this._bar_type) this._bar_type = bar_type;
+
+    // 初始化数据结构
+    this.market_candle ||= {};
+    this.market_candle[bar_type] ||= {};
+    this.market_candle[bar_type][assetId] ||= [];
+    // 解析K线数据
+    const candleInfo = parseCandleData(candle_data);
+
+    // 获取现有的K线数据
+    const existingCandles = this.market_candle[bar_type][assetId];
+
+    // 查找是否存在相同时间戳的K线
+    const existingIndex = existingCandles.findIndex(candle => candle.ts === candleInfo.ts);
+
+    if (existingIndex !== -1) {
+      // 如果存在相同时间戳的K线，更新它
+      existingCandles[existingIndex] = candleInfo;
+    } else {
+      // 如果不存在，添加新的K线并保持时间顺序
+      const insertIndex = this._findInsertIndex(
+        existingCandles.map(candle => candle.ts),
+        candleInfo.ts
+      );
+      existingCandles.splice(insertIndex, 0, candleInfo);
+    }
+  }
+
+  static updateCandleDates(assetId, bar_type, candle_data_array) {
+    // 设置默认资产
+    if (!this._main_asset) this._main_asset = assetId;
+    // 设置默认k线粒度
+    if (!this._bar_type) this._bar_type = bar_type;
+
+    // 初始化数据结构
+    this.market_candle ||= {};
+    this.market_candle[bar_type] ||= {};
+    this.market_candle[bar_type][assetId] ||= [];
+    // 解析每一条K线数据
+    const candleInfoArray = candle_data_array.map(data => parseCandleData(data));
+
+    // 创建临时映射表用于去重和排序
+    const candleMap = new Map();
+
+    // 获取现有的K线数据
+    const existingCandles = this.market_candle[bar_type][assetId] || [];
+
+    // 合并现有数据和新数据
+    [...existingCandles, ...candleInfoArray].forEach(candle => {
+      candleMap.set(candle.ts, candle);
+    });
+
+    // 按时间戳排序
+    const sortedTimestamps = [...candleMap.keys()].sort((a, b) => a - b);
+
+    // 生成有序的K线数据
+    this.market_candle[bar_type][assetId] = sortedTimestamps.map(ts => candleMap.get(ts));
   }
 
   /**
