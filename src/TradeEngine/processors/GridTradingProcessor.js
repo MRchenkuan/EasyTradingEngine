@@ -278,32 +278,49 @@ export class GridTradingProcessor extends AbstractProcessor {
     return result;
   }
 
-  getVolumeStandard() {
+  getVolumeStandard(n = 3) {
     const candles = this.engine.getCandleData(this.asset_name);
+
     const volumeArray = candles
-      .filter(candle => candle.confirm > 0)
+      // .filter(candle => candle.confirm > 0)
       .map(candle => parseFloat(candle.vol));
 
-    // 获取最后一根K线数据
-    const lastCandle = candles.at(-1);
-    const { vol, ts } = lastCandle;
+    // 获取最后n根K线数据
+    const lastNCandles = candles.slice(-n);
+    const { vol: lastVol, ts } = lastNCandles.at(-1); // 最新的K线
 
     // 计算移动平均
     const windowSize = 30;
     const movingAverages = this._calculateMovingAverage(volumeArray, windowSize);
+    const movingAverages_fast = this._calculateMovingAverage(volumeArray, n);
     const lastMovingAverage = movingAverages[movingAverages.length - 1] || 0;
+    const lastMovingAverage_fast = movingAverages_fast[movingAverages_fast.length - 1] || 0;
 
     // 计算当前分钟已经过去的时间（秒）
     const currentTime = Math.floor(Date.now() / 1000);
     const elapsedSeconds = Math.max(1, currentTime - ts / 1000); // 防止除零
 
     return {
-      vol: parseFloat(vol), // 当前分钟已成交量
-      avgVol: lastMovingAverage, // 移动平均成交量
+      vol: parseFloat(lastVol), // 当前分钟已成交量
+      vol_avg_slow: lastMovingAverage, // 移动平均成交量
+      vol_avg_fast: lastMovingAverage_fast, // 移动平均成交量
       second: elapsedSeconds, // 已经过去的秒数
     };
   }
 
+  printIndicators() {
+    // 计算波动率
+    const volatility = this.getVolatility(30);
+
+    // 计算ATR
+    const atr = this.getAtr(14);
+
+    const { vol, vol_avg_fast, vol_avg_slow, second } = this.getVolumeStandard();
+    const vol_power = vol_avg_fast / vol_avg_slow;
+    console.log(
+      `[${this.asset_name}] ATR: ${(atr * 100).toFixed(2)}%; 瞬时波动率: ${(volatility * 100).toFixed(2)}%; VOL:  ${(vol / 1000).toFixed(0)}k/${(vol_avg_fast / 1000).toFixed(0)}k/${(vol_avg_slow / 1000).toFixed(0)}k; 量能: ${(vol_power * 100).toFixed(2)}%; 剩余: ${60 - second}s`
+    );
+  }
   /**
    * 时间触发器
    * @implements
@@ -316,18 +333,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 保存价格记录
     this._recordMomentPrice();
 
-    // 计算波动率
-    const volatility = this.getVolatility(30);
-
-    // 计算ATR
-    const atr = this.getAtr(14);
-
-    const vs = this.getVolumeStandard();
-
-    const vol_power = ((60 / vs.second) * vs.vol - vs.avgVol) / vs.avgVol;
-    console.log(
-      `[${this.asset_name}] ATR: ${(atr * 100).toFixed(2)}%; 瞬时波动率: ${(volatility * 100).toFixed(2)}%; VOL(预估/MA): ${vs.vol.toFixed(0)}/${vs.avgVol.toFixed(0)}; 量能: ${(vol_power * 100).toFixed(2)}%;剩余: ${60 - vs.second}s`
-    );
+    this.printIndicators();
 
     // 检查是否需要重置网格
     if (!this._current_price) {
