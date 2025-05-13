@@ -1,54 +1,28 @@
-class MA {
-  constructor(period = 20) {
-    this.period = period;    // 移动平均周期，默认20
-    this.prices = [];        // 价格数据
+/**
+ *  * 计算移动平均线
+ * @param {*} volumeArray 
+ * @param {*} windowSize 
+ * @returns `
+ */
+export function calculateMA(volumeArray, windowSize) {
+  // 参数校验：确保输入合法
+  if (!Array.isArray(volumeArray) || windowSize <= 0 || windowSize > volumeArray.length) {
+    return [];
   }
 
-  // 添加新价格
-  update(price) {
-    this.prices.push(price);
-    // 保持数组长度等于周期
-    if (this.prices.length > this.period) {
-      this.prices.shift();
-    }
-  }
+  const result = [];
+  let sum = 0;
 
-  // 计算移动平均线
-  getValue() {
-    if (this.prices.length < this.period) return null;
-    const sum = this.prices.reduce((a, b) => a + b, 0);
-    return sum / this.period;
+  // 计算初始窗口（前 windowSize 个元素）的和
+  for (let i = 0; i < windowSize; i++) {
+    sum += volumeArray[i];
   }
+  result.push(sum / windowSize); // 添加第一个移动平均值
 
-  // 获取当前价格相对于MA的位置
-  getPosition(currentPrice) {
-    const ma = this.getValue();
-    if (!ma) return null;
-    
-    return {
-      value: ma,
-      position: currentPrice > ma ? 'above' : 'below',
-      deviation: (currentPrice - ma) / ma  // 偏离程度
-    };
+  // 滑动窗口，依次计算后续的移动平均
+  for (let i = windowSize; i < volumeArray.length; i++) {
+    sum += volumeArray[i] - volumeArray[i - windowSize]; // 更新总和：加上新元素，减去旧元素
+    result.push(sum / windowSize); // 添加当前窗口的平均值
   }
-
-  // 重置数据
-  reset() {
-    this.prices = [];
-  }
+  return result;
 }
-
-// 使用示例
-/*
-const ma = new MA(20);  // 创建20日均线
-
-// 在交易中使用
-ma.update(currentPrice);
-const maValue = ma.getValue();
-const position = ma.getPosition(currentPrice);
-
-if (position) {
-  const { value, position, deviation } = position;
-  // 可以根据position和deviation来判断交易信号
-}
-*/

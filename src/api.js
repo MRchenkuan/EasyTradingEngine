@@ -14,7 +14,7 @@ export async function marketCandles(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 5000, // 设置5秒超时
+    timeout: 10000, // 设置5秒超时
   });
   return data;
 }
@@ -28,7 +28,7 @@ export async function marketCandlesHistory(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 5000, // 设置5秒超时
+    timeout: 10000, // 设置5秒超时
   });
 }
 

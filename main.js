@@ -69,13 +69,13 @@ TradeEngine.setMetaInfo({
 
 TradeEngine.createGridTrading('XRP-USDT', {
   // _grid_base_price: 2.0, //建仓基准价
-  _grid_width: 0.005,
   _max_drawdown: 0.005,
   _max_bounce: 0.005,
+  _grid_width: 0.005,
   _trade_amount: 20,
-  _max_position: 100,
+  _max_position: 200,
   _min_price: 1.5,
-  _max_price: 2.5,
+  _max_price: 2.7,
 });
 
 // TradeEngine.createGridTrading('ETH-USDT', {

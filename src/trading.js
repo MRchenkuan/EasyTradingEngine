@@ -53,6 +53,7 @@ export async function executeOrders(orderList) {
   }
 
   let result = mergeOrder2Result([...orderList, ...data]);
+  // 等待1500毫秒
   let orderDetails = await Promise.all(
     result.map(async order => {
       const { data = [] } = await getOrderInfo(order.instId, order.ordId);

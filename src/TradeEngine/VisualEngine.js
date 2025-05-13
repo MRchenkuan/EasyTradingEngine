@@ -238,6 +238,11 @@ export class VisualEngine {
 
               this._drawDateTime(chart);
 
+              // 绘制交易信息
+              TradeEngine.processors
+                .find(it => it.type === 'GridTradingProcessor' && it.asset_name === instId)
+                ?.display(chart);
+
               // 绘制历史订单信息
               if (group_orders && group_orders.length)
                 group_orders.forEach(order => {
