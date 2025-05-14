@@ -222,8 +222,8 @@ export class VisualEngine {
                 formatTimestamp(current_price_ts, TradeEngine._bar_type)
               );
               // 绘制趋势箭头
-              this._drawTrendArrow(chart, current_point_x, current_point_y, tendency, 'bold');
-              this._drawTrendArrow(chart, current_point_x, current_point_y, direction, 'thin');
+              this._drawTrendArrow(chart, current_point_x+20, current_point_y, tendency, 'bold');
+              this._drawTrendArrow(chart, current_point_x+20, current_point_y, direction, 'thin');
 
               // 绘制零基准线
               const baseValue = prices[0];

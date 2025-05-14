@@ -357,7 +357,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    */
   trendReversalThreshold(price_distance_count, price_grid_count, time_passed_seconds, diff_rate) {
     // 基础阈值（初始回撤/反弹容忍度）
-    let threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
+    let threshold = this._threshold;
     const min_threshold = 0.1; // 最小阈值，避免阈值过小
     const max_threshold = 1.2; // 最大阈值，避免阈值过大
 
@@ -370,14 +370,14 @@ export class GridTradingProcessor extends AbstractProcessor {
     const boll = this.getBOLL(20); // 20分钟BOLL(20)
     const vol_power = vol_avg_fast / vol_avg_slow; // 量能
 
-    console.log(`- 当前价格:${this._current_price.toFixed(3)}`);
+    console.log(`- 价格因子:${this._current_price.toFixed(3)}`);
 
     console.log(
-      `- 布林带因子:${boll.lower.toFixed(3)} - ${boll.middle.toFixed(3)} - ${boll.upper.toFixed(3)} [${(100 * boll.bandwidth).toFixed(2)}%]`
+      `- 布林带:${boll.lower.toFixed(3)} - ${boll.middle.toFixed(3)} - ${boll.upper.toFixed(3)} [${(100 * boll.bandwidth).toFixed(2)}%]`
     );
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
     // 1. 网格距离因子（price_distance_count）：连续距离反映价格逼近程度
-    console.log(`- 网格距离:${price_distance_count.toFixed(2)}`);
+    console.log(`- 价距因子:${price_distance_count.toFixed(2)}`);
 
     // 2. 网格跨越因子（price_grid_count）：离散格数强化趋势强度
     console.log(`- 网格因子:${price_grid_count}`);
@@ -386,7 +386,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     console.log(`- 瞬时波动:${(100 * volatility).toFixed(2)}%`);
 
     // 3. 波动率因子：波动率>2%时放大阈值
-    console.log(`- ATR因子:${(100 * atr).toFixed(2)}%`);
+    console.log(`- ATR 因子:${(100 * atr).toFixed(2)}%`);
 
     // 4. 时间因子：每20分钟阈值递增0.1%
     const timeFactor = Math.log1p(time_passed_seconds / 3600);
@@ -402,12 +402,14 @@ export class GridTradingProcessor extends AbstractProcessor {
       rsiFactor = (0.4 * (30 - rsi_fast)) / 30; // 超卖时提高阈值
     }
 
-    console.log(`- RSI动量因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)}`);
+    console.log(`- 动量因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)}`);
 
     // 6. 成交量因子：量能爆发时降低阈值
-    console.log(`- 成交量: ${(100 * vol_power).toFixed(2)}%`);
+    console.log(`- 量能因子: ${(100 * vol_power).toFixed(2)}%`);
 
     console.log(`- 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
+
+    console.log(`- 当前门限：${(100 * threshold).toFixed(2)}%`);
 
     // --- 合成动态阈值 ---
 
@@ -445,8 +447,6 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       const correction = this._correction();
       const grid_count_abs = Math.abs(gridCount);
-      const volatility = this.getVolatility(30);
-      const atr = this.getATR(10);
       // 退避机制 ---- 在一个格子内做文章
       // 如果大于 5 分钟,则减少回撤门限使其尽快平仓
       // 减少回撤门限，仅限于平仓
@@ -454,12 +454,13 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 持仓方向判断很重要，不能盲目加仓
       // 判断动量，如果涨跌速度过快则不能盲目减少回撤门限
 
-      const diff_rate =
+      const price_diff = Math.abs(this._current_price - this._last_trade_price);
+      const ref_price =
         this._direction > 0
-          ? Math.abs(this._current_price - this._last_trade_price) /
-            Math.min(this._current_price, this._last_trade_price)
-          : Math.abs(this._current_price - this._last_trade_price) /
-            Math.max(this._current_price, this._last_trade_price);
+          ? Math.min(this._current_price, this._last_trade_price)
+          : Math.max(this._current_price, this._last_trade_price);
+      const diff_rate = price_diff / ref_price;
+
       const price_distance_grid = diff_rate / this._grid_width;
 
       console.log(
@@ -487,13 +488,13 @@ export class GridTradingProcessor extends AbstractProcessor {
 
         if (timeDiff > this._backoff_3nd_time) {
           console.log(
-            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，快速平仓条件：价差1.5格，门限：${((100 * this._threshold/1.5)).toFixed(2)}%`
+            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，快速平仓条件：价差1.8格，门限：${(100 * this._threshold).toFixed(2)}%`
           );
           // TODO 将来只有针对平仓才做
-          if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {
+          if (price_distance_grid > 1.8 && this._direction / this._tendency < 0) {
             // 直接平仓会错过收益，所以需要继续减少容限
             // 瞬时波动率
-            if (this._threshold > 0 && Math.abs(correction) > this._threshold / 1.5) {
+            if (this._threshold > 0 && Math.abs(correction) > this._threshold) {
               const count = Math.max(1, grid_count_abs);
               if (this._direction > 0) await this._placeOrder(-count, '- 超时直接平仓');
               if (this._direction < 0) await this._placeOrder(count, '- 超时直接平仓');
@@ -501,6 +502,13 @@ export class GridTradingProcessor extends AbstractProcessor {
             }
           }
         }
+      }
+
+      if (price_distance_grid - grid_count_abs < 0.5) {
+        // 大于3格，扩大容限
+        this._threshold = this._threshold * 1.2;
+      } else {
+        this._threshold = this._threshold / 1.2;
       }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
