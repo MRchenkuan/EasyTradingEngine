@@ -177,7 +177,9 @@ export class VisualEngine {
           labels,
           datasets: [
             {
+              type: 'line',
               label: instId,
+              // data: prices.map(it => [it * 0.995, it]).slice(-100),
               data: prices,
               borderColor: color,
               pointBackgroundColor: color,
@@ -185,16 +187,19 @@ export class VisualEngine {
             },
             // 绘制布林线
             {
+              type: 'line',
               label: 'BOLL',
               data: boll.upperArray,
               ...styles_2,
             },
             {
+              type: 'line',
               label: 'BOLL',
               data: boll.lowerArray,
               ...styles_2,
             },
             {
+              type: 'line',
               label: 'BOLL',
               data: boll.middleArray,
               ...styles_2,

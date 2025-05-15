@@ -361,11 +361,16 @@ export class GridTradingProcessor extends AbstractProcessor {
     price_distance_count,
     price_grid_count,
     time_passed_seconds,
-    diff_rate
+    diff_rate,
+    direction,
+    tendency
   ) {
     // 基础阈值（初始回撤/反弹容忍度）
-    const min_threshold = 0.1; // 最小阈值，避免阈值过小
-    const max_threshold = 1.2; // 最大阈值，避免阈值过大
+    const min_threshold = 0.001; // 最小阈值，避免阈值过小
+    const max_threshold = 0.012; // 最大阈值，避免阈值过大
+
+    // 价格是否正在回撤
+    const is_returning = tendency != 0 ? direction / tendency < 0 : false;
 
     // 获取指标数据
     const volatility = this.getVolatility(30); // 30秒瞬时波动率（百分比）
@@ -377,42 +382,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     const vol_power = vol_avg_fast / vol_avg_slow; // 量能
 
     console.log(`- 价格因子:${this._current_price.toFixed(3)}`);
-
-    // 计算当前价格相对于布林带的位置
-    /**
-     * 一定需要判断上穿下穿方向
-     * 例如在向下中，如果到了下轨，明显有反弹，此时不应该减少门限
-     * 例如在向上中，如果到了上轨，明显有回撤，此时同样不应该减少门限
-     * 只有上到了上轨，下到了下轨，才应该减少门限，甚至下到了上轨上到了上轨更要增加门限
-     * 
-     * ？中线与网格线相接近的情况，因为跨越网格线代表利润阶跃（但回撤时应减少门限），而跨越中线则代表变化扩大（应该放大门限），因此需要考虑如何设计折中。
-     * 例如，在向下中，如果价格接近中轨，应该增加门限，因为这可能是一个较大的回撤。但如果接近网格线，则应该减少门限，尽快平仓，因为这可能是一个较大的利润回撤。
-     */
-    const bandDeviation = price > boll.middle
-      ? ((price - boll.middle) / (boll.upper - boll.middle)) * 50 // 中轨以上，相对上轨的位置
-      : ((price - boll.middle) / (boll.middle - boll.lower)) * 50; // 中轨以下，相对下轨的位置
-
-    // 根据价格位置动态调整阈值
-    const deviationAbs = Math.abs(bandDeviation);
-    let thresholdAdjustment = 1;
-    let deviationMessage = '';
-
-    if (deviationAbs < 15) {
-      thresholdAdjustment = 1.5;
-      deviationMessage = `价格接近中轨（偏离${bandDeviation.toFixed(2)}%）`;
-    } else if (deviationAbs > 50) {
-      thresholdAdjustment = price_grid_count >= 2 
-        ? 0.3 / price_distance_count 
-        : 0.3;
-      deviationMessage = `价格超过上下轨（偏离${bandDeviation.toFixed(2)}%）${price_grid_count >= 2 ? `，并且超过2格(${price_distance_count.toFixed(2)})` : ''}`;
-    } else {
-      deviationMessage = `价格偏离中轨${bandDeviation.toFixed(2)}%`;
-    }
-
-    threshold *= thresholdAdjustment;
-    console.log(`- ${deviationMessage}，门限${thresholdAdjustment === 1 ? '保持不变' : thresholdAdjustment > 1 ? '扩大' : '缩小'}至：${(threshold * 100).toFixed(2)}%`);
-
-    console.log(` - 布林带带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
     console.log(`- 价距因子:${price_distance_count.toFixed(2)}`);
 
@@ -430,6 +399,74 @@ export class GridTradingProcessor extends AbstractProcessor {
     console.log(
       `- 时间因子:${timeFactor.toFixed(2)} / ${(time_passed_seconds / 60).toFixed(2)}分钟`
     );
+    console.log(`- 量能因子: ${(100 * vol_power).toFixed(2)}%`);
+    // 输出清晰的日志信息
+    console.log(`- 布林带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
+    /**
+     * 一定需要判断上穿下穿方向
+     * 例如在向下中，如果到了下轨，明显有反弹，此时不应该减少门限
+     * 例如在向上中，如果到了上轨，明显有回撤，此时同样不应该减少门限
+     * 只有上到了上轨，下到了下轨，才应该减少门限，甚至下到了上轨上到了上轨更要增加门限
+     *
+     * ？中线与网格线相接近的情况，因为跨越网格线代表利润阶跃（但回撤时应减少门限），而跨越中线则代表变化扩大（应该放大门限），因此需要考虑如何设计折中。
+     * 例如，在向下中，如果价格接近中轨，应该增加门限，因为这可能是一个较大的回撤。但如果接近网格线，则应该减少门限，尽快平仓，因为这可能是一个较大的利润回撤。
+     */
+
+    // 计算价格相对于布林带的位置（0-50范围，0=中轨，50=上/下轨）
+    const bandDeviation =
+      price > boll.middle
+        ? ((price - boll.middle) / (boll.upper - boll.middle)) * 50 // 中轨以上
+        : ((price - boll.middle) / (boll.middle - boll.lower)) * 50; // 中轨以下
+
+    // 动态调整阈值
+    const deviationAbs = Math.abs(bandDeviation);
+    let thresholdAdjustment = 1;
+    let deviationMessage = '';
+
+    // 根据价格位置和趋势方向调整阈值
+    if (deviationAbs < 15) {
+      // 价格接近中轨，增加阈值
+      thresholdAdjustment = 1.5;
+      deviationMessage = '价格接近中轨';
+    } else if (deviationAbs > 40) {
+      // 价格接近边界，根据趋势方向调整
+      const isNearUpper = bandDeviation > 40;
+      const isNearLower = bandDeviation < -40;
+
+      deviationMessage = `价格正在${isNearUpper ? '触及上轨' : '触及下轨'}`;
+      if (tendency !== 0) {
+        const isTrendUp = tendency > 0;
+        // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
+        if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
+          if (price_grid_count >= 3) {
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，允许更大回撤`;
+            thresholdAdjustment = 1.5;
+          } else if (price_grid_count >= 2) {
+            thresholdAdjustment = 0.2;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，阈值减少更多`;
+          } else {
+            deviationMessage += `，阈值减少`;
+            thresholdAdjustment = 0.3;
+          }
+        } else {
+          deviationMessage += `，反向触界，阈值增加`;
+          // 反向触及边界时增加阈值
+          thresholdAdjustment = 1.5;
+        }
+      }
+    } else {
+      deviationMessage = '价格在正常区间';
+    }
+
+    // 应用阈值调整
+    threshold *= thresholdAdjustment;
+
+    [
+      `价格偏离度：${bandDeviation.toFixed(2)}%`,
+      `${deviationMessage}`,
+      `阈值调整：${thresholdAdjustment === 1 ? '不变' : thresholdAdjustment > 1 ? '扩大' : '缩小'}`,
+      `当前阈值：${(threshold * 100).toFixed(2)}%`,
+    ].map(msg => console.log(` * ${msg}`));
 
     // 5. RSI动量因子：超买/超卖反向调整
     // ...existing code ...
@@ -465,21 +502,14 @@ export class GridTradingProcessor extends AbstractProcessor {
     console.log(
       `- RSI 因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)} (${rsiFactor.toFixed(2)}), 调整阈值至：${(threshold * 100).toFixed(2)}%`
     );
-    console.log(` - ${rsi_msg}`);
-
-    console.log(`- 量能因子: ${(100 * vol_power).toFixed(2)}%`);
+    console.log(` * ${rsi_msg}`);
 
     console.log(`- 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
-
-    console.log(`- 当前门限：${(100 * threshold).toFixed(2)}%`);
 
     // --- 合成动态阈值 ---
 
     // 硬性限制：阈值范围0.2%~5%
-    return Math.min(
-      Math.max(((100 * boll.bandwidth) / 3).toFixed(2), min_threshold),
-      max_threshold
-    );
+    return Math.min(Math.max(threshold, min_threshold), max_threshold);
   }
 
   async _orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower) {
@@ -505,12 +535,6 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       const timeDiff = (this._current_price_ts - this._last_grid_count_overtime_reset_ts) / 1000;
 
-      // 趋势和方向一致时不交易
-      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
-        return;
-      }
-
       const correction = this._correction();
       const grid_count_abs = Math.abs(gridCount);
       // 退避机制 ---- 在一个格子内做文章
@@ -531,8 +555,25 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
 
       console.log(
-        `- 推荐阈值：${this.trendReversalThreshold(this._current_price, this._threshold, price_distance_grid, grid_count_abs, timeDiff, correction).toFixed(2)}%\n`
+        `- 推荐阈值：${(
+          100 *
+          this.trendReversalThreshold(
+            this._current_price,
+            this._threshold,
+            price_distance_grid,
+            grid_count_abs,
+            timeDiff,
+            correction,
+            this._direction,
+            this._tendency
+          )
+        ).toFixed(2)}%\n`
       );
+      // 趋势和方向一致时不交易
+      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        return;
+      }
 
       if (timeDiff > this._backoff_1st_time) {
         // const vol_power = this.getVolumeStandard();
