@@ -6,7 +6,7 @@ import { calculateATR } from '../../indicators/ATR.js';
 import { calculateIV } from '../../indicators/IV.js';
 import { calculateMA } from '../../indicators/MA.js';
 import { calculateRSI } from '../../indicators/RSI.js';
-import { calculateBOLL } from '../../indicators/BOLL.js';
+import { calculateBOLL, calculateBOLLLast } from '../../indicators/BOLL.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -228,7 +228,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   getBOLL(p = 20) {
     const candles = this.engine.getCandleData(this.asset_name);
-    return calculateBOLL(candles, p);
+    return calculateBOLLLast(candles, p);
   }
 
   _recordPrice() {
@@ -355,9 +355,15 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {*} price_grid_count 价格距离上次交易的格数，绝对格数，确定跨越两条网格线
    * @param {*} time_passed_seconds 距离上次交易的时间，秒数
    */
-  trendReversalThreshold(price_distance_count, price_grid_count, time_passed_seconds, diff_rate) {
+  trendReversalThreshold(
+    price,
+    threshold,
+    price_distance_count,
+    price_grid_count,
+    time_passed_seconds,
+    diff_rate
+  ) {
     // 基础阈值（初始回撤/反弹容忍度）
-    let threshold = this._threshold;
     const min_threshold = 0.1; // 最小阈值，避免阈值过小
     const max_threshold = 1.2; // 最大阈值，避免阈值过大
 
@@ -372,11 +378,42 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     console.log(`- 价格因子:${this._current_price.toFixed(3)}`);
 
-    console.log(
-      `- 布林带:${boll.lower.toFixed(3)} - ${boll.middle.toFixed(3)} - ${boll.upper.toFixed(3)} [${(100 * boll.bandwidth).toFixed(2)}%]`
-    );
+    // 计算当前价格相对于布林带的位置
+    /**
+     * 一定需要判断上穿下穿方向
+     * 例如在向下中，如果到了下轨，明显有反弹，此时不应该减少门限
+     * 例如在向上中，如果到了上轨，明显有回撤，此时同样不应该减少门限
+     * 只有上到了上轨，下到了下轨，才应该减少门限，甚至下到了上轨上到了上轨更要增加门限
+     * 
+     * ？中线与网格线相接近的情况，因为跨越网格线代表利润阶跃（但回撤时应减少门限），而跨越中线则代表变化扩大（应该放大门限），因此需要考虑如何设计折中。
+     * 例如，在向下中，如果价格接近中轨，应该增加门限，因为这可能是一个较大的回撤。但如果接近网格线，则应该减少门限，尽快平仓，因为这可能是一个较大的利润回撤。
+     */
+    const bandDeviation = price > boll.middle
+      ? ((price - boll.middle) / (boll.upper - boll.middle)) * 50 // 中轨以上，相对上轨的位置
+      : ((price - boll.middle) / (boll.middle - boll.lower)) * 50; // 中轨以下，相对下轨的位置
+
+    // 根据价格位置动态调整阈值
+    const deviationAbs = Math.abs(bandDeviation);
+    let thresholdAdjustment = 1;
+    let deviationMessage = '';
+
+    if (deviationAbs < 15) {
+      thresholdAdjustment = 1.5;
+      deviationMessage = `价格接近中轨（偏离${bandDeviation.toFixed(2)}%）`;
+    } else if (deviationAbs > 50) {
+      thresholdAdjustment = price_grid_count >= 2 
+        ? 0.3 / price_distance_count 
+        : 0.3;
+      deviationMessage = `价格超过上下轨（偏离${bandDeviation.toFixed(2)}%）${price_grid_count >= 2 ? `，并且超过2格(${price_distance_count.toFixed(2)})` : ''}`;
+    } else {
+      deviationMessage = `价格偏离中轨${bandDeviation.toFixed(2)}%`;
+    }
+
+    threshold *= thresholdAdjustment;
+    console.log(`- ${deviationMessage}，门限${thresholdAdjustment === 1 ? '保持不变' : thresholdAdjustment > 1 ? '扩大' : '缩小'}至：${(threshold * 100).toFixed(2)}%`);
+
+    console.log(` - 布林带带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
-    // 1. 网格距离因子（price_distance_count）：连续距离反映价格逼近程度
     console.log(`- 价距因子:${price_distance_count.toFixed(2)}`);
 
     // 2. 网格跨越因子（price_grid_count）：离散格数强化趋势强度
@@ -395,16 +432,41 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
 
     // 5. RSI动量因子：超买/超卖反向调整
-    let rsiFactor = 0;
-    if (rsi_fast > 70 && rsi_fast > rsi_slow) {
-      rsiFactor = (-0.3 * (rsi_fast - 70)) / 30; // 超买时降低阈值
-    } else if (rsi_fast < 30 && rsi_fast < rsi_slow) {
-      rsiFactor = (0.4 * (30 - rsi_fast)) / 30; // 超卖时提高阈值
+    // ...existing code ...
+    // RSI动量因子优化：根据背离程度调整
+    let rsiFactor = 1;
+    const rsiDivergence = Math.abs(rsi_fast - rsi_slow);
+    let rsi_msg = '平稳';
+    if (rsi_fast > 70) {
+      // 超买区域
+      if (rsi_fast > rsi_slow) {
+        // RSI快线上穿慢线，超买加强，降低阈值
+        rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+        rsi_msg = '🚀RSI快线上穿慢线，超买加强，降低阈值';
+      } else {
+        // RSI快线下穿慢线，超买减弱，轻微提高阈值
+        rsiFactor = Math.min(1.2, 1 + rsiDivergence / 50);
+        rsi_msg = '🐢RSI快线下穿慢线，超买减弱，轻微提高阈值';
+      }
+    } else if (rsi_fast < 30) {
+      // 超卖区域
+      if (rsi_fast < rsi_slow) {
+        // RSI快线下穿慢线，超卖加强，降低阈值
+        rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+        rsi_msg = '🚀RSI快线下穿慢线，超卖加强，降低阈值';
+      } else {
+        // RSI快线上穿慢线，超卖减弱，轻微提高阈值
+        rsiFactor = Math.min(1.2, 1 + rsiDivergence / 50);
+        rsi_msg = '🐢RSI快线上穿慢线，超卖减弱，轻微提高阈值';
+      }
     }
 
-    console.log(`- 动量因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)}`);
+    threshold = threshold * rsiFactor;
+    console.log(
+      `- RSI 因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)} (${rsiFactor.toFixed(2)}), 调整阈值至：${(threshold * 100).toFixed(2)}%`
+    );
+    console.log(` - ${rsi_msg}`);
 
-    // 6. 成交量因子：量能爆发时降低阈值
     console.log(`- 量能因子: ${(100 * vol_power).toFixed(2)}%`);
 
     console.log(`- 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
@@ -429,7 +491,11 @@ export class GridTradingProcessor extends AbstractProcessor {
       const currentGridCountAbs = Math.abs(gridCount);
 
       // 当网格数量增加且超过上次重置的网格数时重置超时时间
-      if (currentGridCountAbs > 1 && currentGridCountAbs > this._last_reset_grid_count) {
+      if (
+        currentGridCountAbs < 3 &&
+        currentGridCountAbs > 1 &&
+        currentGridCountAbs > this._last_reset_grid_count
+      ) {
         console.log(
           `[${this.asset_name}]网格突破新高点：从${this._last_reset_grid_count}增加到${currentGridCountAbs}，重置超时间`
         );
@@ -462,12 +528,12 @@ export class GridTradingProcessor extends AbstractProcessor {
       const diff_rate = price_diff / ref_price;
 
       const price_distance_grid = diff_rate / this._grid_width;
+      this._threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
 
       console.log(
-        `- 推荐阈值：${this.trendReversalThreshold(price_distance_grid, grid_count_abs, timeDiff, correction).toFixed(2)}%\n`
+        `- 推荐阈值：${this.trendReversalThreshold(this._current_price, this._threshold, price_distance_grid, grid_count_abs, timeDiff, correction).toFixed(2)}%\n`
       );
 
-      this._threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
       if (timeDiff > this._backoff_1st_time) {
         // const vol_power = this.getVolumeStandard();
 

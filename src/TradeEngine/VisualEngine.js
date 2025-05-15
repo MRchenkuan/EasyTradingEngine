@@ -13,17 +13,28 @@ import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
+import { calculateBOLL } from '../indicators/BOLL.js';
 
-const width = 2000,
-  height = 900;
+const width = 2800,
+  height = 1200;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
 const font_style = 'Monaco, Menlo, Consolas, monospace';
 
 const styles = {
   borderWidth: 1,
+
   fill: false, // 不填充颜色
-  pointRadius: 0.5, // 设置点的大小
-  tension: 0.1, // 设置曲线平滑度 (0 为折线)
+  pointRadius: 0, // 设置点的大小
+  tension: 0, // 设置曲线平滑度 (0 为折线)
+};
+
+const styles_2 = {
+  borderWidth: 0.5,
+  fill: false, // 不填充颜色
+  tension: 0.2, // 设置曲线平滑度 (0 为折线)
+  pointRadius: 0, // 设置点的大小
+  borderColor: '#d35400', // 设置边框颜色
+  pointBackgroundColor: '#d35400',
 };
 
 export class VisualEngine {
@@ -33,6 +44,8 @@ export class VisualEngine {
   static _asset_names = [];
   static _show_order_his = [];
   static _painting_interval = 1000; //
+  static _boll_cache = new Map();
+  static _boll_timer = null;
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
   static _config = new LocalVariable('config');
@@ -79,6 +92,29 @@ export class VisualEngine {
 
   static stop() {
     clearTimeout(this._timer.start);
+  }
+
+  static getBOLL(instId) {
+    const candles = TradeEngine.getCandleData(instId);
+    const cacheKey = JSON.stringify(candles.at(-1));
+    if (this._boll_cache.has(cacheKey)) {
+      return this._boll_cache.get(cacheKey);
+    }
+
+    const result = calculateBOLL(candles, 20);
+    this._boll_cache.set(cacheKey, result);
+
+    // 清除旧的定时器
+    if (this._boll_timer) {
+      clearTimeout(this._boll_timer);
+    }
+
+    // 2秒后清除缓存
+    this._boll_timer = setTimeout(() => {
+      this._boll_cache.delete(cacheKey);
+    }, 5000);
+
+    return result;
   }
 
   static drawGridTrading() {
@@ -131,6 +167,8 @@ export class VisualEngine {
       const labels = ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
       const file_path = path.join('grid', `/${instId}.jpg`);
 
+      const boll = this.getBOLL(instId);
+
       // 计算差值并添加注释
       const configuration = {
         // type: 'scatter',
@@ -144,6 +182,22 @@ export class VisualEngine {
               borderColor: color,
               pointBackgroundColor: color,
               ...styles,
+            },
+            // 绘制布林线
+            {
+              label: 'BOLL',
+              data: boll.upperArray,
+              ...styles_2,
+            },
+            {
+              label: 'BOLL',
+              data: boll.lowerArray,
+              ...styles_2,
+            },
+            {
+              label: 'BOLL',
+              data: boll.middleArray,
+              ...styles_2,
             },
           ],
         },
@@ -222,8 +276,8 @@ export class VisualEngine {
                 formatTimestamp(current_price_ts, TradeEngine._bar_type)
               );
               // 绘制趋势箭头
-              this._drawTrendArrow(chart, current_point_x+20, current_point_y, tendency, 'bold');
-              this._drawTrendArrow(chart, current_point_x+20, current_point_y, direction, 'thin');
+              this._drawTrendArrow(chart, current_point_x + 20, current_point_y, tendency, 'bold');
+              this._drawTrendArrow(chart, current_point_x + 20, current_point_y, direction, 'thin');
 
               // 绘制零基准线
               const baseValue = prices[0];
