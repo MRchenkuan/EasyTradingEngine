@@ -442,7 +442,7 @@ export class GridTradingProcessor extends AbstractProcessor {
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，允许更大回撤`;
             thresholdAdjustment = 1.5;
           } else if (price_grid_count >= 2) {
-            thresholdAdjustment = 0.2;
+            thresholdAdjustment = 1;
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，阈值减少更多`;
           } else {
             deviationMessage += `，阈值减少`;
@@ -517,6 +517,12 @@ export class GridTradingProcessor extends AbstractProcessor {
     try {
       this._stratage_locked = true;
 
+      // 趋势和方向一致时不交易
+      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        return;
+      }
+
       // 检查网格数量变化并处理超时重置
       const currentGridCountAbs = Math.abs(gridCount);
 
@@ -569,11 +575,6 @@ export class GridTradingProcessor extends AbstractProcessor {
           )
         ).toFixed(2)}%\n`
       );
-      // 趋势和方向一致时不交易
-      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
-        return;
-      }
 
       if (timeDiff > this._backoff_1st_time) {
         // const vol_power = this.getVolumeStandard();

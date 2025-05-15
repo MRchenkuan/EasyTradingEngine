@@ -15,26 +15,24 @@ import { LocalVariable } from '../LocalVariable.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 import { calculateBOLL } from '../indicators/BOLL.js';
 
-const width = 2800,
-  height = 1200;
+const width = 2560,
+  height = 1440;
 const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
 const font_style = 'Monaco, Menlo, Consolas, monospace';
+const MAX_CANDLE = 800;
 
 const styles = {
   borderWidth: 1,
-
-  fill: false, // 不填充颜色
   pointRadius: 0, // 设置点的大小
   tension: 0, // 设置曲线平滑度 (0 为折线)
 };
 
 const styles_2 = {
   borderWidth: 0.5,
-  fill: false, // 不填充颜色
   tension: 0.2, // 设置曲线平滑度 (0 为折线)
   pointRadius: 0, // 设置点的大小
-  borderColor: '#d35400', // 设置边框颜色
-  pointBackgroundColor: '#d35400',
+  borderColor: '#f39c12', // 设置边框颜色
+  pointBackgroundColor: '#f39c12',
 };
 
 export class VisualEngine {
@@ -138,6 +136,12 @@ export class VisualEngine {
       const color = themes_map[instId] || '#666666';
 
       const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
+      const candle_data = (TradeEngine.getCandleData(instId) || []).map(it => [
+        parseFloat(it.open),
+        parseFloat(it.close),
+        parseFloat(it.low),
+        parseFloat(it.high),
+      ]);
       const {
         _grid_base_price,
         _grid_base_price_ts,
@@ -174,48 +178,90 @@ export class VisualEngine {
         // type: 'scatter',
         type: 'line',
         data: {
-          labels,
+          labels: labels.slice(-MAX_CANDLE),
           datasets: [
+            // 低到高
             {
-              type: 'line',
-              label: instId,
-              // data: prices.map(it => [it * 0.995, it]).slice(-100),
-              data: prices,
-              borderColor: color,
-              pointBackgroundColor: color,
               ...styles,
+              type: 'bar',
+              label: instId,
+              data: candle_data.slice(-MAX_CANDLE),
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                const [open, close, low, hight] = ctx.dataset.data[ctx.dataIndex];
+                return close > open ? '#52be80' : '#ec7063';
+              },
+              borderWidth: 0,
+              barThickness: 1.5, // 默认宽度
+            },
+            // 高点
+            {
+              ...styles,
+              type: 'bar',
+              label: instId,
+              data: candle_data
+                .map(it => [Math.max(it[0], it[1]), it[3], it[0], it[1]])
+                .slice(-MAX_CANDLE),
+              borderWidth: 0,
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
+                return close > open ? '#52be80' : '#ec7063';
+                // return '#aeaeae';
+              },
+              barThickness: 0.5,
+            },
+            // 低点
+            {
+              ...styles,
+              type: 'bar',
+              label: instId,
+              data: candle_data
+                .map(it => [Math.min(it[0], it[1]), it[2], it[0], it[1]])
+                .slice(-MAX_CANDLE),
+              borderWidth: 0,
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
+                return close > open ? '#52be80' : '#ec7063';
+                // return '#aeaeae';
+              },
+              barThickness: 0.5,
             },
             // 绘制布林线
             {
+              ...styles_2,
               type: 'line',
               label: 'BOLL',
-              data: boll.upperArray,
-              ...styles_2,
+              data: boll.upperArray.slice(-MAX_CANDLE),
             },
             {
+              ...styles_2,
               type: 'line',
               label: 'BOLL',
-              data: boll.lowerArray,
-              ...styles_2,
+              data: boll.lowerArray.slice(-MAX_CANDLE),
             },
             {
+              ...styles_2,
               type: 'line',
               label: 'BOLL',
-              data: boll.middleArray,
-              ...styles_2,
+              data: boll.middleArray.slice(-MAX_CANDLE),
             },
           ],
         },
         options: {
           responsive: true, // 确保响应式布局
           maintainAspectRatio: false, // 允许自定义宽高比例
-          responsive: true,
-          maintainAspectRatio: false,
           plugins: {
-            legend: { labels: { color: 'black' } },
+            legend: {
+              display: false,
+              labels: { color: 'black' },
+            },
           },
           scales: {
             y: {
+              // type: 'logarithmic',
+              beginAtZero: false,
               ticks: {
                 callback: function (value) {
                   const baseValue = prices[0];
@@ -226,6 +272,9 @@ export class VisualEngine {
                   return baseValue * 0.025; // 2.5% 的实际价格变化值
                 },
               },
+            },
+            x: {
+              stacked: true,
             },
           },
           layout: {
