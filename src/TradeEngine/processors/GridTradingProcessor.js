@@ -428,7 +428,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 价格接近中轨，增加阈值
       thresholdAdjustment = 1.5;
       deviationMessage = '价格接近中轨';
-    } else if (deviationAbs > 40) {
+    } else if (deviationAbs > 35) {
       // 价格接近边界，根据趋势方向调整
       const isNearUpper = bandDeviation > 40;
       const isNearLower = bandDeviation < -40;
@@ -438,20 +438,20 @@ export class GridTradingProcessor extends AbstractProcessor {
         const isTrendUp = tendency > 0;
         // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
         if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
-          if (price_grid_count >= 3) {
+          if (price_distance_count >= 3.5) {
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，允许更大回撤`;
             thresholdAdjustment = 1.5;
-          } else if (price_grid_count >= 2) {
-            thresholdAdjustment = 1;
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，阈值减少更多`;
+          } else if (price_distance_count >= 2.5) {
+            thresholdAdjustment = 0.5;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，阈值减少`;
           } else {
-            deviationMessage += `，阈值减少`;
-            thresholdAdjustment = 0.3;
+            deviationMessage += `，不足2格，阈值增加`;
+            thresholdAdjustment = 1.2;
           }
         } else {
           deviationMessage += `，反向触界，阈值增加`;
           // 反向触及边界时增加阈值
-          thresholdAdjustment = 1.5;
+          thresholdAdjustment = 1.75;
         }
       }
     } else {
@@ -482,7 +482,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         rsi_msg = '🚀RSI快线上穿慢线，超买加强，降低阈值';
       } else {
         // RSI快线下穿慢线，超买减弱，轻微提高阈值
-        rsiFactor = Math.min(1.2, 1 + rsiDivergence / 50);
+        rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
         rsi_msg = '🐢RSI快线下穿慢线，超买减弱，轻微提高阈值';
       }
     } else if (rsi_fast < 30) {
@@ -493,7 +493,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         rsi_msg = '🚀RSI快线下穿慢线，超卖加强，降低阈值';
       } else {
         // RSI快线上穿慢线，超卖减弱，轻微提高阈值
-        rsiFactor = Math.min(1.2, 1 + rsiDivergence / 50);
+        rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
         rsi_msg = '🐢RSI快线上穿慢线，超卖减弱，轻微提高阈值';
       }
     }
@@ -558,59 +558,56 @@ export class GridTradingProcessor extends AbstractProcessor {
       const diff_rate = price_diff / ref_price;
 
       const price_distance_grid = diff_rate / this._grid_width;
-      this._threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
+      const default_threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
 
-      console.log(
-        `- 推荐阈值：${(
-          100 *
-          this.trendReversalThreshold(
-            this._current_price,
-            this._threshold,
-            price_distance_grid,
-            grid_count_abs,
-            timeDiff,
-            correction,
-            this._direction,
-            this._tendency
-          )
-        ).toFixed(2)}%\n`
+      this._threshold = this.trendReversalThreshold(
+        this._current_price,
+        default_threshold,
+        price_distance_grid,
+        grid_count_abs,
+        timeDiff,
+        correction,
+        this._direction,
+        this._tendency
       );
 
-      if (timeDiff > this._backoff_1st_time) {
-        // const vol_power = this.getVolumeStandard();
+      console.log(`- 推荐阈值：${(100 * this._threshold).toFixed(2)}%\n`);
 
-        this._threshold = this._threshold / 1.5;
+      // if (timeDiff > this._backoff_1st_time) {
+      //   // const vol_power = this.getVolumeStandard();
 
-        console.log(
-          `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_1st_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
-        );
+      //   this._threshold = this._threshold / 1.5;
 
-        if (timeDiff > this._backoff_2nd_time) {
-          // if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {}
-          this._threshold = this._threshold / 1.5;
+      //   console.log(
+      //     `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_1st_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
+      //   );
 
-          console.log(
-            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
-          );
-        }
+      //   if (timeDiff > this._backoff_2nd_time) {
+      //     // if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {}
+      //     this._threshold = this._threshold / 1.5;
 
-        if (timeDiff > this._backoff_3nd_time) {
-          console.log(
-            `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，快速平仓条件：价差1.8格，门限：${(100 * this._threshold).toFixed(2)}%`
-          );
-          // TODO 将来只有针对平仓才做
-          if (price_distance_grid > 1.8 && this._direction / this._tendency < 0) {
-            // 直接平仓会错过收益，所以需要继续减少容限
-            // 瞬时波动率
-            if (this._threshold > 0 && Math.abs(correction) > this._threshold) {
-              const count = Math.max(1, grid_count_abs);
-              if (this._direction > 0) await this._placeOrder(-count, '- 超时直接平仓');
-              if (this._direction < 0) await this._placeOrder(count, '- 超时直接平仓');
-              return;
-            }
-          }
-        }
-      }
+      //     console.log(
+      //       `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
+      //     );
+      //   }
+
+      //   if (timeDiff > this._backoff_3nd_time) {
+      //     console.log(
+      //       `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，快速平仓条件：价差1.8格，门限：${(100 * this._threshold).toFixed(2)}%`
+      //     );
+      //     // TODO 将来只有针对平仓才做
+      //     if (price_distance_grid > 1.8 && this._direction / this._tendency < 0) {
+      //       // 直接平仓会错过收益，所以需要继续减少容限
+      //       // 瞬时波动率
+      //       if (this._threshold > 0 && Math.abs(correction) > this._threshold) {
+      //         const count = Math.max(1, grid_count_abs);
+      //         if (this._direction > 0) await this._placeOrder(-count, '- 超时直接平仓');
+      //         if (this._direction < 0) await this._placeOrder(count, '- 超时直接平仓');
+      //         return;
+      //       }
+      //     }
+      //   }
+      // }
 
       if (price_distance_grid - grid_count_abs < 0.5) {
         // 大于3格，扩大容限

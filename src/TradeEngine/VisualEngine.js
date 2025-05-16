@@ -189,7 +189,7 @@ export class VisualEngine {
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
                 const [open, close, low, hight] = ctx.dataset.data[ctx.dataIndex];
-                return close > open ? '#52be80' : '#ec7063';
+                return close < open ? '#52be80' : '#ec7063';
               },
               borderWidth: 0,
               barThickness: 1.5, // 默认宽度
@@ -206,7 +206,7 @@ export class VisualEngine {
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
                 const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close > open ? '#52be80' : '#ec7063';
+                return close < open ? '#52be80' : '#ec7063';
                 // return '#aeaeae';
               },
               barThickness: 0.5,
@@ -223,7 +223,7 @@ export class VisualEngine {
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
                 const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close > open ? '#52be80' : '#ec7063';
+                return close < open ? '#52be80' : '#ec7063';
                 // return '#aeaeae';
               },
               barThickness: 0.5,
