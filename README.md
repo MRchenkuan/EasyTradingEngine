@@ -1,4 +1,5 @@
 # 两个主要策略
+
 策略1 - 多空对冲：💰拟合两个资产价格，通过多空对冲实现套利
 
 策略2 - 趋势网格：💰结合网格交易策略，在趋势中控仓，并在回撤时平仓，实现风险和收益控制
@@ -12,7 +13,6 @@
 ### 大盘指标 位置：chart/main_chart.jpg
 
 ![image](https://github.com/user-attachments/assets/f674885c-64e9-4188-8bff-57a8835553f4)
-
 
 - 左上角各是个资产之间的ρ值（皮尔逊相关系数），用于比较哪些资产适合做对冲
 - 中间是各个资产的实时价格、建议的对冲比（等额对冲），主要关注这个比值是否稳定
@@ -38,7 +38,6 @@
 
 ![image](https://github.com/user-attachments/assets/dedf2fea-0bac-4ed0-bf58-c90ad136dcec)
 
-
 # NOTICE
 
 - 做市商策略会亏手续费，没有免费接口不要去跑
@@ -63,6 +62,7 @@ export { base_url, api_key, api_secret, pass_phrase };
 ## 可用命令
 
 ### 交易相关
+
 - `npm run open [空头资产] [多头资产] [金额]`
   - 开仓命令，支持简写币种名称，不区分大小写
   - 示例：`npm run open sol eth 2000`
@@ -77,10 +77,10 @@ export { base_url, api_key, api_secret, pass_phrase };
 - `npm run list:delete <tradeId>` - 删除指定交易ID的所有相关记录
 - `npm run monit`
   - 实时监控持仓情况，自动刷新
-<img width="651" alt="image" src="https://github.com/user-attachments/assets/cde8f587-669d-4657-94bf-3b63a20642e5" />
+    <img width="651" alt="image" src="https://github.com/user-attachments/assets/cde8f587-669d-4657-94bf-3b63a20642e5" />
 
- 
 ### 绘图相关
+
 - `npm run graph orders` - 切换主图上历史订单记录的显示/隐藏
 - `npm run graph trans` - 切换主图上开平仓信息的显示/隐藏
 
@@ -135,6 +135,7 @@ TradeEngine.createHedge(['XRP-USDT', 'BTC-USDT'], 2000, 0.01);
   - 第三个参数：触发门限
 
 ## 网格交易
+
 ![c23a576fc3a9701935b957e6cde69dbc](https://github.com/user-attachments/assets/a949b332-ca94-4ac4-8dad-8ca9c35ddf17)
 
 ```bash
@@ -147,6 +148,7 @@ npm run grid monit
 # 查看指定币种的网格交易盈亏
 npm run grid monit BTC
 ```
+
 统计信息包含：
 
 <img width="587" alt="image" src="https://github.com/user-attachments/assets/0164dc43-628e-41db-8575-c08991dbc270" />
@@ -162,8 +164,8 @@ npm run grid monit BTC
 ```javascript
 TradeEngine.createGridTrading('SOL-USDT', {
   _grid_width: 0.0025, // 网格宽度，相邻网格价格间隔
-  _max_drawdown: 0.0012, // 最大回撤，超过此值触发买入
-  _max_bounce: 0.0012, // 最大反弹，超过此值触发卖出
+  _upper_drawdown: 0.0012, // 最大回撤，超过此值触发买入
+  _lower_drawdown: 0.0012, // 最大反弹，超过此值触发卖出
   _trade_amount: 0.1, // 每次交易数量
   _max_position: 10, // 最大持仓数量
   _start_position: 0, // 起始仓位
@@ -176,8 +178,8 @@ TradeEngine.createGridTrading('SOL-USDT', {
   - 第一个参数：交易资产
   - 第二个参数：网格交易参数对象
     - \_grid_width：网格宽度，相邻网格价格间隔
-    - \_max_drawdown：最大回撤，超过此值触发买入
-    - \_max_bounce：最大反弹，超过此值触发卖出
+    - \_upper_drawdown：最大回撤，超过此值触发买入
+    - \_lower_drawdown：最大反弹，超过此值触发卖出
     - \_trade_amount：每次交易数量
     - \_max_position：最大持仓数量
     - \_start_position：起始仓位
@@ -205,9 +207,10 @@ TradeEngine.createGridTrading('SOL-USDT', {
 # TODO
 
 1. **动态回撤门限**
+
 ```javascript
 // 当前的回撤门限是固定的
-let threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
+let threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
 // 建议改进：根据市场波动率动态调整
 // 1. 计算最近N个周期的价格波动率
@@ -216,10 +219,11 @@ let threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
 ```
 
 2. **趋势强度相关性**
+
 ```javascript
 // 当前只是简单判断趋势方向
 if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-    return;
+  return;
 }
 
 // 建议改进：增加趋势强度判断
@@ -229,6 +233,7 @@ if (this._tendency == 0 || this._direction / this._tendency >= 0) {
 ```
 
 3. **交易量相关性**
+
 ```javascript
 // 当前没有考虑交易量因素
 // 建议改进：
@@ -238,13 +243,14 @@ if (this._tendency == 0 || this._direction / this._tendency >= 0) {
 ```
 
 4. **时间衰减优化**
+
 ```javascript
 // 当前的时间衰减是固定的
 if (timeDiff > this._backoff_1st_time) {
-    threshold *= 0.5;
+  threshold *= 0.5;
 }
 if (timeDiff > this._backoff_2nd_time) {
-    threshold *= 0.5;
+  threshold *= 0.5;
 }
 
 // 建议改进：使用平滑衰减函数
@@ -254,6 +260,7 @@ if (timeDiff > this._backoff_2nd_time) {
 ```
 
 5. **价格距离自适应**
+
 ```javascript
 // 当前价格距离判断较为简单
 const price_distance_grid = diff_rate / this._grid_width;
@@ -265,6 +272,7 @@ const price_distance_grid = diff_rate / this._grid_width;
 ```
 
 6. **历史表现反馈**
+
 ```javascript
 // 当前没有利用历史交易表现
 // 建议改进：
@@ -274,6 +282,7 @@ const price_distance_grid = diff_rate / this._grid_width;
 ```
 
 7. **风险控制优化**
+
 ```javascript
 // 建议增加以下风险控制措施：
 // 1. 设置最大回撤限制
@@ -282,6 +291,7 @@ const price_distance_grid = diff_rate / this._grid_width;
 ```
 
 8. **外部因素整合**
+
 ```javascript
 // 当前已有但未充分利用的外部因素
 factor_is_people_bullish = false;
@@ -293,14 +303,13 @@ factor_is_people_bullish = false;
 ```
 
 这些优化建议主要围绕以下几个核心目标：
+
 1. 提高策略的自适应能力
 2. 增强风险控制
 3. 优化收益表现
 4. 提升策略的稳定性
 
 建议逐步实施这些优化，每次修改后进行充分的回测验证，确保改进确实带来了预期的效果。
-
-        
 
 ### 显示设置
 
@@ -323,4 +332,3 @@ factor_is_people_bullish = false;
 - ✅ 允许：查看、修改、非商业用途的分发。
 - ⚠️ 要求：基于本项目的衍生作品（包括网络服务）**必须开源**。
 - 💼 **商业用途**：需联系作者（[393667111@qq.com](mailto:393667111@qq.com)）获取商业授权并支付费用。
-

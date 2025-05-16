@@ -15,8 +15,8 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   // 网格参数
   _grid_width = 0.025; // 网格宽度
-  _max_drawdown = 0.012; // 最大回撤
-  _max_bounce = 0.012; // 最大反弹
+  _upper_drawdown = 0.012; // 最大回撤
+  _lower_drawdown = 0.012; // 最大反弹
   _trade_amount = 9000; // 每次交易数量
   _max_position = 100000; // 最大持仓
   _min_price = 0.1; // 最低触发价格
@@ -233,8 +233,8 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   _recordPrice() {
     this._recent_prices.push(this._current_price);
-    if (this._recent_prices.length > 60) {
-      this._recent_prices = this._recent_prices.slice(-60);
+    if (this._recent_prices.length > 300) {
+      this._recent_prices = this._recent_prices.slice(-300);
     }
   }
 
@@ -376,32 +376,35 @@ export class GridTradingProcessor extends AbstractProcessor {
     const volatility = this.getVolatility(30); // 30秒瞬时波动率（百分比）
     const atr = this.getATR(10); // 10分钟ATR（绝对值）
     const rsi_fast = this.getFastRSI(10); // 快速RSI(10)
-    const rsi_slow = this.getSlowRSI(10); // 慢速RSI(30)
+    const rsi_slow = this.getFastRSI(300); // 快速RSI(10)
+    // const rsi_slow = this.getSlowRSI(10); // 慢速RSI(30)
     const { vol_avg_fast, vol_avg_slow } = this.getVolumeStandard();
     const boll = this.getBOLL(20); // 20分钟BOLL(20)
     const vol_power = vol_avg_fast / vol_avg_slow; // 量能
 
-    console.log(`- 价格因子:${this._current_price.toFixed(3)}`);
+    console.log(`- 💵价格:${this._current_price.toFixed(3)}`);
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
-    console.log(`- 价距因子:${price_distance_count.toFixed(2)}`);
+    console.log(`- ↕️ 价距格数:${price_distance_count.toFixed(2)}`);
 
     // 2. 网格跨越因子（price_grid_count）：离散格数强化趋势强度
-    console.log(`- 网格因子:${price_grid_count}`);
+    console.log(`- 📶价差格数:${price_grid_count}`);
 
     // 3. 波动率因子：波动率>2%时放大阈值
-    console.log(`- 瞬时波动:${(100 * volatility).toFixed(2)}%`);
+    console.log(`- 🌪️ 瞬时波动:${(100 * volatility).toFixed(2)}%`);
 
     // 3. 波动率因子：波动率>2%时放大阈值
-    console.log(`- ATR 因子:${(100 * atr).toFixed(2)}%`);
+    console.log(`- 🌡️ 真实波动(ATR):${(100 * atr).toFixed(2)}%`);
 
     // 4. 时间因子：每20分钟阈值递增0.1%
     const timeFactor = Math.log1p(time_passed_seconds / 3600);
     console.log(
-      `- 时间因子:${timeFactor.toFixed(2)} / ${(time_passed_seconds / 60).toFixed(2)}分钟`
+      `- 🕒时间因子:${timeFactor.toFixed(2)} / ${(time_passed_seconds / 60).toFixed(2)}分钟`
     );
-    console.log(`- 量能因子: ${(100 * vol_power).toFixed(2)}%`);
+    console.log(`- 🌊量能因子: ${(100 * vol_power).toFixed(2)}%`);
     // 输出清晰的日志信息
-    console.log(`- 布林带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
+    console.log(`- 🎢布林带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
+    console.log(`- 🚀动量因子(RSI): ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)}`);
+    console.log(`-------------------`);
     /**
      * 一定需要判断上穿下穿方向
      * 例如在向下中，如果到了下轨，明显有反弹，此时不应该减少门限
@@ -424,48 +427,48 @@ export class GridTradingProcessor extends AbstractProcessor {
     let deviationMessage = '';
 
     // 根据价格位置和趋势方向调整阈值
-    if (deviationAbs < 15) {
+    if (deviationAbs < 20) {
       // 价格接近中轨，增加阈值
       thresholdAdjustment = 1.5;
-      deviationMessage = '价格接近中轨';
+      deviationMessage = '🪜 价格接近中轨';
     } else if (deviationAbs > 35) {
       // 价格接近边界，根据趋势方向调整
       const isNearUpper = bandDeviation > 40;
       const isNearLower = bandDeviation < -40;
 
-      deviationMessage = `价格正在${isNearUpper ? '触及上轨' : '触及下轨'}`;
+      deviationMessage = `🚧价格正在${isNearUpper ? '📈 触及上轨' : '📉 触及下轨'}`;
       if (tendency !== 0) {
         const isTrendUp = tendency > 0;
         // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
         if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
           if (price_distance_count >= 3.5) {
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，允许更大回撤`;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
             thresholdAdjustment = 1.5;
           } else if (price_distance_count >= 2.5) {
-            thresholdAdjustment = 0.5;
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，阈值减少`;
+            thresholdAdjustment = 0.75;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，➡️ ⬅️ 阈值减少`;
           } else {
-            deviationMessage += `，不足2格，阈值增加`;
+            deviationMessage += `，不足2格，⬅️ ➡️ 阈值增加`;
             thresholdAdjustment = 1.2;
           }
         } else {
-          deviationMessage += `，反向触界，阈值增加`;
+          deviationMessage += `，反向触界，⬅️ ➡️ 阈值增加`;
           // 反向触及边界时增加阈值
           thresholdAdjustment = 1.75;
         }
       }
     } else {
-      deviationMessage = '价格在正常区间';
+      deviationMessage = '♻️ 价格在正常区间';
     }
 
     // 应用阈值调整
     threshold *= thresholdAdjustment;
 
     [
-      `价格偏离度：${bandDeviation.toFixed(2)}%`,
+      `📐价格偏离度：${bandDeviation.toFixed(2)}%`,
       `${deviationMessage}`,
-      `阈值调整：${thresholdAdjustment === 1 ? '不变' : thresholdAdjustment > 1 ? '扩大' : '缩小'}`,
-      `当前阈值：${(threshold * 100).toFixed(2)}%`,
+      `⛩ 阈值调整：${thresholdAdjustment === 1 ? '⭕️ 不变' : thresholdAdjustment > 1 ? '⬅️ ➡️ 扩大' : '➡️ ⬅️ 缩小'}`,
+      `⛩ 当前阈值：${(threshold * 100).toFixed(2)}%`,
     ].map(msg => console.log(` * ${msg}`));
 
     // 5. RSI动量因子：超买/超卖反向调整
@@ -473,38 +476,38 @@ export class GridTradingProcessor extends AbstractProcessor {
     // RSI动量因子优化：根据背离程度调整
     let rsiFactor = 1;
     const rsiDivergence = Math.abs(rsi_fast - rsi_slow);
-    let rsi_msg = '平稳';
-    if (rsi_fast > 70) {
-      // 超买区域
-      if (rsi_fast > rsi_slow) {
-        // RSI快线上穿慢线，超买加强，降低阈值
-        rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
-        rsi_msg = '🚀RSI快线上穿慢线，超买加强，降低阈值';
-      } else {
-        // RSI快线下穿慢线，超买减弱，轻微提高阈值
-        rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
-        rsi_msg = '🐢RSI快线下穿慢线，超买减弱，轻微提高阈值';
-      }
-    } else if (rsi_fast < 30) {
-      // 超卖区域
-      if (rsi_fast < rsi_slow) {
-        // RSI快线下穿慢线，超卖加强，降低阈值
-        rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
-        rsi_msg = '🚀RSI快线下穿慢线，超卖加强，降低阈值';
-      } else {
-        // RSI快线上穿慢线，超卖减弱，轻微提高阈值
-        rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
-        rsi_msg = '🐢RSI快线上穿慢线，超卖减弱，轻微提高阈值';
+    let rsi_msg = '⌛价格收集中...';
+    if (rsi_fast >= 0 && rsi_slow >= 0) {
+      rsi_msg = '♻️ 价格平稳';
+      if (rsi_fast > 70) {
+        // 超买区域
+        if (rsi_fast > rsi_slow) {
+          // RSI快线上穿慢线，超买加强，降低阈值
+          rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+          rsi_msg = '🚀📈 超买加强，降低阈值➡️ ⬅️';
+        } else {
+          // RSI快线下穿慢线，超买减弱，轻微提高阈值
+          rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
+          rsi_msg = '🐢📈 超买减弱，轻微提高阈值⬅️ ➡️';
+        }
+      } else if (rsi_fast < 30) {
+        // 超卖区域
+        if (rsi_fast < rsi_slow) {
+          // RSI快线下穿慢线，超卖加强，降低阈值
+          rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+          rsi_msg = '🚀📉 超卖加强，降低阈值➡️ ⬅️';
+        } else {
+          // RSI快线上穿慢线，超卖减弱，轻微提高阈值
+          rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
+          rsi_msg = '🐢📉 超卖减弱，轻微提高阈值⬅️ ➡️';
+        }
       }
     }
-
     threshold = threshold * rsiFactor;
-    console.log(
-      `- RSI 因子: ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)} (${rsiFactor.toFixed(2)}), 调整阈值至：${(threshold * 100).toFixed(2)}%`
-    );
-    console.log(` * ${rsi_msg}`);
-
-    console.log(`- 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
+    console.log(` * ${rsi_msg}(${rsiFactor.toFixed(2)})`);
+    console.log(` * 🎯调整阈值至：⛩ ${(threshold * 100).toFixed(2)}%`);
+    console.log(` * ↩️ 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
+    console.log(`-------------------`);
 
     // --- 合成动态阈值 ---
 
@@ -558,7 +561,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       const diff_rate = price_diff / ref_price;
 
       const price_distance_grid = diff_rate / this._grid_width;
-      const default_threshold = this._direction < 0 ? this._max_drawdown : this._max_bounce;
+      const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
       this._threshold = this.trendReversalThreshold(
         this._current_price,
