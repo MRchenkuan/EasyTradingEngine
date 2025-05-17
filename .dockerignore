@@ -6,7 +6,7 @@ records
 .gitignore
 .env
 *.md
-.zip
-.tar
+*.zip
+*.tar
 Dockerfile
 .dockerignore

@@ -17,6 +17,9 @@ RUN apt-get update && apt-get install -y \
     fontconfig \
     && rm -rf /var/lib/apt/lists/*
 
+# 全局安装 PM2
+RUN npm install -g pm2
+
 WORKDIR /app
 
 COPY package*.json ./
@@ -24,4 +27,5 @@ RUN npm install
 
 COPY . .
 
-CMD ["npm", "start"]
+# 使用 PM2 启动应用
+CMD ["pm2-runtime", "start", "main.js", "--name", "okx-trading"]

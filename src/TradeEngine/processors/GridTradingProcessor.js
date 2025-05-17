@@ -574,7 +574,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._tendency
       );
 
-      console.log(`- 推荐阈值：${(100 * this._threshold).toFixed(2)}%\n`);
+      console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);
 
       // if (timeDiff > this._backoff_1st_time) {
       //   // const vol_power = this.getVolumeStandard();
@@ -612,12 +612,12 @@ export class GridTradingProcessor extends AbstractProcessor {
       //   }
       // }
 
-      if (price_distance_grid - grid_count_abs < 0.5) {
-        // 大于3格，扩大容限
-        this._threshold = this._threshold * 1.2;
-      } else {
-        this._threshold = this._threshold / 1.2;
-      }
+      // if (price_distance_grid - grid_count_abs < 0.5) {
+      //   // 大于3格，扩大容限
+      //   this._threshold = this._threshold * 1.2;
+      // } else {
+      //   this._threshold = this._threshold / 1.2;
+      // }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
