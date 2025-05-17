@@ -70,6 +70,10 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   _loadState() {
     this._is_position_created = this.local_variables.is_position_created || false;
+
+    // todo
+    // 先恢复前次交易的状态，更新最真实交易的结果（最近一次交易状态为成功的）
+
     this._last_trade_price = this.local_variables.last_trade_price;
     this._last_trade_price_ts = this.local_variables.last_trade_price_ts;
     this._last_lower_turning_price = this.local_variables.last_lower_turning_price;
@@ -272,6 +276,11 @@ export class GridTradingProcessor extends AbstractProcessor {
   tick() {
     // 获取最新价格
     this._current_price = this.engine.getRealtimePrice(this.asset_name) || this._prev_price;
+
+    if (!this._last_trade_price) {
+      // 冷启动没有历史价格时记录当时价格
+      this._last_trade_price = this._current_price;
+    }
     this._current_price_ts = this.engine.realtime_price_ts[this.asset_name] || this._prev_price_ts;
 
     // 保存价格记录
@@ -765,38 +774,66 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     console.log(`💰${orderType}：${this._current_price} ${amount} 个`);
+    // 然后执行交易
     const order = createOrder_market(
       this.asset_name,
       Math.abs(amount),
       amount / Math.abs(amount),
       true
     );
-    let result = await executeOrders([order]);
-    if (!result.success) {
+    // todo 1.先记录...
+    const order_record = recordGridTradeOrders({ ...order });
+
+    // todo 2.然后执行
+    let result = {};
+    try {
+      result = await executeOrders([order]);
+    } catch (error) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       return;
     }
-    recordGridTradeOrders({ ...result.data[0], gridCount, orderType });
-    console.log(`✅${this.asset_name} 交易成功: ${orderType}`);
-    // 重置关键参数
-    this._resetKeyPrices(this._current_price, this._current_price_ts);
-    this._saveState(); // 立即保存状态
-    try {
-      const [o] = (await fetchOrders(result.data)) || [];
-      if (o && o.avgPx && o.fillTime) {
-        this._resetKeyPrices(parseFloat(o.avgPx), parseFloat(o.fillTime));
-        console.log(
-          `✅${this.asset_name} 远程重置关键参数成功`,
-          parseFloat(o.avgPx),
-          parseFloat(o.fillTime)
-        );
-      } else {
-        console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
+
+    // todo 3.如果失败则重置关键参数,并更新记录状态：交易成功|失败
+    if (!result.success) {
+      // todo 3.1 失败则直接记录为失败订单
+      console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
+      this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
+      return;
+    } else {
+      // todo 3.2 成功则先查询
+      recordGridTradeOrders({ ...result.data[0], gridCount, orderType });
+      console.log(`✅${this.asset_name} 交易成功: ${orderType}`);
+      // 重置关键参数
+      this._resetKeyPrices(this._current_price, this._current_price_ts);
+      this._saveState(); // 立即保存状态
+      try {
+        // todo 3.2.1 开始查询订单信息，更新关键参数
+        const [o] = (await fetchOrders(result.data)) || [];
+        if (o && o.avgPx && o.fillTime) {
+          this._resetKeyPrices(parseFloat(o.avgPx), parseFloat(o.fillTime));
+          console.log(
+            `✅${this.asset_name} 远程重置关键参数成功`,
+            parseFloat(o.avgPx),
+            parseFloat(o.fillTime)
+          );
+          // todo 3.2.2 最终完成记录
+        } else {
+          console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
+        }
+      } catch (e) {
+        // todo 3.3 报错，记录为查询失败
+        console.error(`⛔${this.asset_name} 远程重置关键参数失败: ${e.message}`);
       }
-    } catch (e) {
-      console.error(`⛔${this.asset_name} 远程重置关键参数失败: ${e.message}`);
     }
+  }
+
+  createOrderRecord(order) {
+    return order;
+  }
+
+  updateOrderRecord(order) {
+    return order;
   }
 
   /**

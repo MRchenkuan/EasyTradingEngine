@@ -260,8 +260,10 @@ export function recordGridTradeOrders(order) {
     data.push(order);
     // 写入文件，每个订单一行
     fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
+    return order;
   } catch (error) {
     console.error('订单记录错误:', error);
+    
   }
 }
 

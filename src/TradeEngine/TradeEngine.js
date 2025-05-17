@@ -556,7 +556,10 @@ export class TradeEngine {
 
     orders.map(({ instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy }) => {
       const realtime_price = realtime_price_map[instId];
-      if (!realtime_price) throw new Error('实时价格获取不到');
+      if (!realtime_price) {
+        // console.warn(`实时价格获取不到: ${instId}`);
+        return 0;
+      }
       // 单位 false:本币; true:usdt
       const unit_fgt = tgtCcy === 'base_ccy' ? false : true;
       const unit_fee = feeCcy === 'USDT' ? true : false;
