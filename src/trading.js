@@ -60,7 +60,7 @@ export async function executeOrders(orderList) {
       return data[0];
     })
   );
-  orderDetails = processOrderDetail(orderDetails);
+  orderDetails = processOrderDetails(orderDetails);
   console.log('下单完成..');
   return {
     success: true,
@@ -165,7 +165,7 @@ export function mergeOrder2Result(arr) {
 }
 
 // 标准化订单参数
-function processOrderDetail(orderDetail) {
+function processOrderDetails(orderDetail) {
   return orderDetail.map(order => {
     const { instId, clOrdId, avgPx, px, ordId, sz, accFillSz, fee, feeCcy, tgtCcy, state } = order;
     return {
@@ -223,19 +223,6 @@ export async function marketMaker(assetId, price, size, dir) {
   return { success: true, profit, data: order_details };
 }
 
-// 持续查询订单
-// async function fetchOrders(orders){
-//   let orderDetails = await Promise.all(orders.map(async order=>{
-//     const {data=[]} = await getOrderInfo(order.instId, order.ordId)
-//     return data[0];
-//   }));
-//   if(orderDetails.every(order=>order.state ==='filled')){
-//     return orderDetails;
-//   } else {
-//     await new Promise(resove=>setTimeout(resove, 3000));
-//     return await fetchOrders(orders);
-//   }
-// }
 export async function fetchOrders(orders, initialDelay = 3000, maxRetries = 5) {
   let retryCount = 0;
   let currentDelay = initialDelay;

@@ -248,25 +248,6 @@ export function recordMarketMakerTransactions(tradeId, orders) {
   }
 }
 
-export function recordGridTradeOrders(order) {
-  try {
-    // 读取现有内容
-    let data = [];
-    if (fs.existsSync(filePath_trade_results_grid)) {
-      const content = fs.readFileSync(filePath_trade_results_grid, 'utf-8');
-      data = JSON.parse(content);
-      if (!Array.isArray(data)) data = [];
-    }
-    data.push(order);
-    // 写入文件，每个订单一行
-    fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
-    return order;
-  } catch (error) {
-    console.error('订单记录错误:', error);
-    
-  }
-}
-
 export function getGridTradeOrders() {
   try {
     // 读取现有内容
@@ -279,5 +260,55 @@ export function getGridTradeOrders() {
     return data;
   } catch (error) {
     console.error('订单解析错误:', error);
+  }
+}
+
+export function updateGridTradeOrder(clOrdId, ordId, args) {
+  try {
+    // 参数验证
+    if (!clOrdId && !ordId) {
+      console.error('订单更新错误: 必须提供 clOrdId 或 ordId');
+      return null;
+    }
+
+    // 读取现有内容
+    let data = [];
+    if (fs.existsSync(filePath_trade_results_grid)) {
+      const content = fs.readFileSync(filePath_trade_results_grid, 'utf-8');
+      data = JSON.parse(content);
+      if (!Array.isArray(data)) data = [];
+    }
+
+    // 查找订单
+    const index = data.findIndex(order => {
+      if (ordId && order.ordId) return order.ordId === ordId;
+      if (clOrdId) return order.clOrdId === clOrdId;
+      return false;
+    });
+
+    // 如果找到订单，更新信息；否则创建新订单
+    if (index >= 0) {
+      data[index] = {
+        ...data[index],
+        ...args,
+      };
+      // 写入文件
+      fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
+      return data[index];
+    } else {
+      // 创建一条新记录
+      const newOrder = {
+        clOrdId,
+        ordId,
+        ...args,
+      };
+      data.push(newOrder);
+      // 写入文件
+      fs.writeFileSync(filePath_trade_results_grid, JSON.stringify(data, null, 2), 'utf-8');
+      return newOrder;
+    }
+  } catch (error) {
+    console.error('更新网格订单错误:', error);
+    return null;
   }
 }

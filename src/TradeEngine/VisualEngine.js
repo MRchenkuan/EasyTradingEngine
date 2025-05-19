@@ -117,9 +117,9 @@ export class VisualEngine {
 
   static drawGridTrading() {
     const assets = this._asset_names;
-    const orders = getGridTradeOrders().filter(
-      orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId)
-    );
+    const orders = getGridTradeOrders()
+      .filter(orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId))
+      .filter(order => order.order_status === 'confirmed');
     // 先对order按照instId进行分组
     const groupedOrders = orders.reduce((acc, orderGroup) => {
       const instId = orderGroup.instId; // 使用第一个订单的instId作为key
@@ -354,7 +354,7 @@ export class VisualEngine {
               // 绘制历史订单信息
               if (group_orders && group_orders.length)
                 group_orders.forEach(order => {
-                  const { ts, avgPx, accFillSz, side, gridCount } = order;
+                  const { ts, avgPx, accFillSz, side, grid_count } = order;
                   const time = formatTimestamp(ts, TradeEngine._bar_type);
                   // 超出时间范围的订单不绘制
                   const labels = chart.data.labels;
@@ -365,7 +365,7 @@ export class VisualEngine {
                   const xCoord = chart.scales.x.getPixelForValue(time);
                   const yCoord = chart.scales.y.getPixelForValue(price);
                   // 绘制订单标签
-                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(2)})/${-gridCount} 倍`;
+                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(2)})/${-grid_count} 倍`;
                   this._paintSingleOrder(
                     chart.ctx,
                     xCoord,

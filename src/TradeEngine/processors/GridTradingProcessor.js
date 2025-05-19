@@ -1,7 +1,7 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
 import { createOrder_market, executeOrders, fetchOrders } from '../../trading.js';
-import { getGridTradeOrders, recordGridTradeOrders } from '../../recordTools.js';
+import { getGridTradeOrders, updateGridTradeOrder } from '../../recordTools.js';
 import { calculateATR } from '../../indicators/ATR.js';
 import { calculateIV } from '../../indicators/IV.js';
 import { calculateMA } from '../../indicators/MA.js';
@@ -384,8 +384,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 获取指标数据
     const volatility = this.getVolatility(30); // 30秒瞬时波动率（百分比）
     const atr = this.getATR(10); // 10分钟ATR（绝对值）
-    const rsi_fast = this.getFastRSI(10); // 快速RSI(10)
-    const rsi_slow = this.getFastRSI(300); // 快速RSI(10)
+    const rsi_fast = this.getFastRSI(7); // 快速RSI(10)
+    const rsi_slow = this.getFastRSI(180); // 快速RSI(10)
     // const rsi_slow = this.getSlowRSI(10); // 慢速RSI(30)
     const { vol_avg_fast, vol_avg_slow } = this.getVolumeStandard();
     const boll = this.getBOLL(20); // 20分钟BOLL(20)
@@ -442,19 +442,19 @@ export class GridTradingProcessor extends AbstractProcessor {
       deviationMessage = '🪜 价格接近中轨';
     } else if (deviationAbs > 35) {
       // 价格接近边界，根据趋势方向调整
-      const isNearUpper = bandDeviation > 40;
-      const isNearLower = bandDeviation < -40;
+      const isNearUpper = bandDeviation > 35;
+      const isNearLower = bandDeviation < -35;
 
       deviationMessage = `🚧价格正在${isNearUpper ? '📈 触及上轨' : '📉 触及下轨'}`;
       if (tendency !== 0) {
         const isTrendUp = tendency > 0;
         // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
         if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
-          if (price_distance_count >= 3.5) {
+          if (price_distance_count >= 3.5 && price_grid_count >= 3) {
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
             thresholdAdjustment = 1.5;
-          } else if (price_distance_count >= 2.5) {
-            thresholdAdjustment = 0.75;
+          } else if (price_distance_count >= 2.2) {
+            thresholdAdjustment = 0.7;
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，➡️ ⬅️ 阈值减少`;
           } else {
             deviationMessage += `，不足2格，⬅️ ➡️ 阈值增加`;
@@ -492,7 +492,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超买区域
         if (rsi_fast > rsi_slow) {
           // RSI快线上穿慢线，超买加强，降低阈值
-          rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📈 超买加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线下穿慢线，超买减弱，轻微提高阈值
@@ -503,7 +503,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超卖区域
         if (rsi_fast < rsi_slow) {
           // RSI快线下穿慢线，超卖加强，降低阈值
-          rsiFactor = Math.max(0.5, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📉 超卖加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线上穿慢线，超卖减弱，轻微提高阈值
@@ -515,7 +515,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     threshold = threshold * rsiFactor;
     console.log(` * ${rsi_msg}(${rsiFactor.toFixed(2)})`);
     console.log(` * 🎯调整阈值至：⛩ ${(threshold * 100).toFixed(2)}%`);
-    console.log(` * ↩️ 当前回撤：${(100 * diff_rate).toFixed(2)}%`);
+    console.log(` * ↩️ 当前回撤：⛩ ${(100 * diff_rate).toFixed(2)}%`);
     console.log(`-------------------`);
 
     // --- 合成动态阈值 ---
@@ -525,7 +525,13 @@ export class GridTradingProcessor extends AbstractProcessor {
   }
 
   async _orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower) {
-    if (this._stratage_locked) return;
+    // if (this._stratage_locked) return;
+    // this._stratage_locked = true;
+    // await this._placeOrder(-1, '下单测试');
+    // // 等待1秒
+    // await new Promise(resolve => setTimeout(resolve, 3000));
+    // this._stratage_locked = false;
+    // return;
     try {
       this._stratage_locked = true;
 
@@ -584,49 +590,6 @@ export class GridTradingProcessor extends AbstractProcessor {
       );
 
       console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);
-
-      // if (timeDiff > this._backoff_1st_time) {
-      //   // const vol_power = this.getVolumeStandard();
-
-      //   this._threshold = this._threshold / 1.5;
-
-      //   console.log(
-      //     `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_1st_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
-      //   );
-
-      //   if (timeDiff > this._backoff_2nd_time) {
-      //     // if (price_distance_grid > 1.5 && this._direction / this._tendency < 0) {}
-      //     this._threshold = this._threshold / 1.5;
-
-      //     console.log(
-      //       `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_2nd_time / 60} 分钟，回撤门限减少为：${(this._threshold * 100).toFixed(2)}%`
-      //     );
-      //   }
-
-      //   if (timeDiff > this._backoff_3nd_time) {
-      //     console.log(
-      //       `[${this.asset_name}]距离上一次交易时间超过 ${this._backoff_3nd_time / 60} 分钟，快速平仓条件：价差1.8格，门限：${(100 * this._threshold).toFixed(2)}%`
-      //     );
-      //     // TODO 将来只有针对平仓才做
-      //     if (price_distance_grid > 1.8 && this._direction / this._tendency < 0) {
-      //       // 直接平仓会错过收益，所以需要继续减少容限
-      //       // 瞬时波动率
-      //       if (this._threshold > 0 && Math.abs(correction) > this._threshold) {
-      //         const count = Math.max(1, grid_count_abs);
-      //         if (this._direction > 0) await this._placeOrder(-count, '- 超时直接平仓');
-      //         if (this._direction < 0) await this._placeOrder(count, '- 超时直接平仓');
-      //         return;
-      //       }
-      //     }
-      //   }
-      // }
-
-      // if (price_distance_grid - grid_count_abs < 0.5) {
-      //   // 大于3格，扩大容限
-      //   this._threshold = this._threshold * 1.2;
-      // } else {
-      //   this._threshold = this._threshold / 1.2;
-      // }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
@@ -763,9 +726,9 @@ export class GridTradingProcessor extends AbstractProcessor {
   /**
    * 下单
    * @param {number} gridCount 跨越的网格数量
-   * @param {string} orderType 订单类型
+   * @param {string} orderDesc 订单类型
    */
-  async _placeOrder(gridCount, orderType) {
+  async _placeOrder(gridCount, orderDesc) {
     const amount = -gridCount * this._trade_amount;
 
     if (Math.abs(amount) > this._max_position) {
@@ -773,7 +736,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       return;
     }
 
-    console.log(`💰${orderType}：${this._current_price} ${amount} 个`);
+    console.log(`💰${orderDesc}：${this._current_price} ${amount} 个`);
     // 然后执行交易
     const order = createOrder_market(
       this.asset_name,
@@ -781,29 +744,49 @@ export class GridTradingProcessor extends AbstractProcessor {
       amount / Math.abs(amount),
       true
     );
-    // todo 1.先记录...
-    const order_record = recordGridTradeOrders({ ...order });
 
+    await updateGridTradeOrder(order.clOrdId, null, {
+      order_status: 'pendding',
+      order_desc: orderDesc,
+      grid_count: gridCount,
+    });
+    // todo 1.先记录...
     // todo 2.然后执行
     let result = {};
     try {
       result = await executeOrders([order]);
     } catch (error) {
-      console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
+      console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
+      await updateGridTradeOrder(order.clOrdId, null, {
+        order_status: 'faild',
+        error: error.message,
+      });
       return;
     }
 
     // todo 3.如果失败则重置关键参数,并更新记录状态：交易成功|失败
     if (!result.success) {
       // todo 3.1 失败则直接记录为失败订单
-      console.error(`⛔${this.asset_name} 交易失败: ${orderType}`);
+      console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
+      await updateGridTradeOrder(order.clOrdId, null, {
+        order_status: 'failed',
+        error: result.error,
+      });
       return;
     } else {
       // todo 3.2 成功则先查询
-      recordGridTradeOrders({ ...result.data[0], gridCount, orderType });
-      console.log(`✅${this.asset_name} 交易成功: ${orderType}`);
+      const order = result.data[0];
+      const orign_order = order.originalOrder;
+      delete order.originalOrder;
+      await updateGridTradeOrder(order.clOrdId, order.ordId, {
+        ...order,
+        ...orign_order,
+        order_status: 'placed',
+      });
+
+      console.log(`✅${this.asset_name} 交易成功: ${orderDesc}`);
       // 重置关键参数
       this._resetKeyPrices(this._current_price, this._current_price_ts);
       this._saveState(); // 立即保存状态
@@ -818,22 +801,33 @@ export class GridTradingProcessor extends AbstractProcessor {
             parseFloat(o.fillTime)
           );
           // todo 3.2.2 最终完成记录
+          // todo 3.2 成功则先查询
+          await updateGridTradeOrder(order.clOrdId, null, {
+            order_status: 'confirmed',
+          });
         } else {
+          await updateGridTradeOrder(order.clOrdId, null, {
+            order_status: 'confirm-failed',
+            error: '未获取到订单信息',
+          });
           console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
         }
       } catch (e) {
+        await updateGridTradeOrder(order.clOrdId, null, {
+          order_status: 'confirm-error',
+          error: '订单确认错误',
+        });
         // todo 3.3 报错，记录为查询失败
         console.error(`⛔${this.asset_name} 远程重置关键参数失败: ${e.message}`);
       }
+      this._saveState(); // 立即保存状态
     }
   }
 
-  createOrderRecord(order) {
-    return order;
-  }
-
-  updateOrderRecord(order) {
-    return order;
+  confirmOrder(order) {
+    // todo 1.先记录...
+    // todo 2.然后执行
+    let result = {};
   }
 
   /**

@@ -14,7 +14,7 @@
     "trading": "node ./src/manual.js",
     "docker:build": "docker build -t okx-trading .",
     "docker:build-amd": "docker build --platform linux/amd64 -t okx-trading . && npm run docker:save",
-    "docker:run": "docker run -d --name okx-trading -v $(pwd)/chart:/app/chart -v --restart unless-stopped okx-trading",
+    "docker:run": "sudo docker run -d --name okx-trading -v $(pwd)/chart:/app/chart -v $(pwd)/records:/app/records --ulimit core=0 --restart unless-stopped okx-trading",
     "docker:save": "docker save okx-trading > okx-trading.tar",
     "docker:load": "docker load < okx-trading.tar",
     "docker:stop": "docker stop okx-trading || true",

@@ -15,6 +15,8 @@ const colors = {
 };
 
 function padString(str, length) {
+  // 添加空值处理
+  str = str === undefined || str === null ? '' : String(str);
   const visibleStr = str.replace(/\x1b\[\d+m/g, '');
   const strWidth = [...visibleStr].reduce((width, char) => {
     return width + (/[\u4e00-\u9fa5]/.test(char) ? 2 : 1);
@@ -32,7 +34,9 @@ function displayGridTrades(monit = false) {
     return;
   }
 
-  const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8'));
+  const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8')).filter(
+    order => order.order_status === 'confirmed'
+  );
   if (trades.length === 0) {
     console.log('没有网格交易记录');
     return;
@@ -47,6 +51,7 @@ function displayGridTrades(monit = false) {
     ? trades.filter(order => order.instId.toUpperCase().startsWith(filterSymbol))
     : trades.filter(order => !!order);
 
+  // 打印网格收益表格
   if (filteredTrades.length === 0) {
     console.log(`没有找到 ${filterSymbol} 的交易记录`);
     return;
@@ -186,7 +191,9 @@ function displayGridTradeList(filterSymbol) {
     return;
   }
 
-  const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8'));
+  const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8')).filter(
+    order => order.order_status === 'confirmed'
+  );
   const filteredTrades = filterSymbol
     ? trades.filter(order => order.instId.toUpperCase().startsWith(filterSymbol.toUpperCase()))
     : trades;
