@@ -235,7 +235,7 @@ export async function batchCancelOrders(orders) {
     console.error(orders);
     throw new Error('订单参数格式错误：每个订单必须包含 instId 和 ordId/clOrdId 中的至少一个');
   }
-  const security = MIMIC? mimic : firm;
+  const security = MIMIC ? mimic : firm;
 
   // const security = mimic;
 
@@ -257,7 +257,6 @@ export async function batchCancelOrders(orders) {
     headers['x-simulated-trading'] = 1;
   }
 
-
   const { data } = await axios.post(base_url + requestPath, orders, {
     headers,
   });
@@ -268,7 +267,7 @@ export async function batchCancelOrders(orders) {
 export async function getOrderInfo(instId, ordId) {
   // const security = firm;
   // const security = mimic;
-  const security = MIMIC? mimic : firm;
+  const security = MIMIC ? mimic : firm;
 
   const timestamp = new Date().toISOString();
   const method = 'GET';
@@ -282,7 +281,7 @@ export async function getOrderInfo(instId, ordId) {
     'OK-ACCESS-PASSPHRASE': security.pass_phrase,
     // 'x-simulated-trading': 1,
   };
-  
+
   if (MIMIC) {
     headers['x-simulated-trading'] = 1;
   }

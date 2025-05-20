@@ -609,33 +609,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
-        await this._placeOrder(gridCount, this._direction < 0 ? '- 回撤下单' : '- 反弹下单');
-        return;
-      }
-
-      // 处理拐点交易逻辑
-      if (
-        this._enable_none_grid_trading &&
-        this._direction < 0 &&
-        Math.abs(gridTurningCount_upper) >= 1
-      ) {
-        console.log(
-          `↪️[${this.asset_name}]${this._current_price} 价格穿越了上拐点，触发上拐点回调交易`
-        );
-        await this._placeOrder(1, '- 格内上穿拐点下单');
-        return;
-      }
-
-      if (
-        this._enable_none_grid_trading &&
-        this._direction > 0 &&
-        Math.abs(gridTurningCount_lower) >= 1
-      ) {
-        // 这里应该使用 gridTurningCount_lower
-        console.log(
-          `↩️[${this.asset_name}]${this._current_price} 价格穿越了下拐点，触发下拐点回调交易`
-        );
-        await this._placeOrder(-1, '- 格内下穿拐点下单');
+        await this._placeOrder(gridCount, '- 回调下单');
         return;
       }
 
@@ -746,7 +720,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
 
     await updateGridTradeOrder(order.clOrdId, null, {
-      order_status: 'pendding',
+      order_status: 'pending',  // 修改 pendding -> pending
       order_desc: orderDesc,
       grid_count: gridCount,
     });
@@ -754,12 +728,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     // todo 2.然后执行
     let result = {};
     try {
+      this._resetKeyPrices(this._current_price, this._current_price_ts);
       result = await executeOrders([order]);
     } catch (error) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'faild',
+        order_status: 'failed',  // 修改 faild -> failed
         error: error.message,
       });
       return;
@@ -771,18 +746,17 @@ export class GridTradingProcessor extends AbstractProcessor {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'failed',
+        order_status: 'failed',  // 保持一致使用 failed
         error: result.error,
       });
       return;
     } else {
       // todo 3.2 成功则先查询
-      const order = result.data[0];
-      const orign_order = order.originalOrder;
-      delete order.originalOrder;
-      await updateGridTradeOrder(order.clOrdId, order.ordId, {
+      const { originalOrder, clOrdId, ordId, ...rest } = result.data[0];
+      await updateGridTradeOrder(clOrdId, ordId, {
+        ...rest,
         ...order,
-        ...orign_order,
+        ...originalOrder,
         order_status: 'placed',
       });
 
@@ -807,14 +781,14 @@ export class GridTradingProcessor extends AbstractProcessor {
           });
         } else {
           await updateGridTradeOrder(order.clOrdId, null, {
-            order_status: 'confirm-failed',
+            order_status: 'confirm_failed',
             error: '未获取到订单信息',
           });
           console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
         }
       } catch (e) {
         await updateGridTradeOrder(order.clOrdId, null, {
-          order_status: 'confirm-error',
+          order_status: 'confirm_error',
           error: '订单确认错误',
         });
         // todo 3.3 报错，记录为查询失败
@@ -824,10 +798,58 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
   }
 
-  confirmOrder(order) {
-    // todo 1.先记录...
-    // todo 2.然后执行
-    let result = {};
+  async confirmOrder(order) {
+    try {
+      // 查询订单信息
+      const [orderInfo] = (await fetchOrders([order])) || [];
+
+      if (orderInfo && orderInfo.avgPx && orderInfo.fillTime) {
+        // 更新关键价格参数
+        this._resetKeyPrices(parseFloat(orderInfo.avgPx), parseFloat(orderInfo.fillTime));
+        console.log(
+          `✅${this.asset_name} 订单确认成功，更新价格参数：`,
+          parseFloat(orderInfo.avgPx),
+          parseFloat(orderInfo.fillTime)
+        );
+
+        // 更新订单状态为已确认
+        await updateGridTradeOrder(order.clOrdId, null, {
+          order_status: 'confirmed',
+          ...orderInfo,
+        });
+
+        return {
+          success: true,
+          data: orderInfo,
+        };
+      } else {
+        // 未获取到订单信息
+        await updateGridTradeOrder(order.clOrdId, null, {
+          order_status: 'confirm_failed',  // 修改 unconfirmed -> confirm_failed
+          error: '未获取到订单信息',
+        });
+        console.error(`⛔${this.asset_name} 订单确认失败：未获取到订单信息`);
+
+        return {
+          success: false,
+          error: '未获取到订单信息',
+        };
+      }
+    } catch (error) {
+      // 确认过程发生错误
+      await updateGridTradeOrder(order.clOrdId, null, {
+        order_status: 'confirm_error',  // 修改 unconfirmed:error -> confirm_error
+        error: error.message,
+      });
+      console.error(`⛔${this.asset_name} 订单确认错误：${error.message}`);
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    } finally {
+      this._saveState(); // 保存状态
+    }
   }
 
   /**

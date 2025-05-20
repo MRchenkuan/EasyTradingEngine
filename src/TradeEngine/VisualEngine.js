@@ -354,7 +354,8 @@ export class VisualEngine {
               // 绘制历史订单信息
               if (group_orders && group_orders.length)
                 group_orders.forEach(order => {
-                  const { ts, avgPx, accFillSz, side, grid_count } = order;
+                  const { ts, avgPx, accFillSz, side, grid_count, order_status, order_desc } =
+                    order;
                   const time = formatTimestamp(ts, TradeEngine._bar_type);
                   // 超出时间范围的订单不绘制
                   const labels = chart.data.labels;
@@ -365,7 +366,7 @@ export class VisualEngine {
                   const xCoord = chart.scales.x.getPixelForValue(time);
                   const yCoord = chart.scales.y.getPixelForValue(price);
                   // 绘制订单标签
-                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(2)})/${-grid_count} 倍`;
+                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(3)})/${-grid_count} 倍/[${order_status}]`;
                   this._paintSingleOrder(
                     chart.ctx,
                     xCoord,
