@@ -333,23 +333,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     const gridCount = this._last_trade_price
       ? this._countGridNumber(this._current_price, this._last_trade_price)
       : Math.min(this._countGridNumber(this._current_price, this._grid_base_price), 2);
-    // 计算上拐点价横跨网格数量
-    const gridTurningCount_upper = this._countGridNumber(
-      this._last_upper_turning_price,
-      this._last_trade_price
-    );
-    // 计算下拐点价横跨网格数量
-    const gridTurningCount_lower = this._countGridNumber(
-      this._last_lower_turning_price,
-      this._last_trade_price
-    );
 
     // 更新拐点价格
     this._refreshTurningPoint();
 
     // 执行交易策略
 
-    this._orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower);
+    this._orderStrategy(gridCount);
 
     // 更新历史价格
     this._prev_price = this._current_price;
@@ -524,8 +514,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     return Math.min(Math.max(threshold, min_threshold), max_threshold);
   }
 
-  async _orderStrategy(gridCount, gridTurningCount_upper, gridTurningCount_lower) {
-    // if (this._stratage_locked) return;
+  async _orderStrategy(gridCount) {
+    if (this._stratage_locked) return;
     // this._stratage_locked = true;
     // await this._placeOrder(-1, '下单测试');
     // // 等待1秒
@@ -534,7 +524,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     // return;
     try {
       this._stratage_locked = true;
-
       // 趋势和方向一致时不交易
       if (this._tendency == 0 || this._direction / this._tendency >= 0) {
         // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
@@ -720,7 +709,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
 
     await updateGridTradeOrder(order.clOrdId, null, {
-      order_status: 'pending',  // 修改 pendding -> pending
+      order_status: 'pending', // 修改 pendding -> pending
       order_desc: orderDesc,
       grid_count: gridCount,
     });
@@ -734,7 +723,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'failed',  // 修改 faild -> failed
+        order_status: 'failed', // 修改 faild -> failed
         error: error.message,
       });
       return;
@@ -746,7 +735,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'failed',  // 保持一致使用 failed
+        order_status: 'failed', // 保持一致使用 failed
         error: result.error,
       });
       return;
@@ -754,6 +743,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       // todo 3.2 成功则先查询
       const { originalOrder, clOrdId, ordId, ...rest } = result.data[0];
       await updateGridTradeOrder(clOrdId, ordId, {
+        clOrdId,
+        ordId,
         ...rest,
         ...order,
         ...originalOrder,
@@ -825,7 +816,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       } else {
         // 未获取到订单信息
         await updateGridTradeOrder(order.clOrdId, null, {
-          order_status: 'confirm_failed',  // 修改 unconfirmed -> confirm_failed
+          order_status: 'confirm_failed', // 修改 unconfirmed -> confirm_failed
           error: '未获取到订单信息',
         });
         console.error(`⛔${this.asset_name} 订单确认失败：未获取到订单信息`);
@@ -838,7 +829,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     } catch (error) {
       // 确认过程发生错误
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'confirm_error',  // 修改 unconfirmed:error -> confirm_error
+        order_status: 'confirm_error', // 修改 unconfirmed:error -> confirm_error
         error: error.message,
       });
       console.error(`⛔${this.asset_name} 订单确认错误：${error.message}`);

@@ -30,6 +30,7 @@ export class TradeEngine {
   static _trade_fee_rate = 0.001;
   static _show_order_his = [];
   static _positionCost = new LocalVariable('TradeEngine/positionCost');
+  static _max_candle_size = 3000;
 
   /**
    * 对冲监听器
@@ -435,8 +436,9 @@ export class TradeEngine {
     const sorted_prices = sortedTimestamps.map(ts => newDataMap.get(ts));
     this.market_data[bar][assetId] = {
       id: assetId,
-      ts: sortedTimestamps,
-      prices: sorted_prices,
+      ts: sortedTimestamps.slice(-this._max_candle_size), // 只保留最新的3000个数据点
+      prices: sorted_prices.slice(-this._max_candle_size),
+      max_length: this._max_candle_size // 添加长度限制标记
     };
 
     // 更新实时价格
@@ -485,30 +487,33 @@ export class TradeEngine {
         id: assetId,
         prices: [],
         ts: [],
+        max_length: this._max_candle_size, // 添加数据长度限制
       };
       assetData = this.market_data[bar][assetKey];
     }
 
-    // 查找插入位置（要求现有数据已排序）
-    const existingTs = assetData.ts;
-    const existingPrices = assetData.prices;
-
-    // 使用二分查找优化插入效率
-    const insertionIndex = this._findInsertIndex(existingTs, ts);
+    // 查找插入位置
+    const insertionIndex = this._findInsertIndex(assetData.ts, ts);
 
     // 判断是否重复时间戳
-    if (existingTs[insertionIndex] == ts) {
+    if (assetData.ts[insertionIndex] === ts) {
       // 覆盖已有数据
-      existingPrices[insertionIndex] = price;
+      assetData.prices[insertionIndex] = price;
     } else {
       // 插入新数据
-      existingTs.splice(insertionIndex, 0, ts);
-      existingPrices.splice(insertionIndex, 0, price);
+      assetData.ts.splice(insertionIndex, 0, ts);
+      assetData.prices.splice(insertionIndex, 0, price);
+
+      // 维护数组长度
+      if (assetData.ts.length > assetData.max_length) {
+        assetData.ts.shift();
+        assetData.prices.shift();
+      }
     }
+
     // 更新实时价格
-    this.realtime_price[assetId] = existingPrices.at(-1);
-    this.realtime_price_ts[assetId] = existingTs.at(-1);
-    // recordPrice(assetId, this.realtime_price[assetId]);
+    this.realtime_price[assetId] = price;
+    this.realtime_price_ts[assetId] = ts;
   }
 
   /**
@@ -737,3 +742,4 @@ export class TradeEngine {
     return gp;
   }
 }
+
