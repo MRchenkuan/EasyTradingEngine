@@ -16,56 +16,114 @@ function getBetaMap() {
   return Reflect.getOwnPropertyDescriptor(beta_map, '_beta_map').value;
 }
 
+export async function getOrderWithRetry(instId, ordId) {
+  let retryCount = 0;
+  const maxRetries = 3;
+  const initialDelay = 1000;
+
+  while (retryCount <= maxRetries) {
+    try {
+      const { data = [] } = await getOrderInfo(instId, ordId);
+      if (data[0]) {
+        return data[0];
+      }
+
+      if (retryCount === maxRetries) {
+        throw new Error(`无法获取订单信息: ${ordId}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, initialDelay * retryCount));
+      retryCount++;
+    } catch (error) {
+      if (retryCount === maxRetries) {
+        throw error;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, initialDelay * retryCount));
+      retryCount++;
+    }
+  }
+}
+
 // 订单执行器（通用下单逻辑）
 // 修改 executeOrders 函数的返回结构
 export async function executeOrders(orderList) {
-  const {
-    data = [],
-    success,
-    failedOrders,
-    cancelledOrders,
-    reversedOrders,
-  } = await batchOrders(orderList);
-  if (!success) {
-    let msg = '';
-    if (failedOrders.length > 0) {
-      msg += `失败的订单:\n\r`;
-      failedOrders.map(failedOrder => {
-        const { instId, side, sz } = failedOrder.originalOrder;
-        msg += `- ${side} ${instId} ${sz}, ${failedOrder.sMsg};\n\r`;
-      });
-    }
-    if (cancelledOrders.length > 0) {
-      msg += `已撤销的订单:\n\r`;
-      cancelledOrders.map(cancelledOrder => {
-        const { instId, side, sz } = cancelledOrder.originalOrder;
-        msg += `- ${side} ${instId} ${sz}, ${cancelledOrder.sMsg};\n\r`;
-      });
-    }
-    if (reversedOrders.length > 0) {
-      msg += `已执行反向订单:\n\r`;
-      reversedOrders.map(reversedOrder => {
-        const { instId, side, sz } = reversedOrder.originalOrder;
-        msg += `- ${side} ${instId} ${sz}, ${reversedOrder.sMsg};\n\r`;
-      });
-    }
-    return { success: false, msg };
+  // 验证输入
+  if (!Array.isArray(orderList) || orderList.length === 0) {
+    return { success: false, msg: '订单列表为空或格式错误' };
   }
 
-  let result = mergeOrder2Result([...orderList, ...data]);
-  // 等待1500毫秒
-  let orderDetails = await Promise.all(
-    result.map(async order => {
-      const { data = [] } = await getOrderInfo(order.instId, order.ordId);
-      return data[0];
-    })
-  );
-  orderDetails = processOrderDetails(orderDetails);
-  console.log('下单完成..');
-  return {
-    success: true,
-    data: mergeOrder2Result([...result, ...orderDetails]),
-  };
+  try {
+    const {
+      data = [],
+      success,
+      failedOrders,
+      cancelledOrders,
+      reversedOrders,
+    } = await batchOrders(orderList);
+
+    if (!success) {
+      let msg = '';
+      if (failedOrders.length > 0) {
+        msg += `失败的订单:\n\r`;
+        failedOrders.map(failedOrder => {
+          const { instId, side, sz } = failedOrder.originalOrder;
+          msg += `- ${side} ${instId} ${sz}, ${failedOrder.sMsg};\n\r`;
+        });
+      }
+      if (cancelledOrders.length > 0) {
+        msg += `已撤销的订单:\n\r`;
+        cancelledOrders.map(cancelledOrder => {
+          const { instId, side, sz } = cancelledOrder.originalOrder;
+          msg += `- ${side} ${instId} ${sz}, ${cancelledOrder.sMsg};\n\r`;
+        });
+      }
+      if (reversedOrders.length > 0) {
+        msg += `已执行反向订单:\n\r`;
+        reversedOrders.map(reversedOrder => {
+          const { instId, side, sz } = reversedOrder.originalOrder;
+          msg += `- ${side} ${instId} ${sz}, ${reversedOrder.sMsg};\n\r`;
+        });
+      }
+      return { success: false, msg };
+    }
+
+    let result = updateAndDeduplicateOrders([...orderList, ...data]);
+
+    // 获取订单详情
+    let orderDetails = await Promise.all(
+      result.map(order => getOrderWithRetry(order.instId, order.ordId))
+    ).catch(error => {
+      console.error('获取订单详情失败:', error);
+      throw error;
+    });
+
+    orderDetails = processOrderDetails(orderDetails);
+
+    // 验证订单状态
+    const invalidOrders = orderDetails.filter(
+      order => !['filled'].includes(order.state)
+    );
+
+    if (invalidOrders.length > 0) {
+      return {
+        success: false,
+        msg: `部分订单未完成: ${invalidOrders.map(o => o.ordId).join(', ')}`,
+        data: orderDetails,
+      };
+    }
+
+    console.log('下单完成..');
+    return {
+      success: true,
+      data: updateAndDeduplicateOrders([...result, ...orderDetails]),
+    };
+  } catch (error) {
+    return {
+      success: false,
+      msg: `执行订单时发生错误: ${error.message}`,
+    };
+  }
 }
 
 // 修改 open_position 函数
@@ -155,15 +213,6 @@ export function createOrder_market(instId, size, side, is_base_ccy) {
   };
 }
 
-// 合并订单结果
-export function mergeOrder2Result(arr) {
-  const map = {};
-  arr.map(it => {
-    map[it.clOrdId] = { ...(map[it.clOrdId] || {}), ...it };
-  });
-  return Object.values(map);
-}
-
 // 标准化订单参数
 function processOrderDetails(orderDetail) {
   return orderDetail.map(order => {
@@ -212,11 +261,11 @@ export async function marketMaker(assetId, price, size, dir) {
     return { success: false, msg: execResult.msg };
   }
 
-  let result = mergeOrder2Result([order_short, order_long, ...execResult.data]);
+  let result = updateAndDeduplicateOrders([order_short, order_long, ...execResult.data]);
   recordMarketMakerTransactions(tradeId, result);
 
   let order_details = await fetchOrders(result);
-  order_details = mergeOrder2Result([...result, ...order_details]);
+  order_details = updateAndDeduplicateOrders([...result, ...order_details]);
   recordMarketMakerTransactions(tradeId, order_details);
 
   const profit = calcProfit(order_details);
@@ -260,4 +309,34 @@ export async function fetchOrders(orders, initialDelay = 3000, maxRetries = 5) {
 
   // 超过最大重试次数，返回当前已完成的订单
   return orders.map(order => completedOrders.get(order.ordId) || order);
+}
+
+// 更新订单信息并按 clOrdId 去重
+export function updateAndDeduplicateOrders(orders) {
+  if (!Array.isArray(orders)) {
+    throw new Error('输入必须是订单数组');
+  }
+
+  const orderMap = new Map();
+
+  // 按时间顺序处理订单，保证最新状态
+  orders.forEach(order => {
+    if (!order.clOrdId) {
+      console.warn('订单缺少 clOrdId:', order);
+      return;
+    }
+
+    const existingOrder = orderMap.get(order.clOrdId);
+    if (existingOrder) {
+      // 明确指定需要更新的字段
+      orderMap.set(order.clOrdId, {
+        ...existingOrder,
+        ...order,
+      });
+    } else {
+      orderMap.set(order.clOrdId, order);
+    }
+  });
+
+  return Array.from(orderMap.values());
 }

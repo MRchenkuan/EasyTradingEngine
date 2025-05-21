@@ -117,9 +117,10 @@ export class VisualEngine {
 
   static drawGridTrading() {
     const assets = this._asset_names;
-    const orders = getGridTradeOrders()
-      .filter(orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId))
-      .filter(order => order.order_status === 'confirmed');
+    const orders = getGridTradeOrders().filter(
+      orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId)
+    );
+    // .filter(order => order.order_status === 'confirmed');
     // 先对order按照instId进行分组
     const groupedOrders = orders.reduce((acc, orderGroup) => {
       const instId = orderGroup.instId; // 使用第一个订单的instId作为key
@@ -354,8 +355,7 @@ export class VisualEngine {
               // 绘制历史订单信息
               if (group_orders && group_orders.length)
                 group_orders.forEach(order => {
-                  const { ts, avgPx, accFillSz, side, grid_count, order_status, order_desc } =
-                    order;
+                  const { ts, avgPx, accFillSz, side, grid_count, order_status } = order;
                   const time = formatTimestamp(ts, TradeEngine._bar_type);
                   // 超出时间范围的订单不绘制
                   const labels = chart.data.labels;

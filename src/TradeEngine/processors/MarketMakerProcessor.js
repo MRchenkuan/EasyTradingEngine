@@ -1,6 +1,6 @@
 import { recordMarketMakerTransactions } from '../../recordTools.js';
 import { calcProfit, hashString } from '../../tools.js';
-import { createOrder_limit, executeOrders, mergeOrder2Result } from '../../trading.js';
+import { createOrder_limit, executeOrders, updateAndDeduplicateOrders } from '../../trading.js';
 import { generateCounterBasedId } from '../../uuid.js';
 import { AbstractProcessor } from './AbstractProcessor.js';
 
@@ -54,10 +54,10 @@ export class MarketMakerProcessor extends AbstractProcessor {
 
     // 下单
     let result = await executeOrders([order_long, order_short]);
-    result = mergeOrder2Result([order_short, order_long, ...result]);
+    result = updateAndDeduplicateOrders([order_short, order_long, ...result]);
     recordMarketMakerTransactions(tradeId, result);
     let order_details = await fetchOrders(result);
-    order_details = mergeOrder2Result([...result, ...order_details]);
+    order_details = updateAndDeduplicateOrders([...result, ...order_details]);
     recordMarketMakerTransactions(tradeId, order_details);
     const profit = calcProfit(order_details);
     return profit;

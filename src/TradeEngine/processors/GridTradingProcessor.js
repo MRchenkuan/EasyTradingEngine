@@ -237,7 +237,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   _recordPrice() {
     this._recent_prices.push(this._current_price);
-    if (this._recent_prices.length > 300) {
+    if (this._recent_prices.length > 350) {
       this._recent_prices = this._recent_prices.slice(-300);
     }
   }
@@ -375,12 +375,12 @@ export class GridTradingProcessor extends AbstractProcessor {
     const volatility = this.getVolatility(30); // 30秒瞬时波动率（百分比）
     const atr = this.getATR(10); // 10分钟ATR（绝对值）
     const rsi_fast = this.getFastRSI(7); // 快速RSI(10)
-    const rsi_slow = this.getFastRSI(180); // 快速RSI(10)
+    const rsi_slow = this.getFastRSI(300); // 快速RSI(10)
     // const rsi_slow = this.getSlowRSI(10); // 慢速RSI(30)
     const { vol_avg_fast, vol_avg_slow } = this.getVolumeStandard();
     const boll = this.getBOLL(20); // 20分钟BOLL(20)
     const vol_power = vol_avg_fast / vol_avg_slow; // 量能
-
+    console.log(`=========指标数据========`);
     console.log(`- 💵价格:${this._current_price.toFixed(3)}`);
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
     console.log(`- ↕️ 价距格数:${price_distance_count.toFixed(2)}`);
@@ -709,10 +709,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     );
 
     await updateGridTradeOrder(order.clOrdId, null, {
+      ...order,
       order_status: 'pending', // 修改 pendding -> pending
-      order_desc: orderDesc,
       grid_count: gridCount,
-      conditions: `${this._current_price},${this._threshold},${this._correction()}`
+      avgPx: this._current_price,
+      accFillSz: Math.abs(amount),
+      ts: this._current_price_ts,
+      logs: [this._current_price, this._threshold, this._correction(), orderDesc].join('::'),
     });
     // todo 1.先记录...
     // todo 2.然后执行
@@ -742,7 +745,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       return;
     } else {
       // todo 3.2 成功则先查询
-      const { originalOrder, clOrdId, ordId, ...rest } = result.data[0];
+      const { originalOrder, clOrdId, ordId, tag, ...rest } = result.data[0];
       await updateGridTradeOrder(clOrdId, ordId, {
         clOrdId,
         ordId,
