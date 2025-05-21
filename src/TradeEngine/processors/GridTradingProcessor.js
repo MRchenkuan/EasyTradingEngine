@@ -426,7 +426,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     let deviationMessage = '';
 
     // 根据价格位置和趋势方向调整阈值
-    if (deviationAbs < 20) {
+    if (deviationAbs < 15) {
       // 价格接近中轨，增加阈值
       thresholdAdjustment = 1.5;
       deviationMessage = '🪜 价格接近中轨';
@@ -443,8 +443,8 @@ export class GridTradingProcessor extends AbstractProcessor {
           if (price_distance_count >= 3.5 && price_grid_count >= 3) {
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
             thresholdAdjustment = 1.5;
-          } else if (price_distance_count >= 2.2) {
-            thresholdAdjustment = 0.7;
+          } else if (price_distance_count >= 2.1) {
+            thresholdAdjustment = 0.5;
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，➡️ ⬅️ 阈值减少`;
           } else {
             deviationMessage += `，不足2格，⬅️ ➡️ 阈值增加`;
@@ -482,7 +482,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超买区域
         if (rsi_fast > rsi_slow) {
           // RSI快线上穿慢线，超买加强，降低阈值
-          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.25, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📈 超买加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线下穿慢线，超买减弱，轻微提高阈值
@@ -493,7 +493,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超卖区域
         if (rsi_fast < rsi_slow) {
           // RSI快线下穿慢线，超卖加强，降低阈值
-          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.25, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📉 超卖加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线上穿慢线，超卖减弱，轻微提高阈值
@@ -712,6 +712,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       order_status: 'pending', // 修改 pendding -> pending
       order_desc: orderDesc,
       grid_count: gridCount,
+      conditions: `${this._current_price},${this._threshold},${this._correction()}`
     });
     // todo 1.先记录...
     // todo 2.然后执行
