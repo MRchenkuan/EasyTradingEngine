@@ -174,7 +174,7 @@ export class TradeEngine {
 
   static _orderHistoryCache = {};
   static _lastCacheTime = {};
-  static CACHE_DURATION = 20000; // 缓存时间10秒
+  static CACHE_DURATION = 30000; // 缓存时间10秒
 
   /**
    * 获取订单历史（带缓存）
@@ -438,7 +438,7 @@ export class TradeEngine {
       id: assetId,
       ts: sortedTimestamps.slice(-this._max_candle_size), // 只保留最新的3000个数据点
       prices: sorted_prices.slice(-this._max_candle_size),
-      max_length: this._max_candle_size // 添加长度限制标记
+      max_length: this._max_candle_size, // 添加长度限制标记
     };
 
     // 更新实时价格
@@ -613,12 +613,7 @@ export class TradeEngine {
   static runAllProcessors() {
     this.processors.forEach(p => {
       setTimeout(() => {
-        p.tick({
-          ctx: this,
-          scaled_prices: this.getAllScaledPrices(),
-          beta_map: this._beta_map,
-          realtime_prices: this.realtime_price,
-        });
+        p.tick();
       });
     });
   }
@@ -742,4 +737,3 @@ export class TradeEngine {
     return gp;
   }
 }
-

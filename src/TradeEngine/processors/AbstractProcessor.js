@@ -21,7 +21,7 @@ export class AbstractProcessor {
    * @abstract
    * @param {number} deltaTime
    */
-  tick(deltaTime) {} // 抽象方法占位
+  tick() {} // 抽象方法占位
 
   /**
    * @abstract

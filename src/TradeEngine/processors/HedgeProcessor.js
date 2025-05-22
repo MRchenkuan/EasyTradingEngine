@@ -96,19 +96,19 @@ export class HedgeProcessor extends AbstractProcessor {
    * @param {*} args 引擎的上下文
    * @implements
    */
-  tick(args) {
+  tick() {
     // console.log('tick', this.asset_names , args.realtime_prices)
     // 检查各比头寸当前是否已经收敛 gate为 0.5
-    this.captureClosing(args);
+    this.captureClosing();
     // 检查当前是否有开仓机会
-    this.captureOpening(args);
+    this.captureOpening();
   }
 
   /**
    * 捕捉平仓机会
    * @param {} args
    */
-  captureClosing(args) {
+  captureClosing() {
     const transactions = this._getTransactions({ side: 'opening' });
 
     //遍历所有未平仓的头寸，根据当前价格和历史beta计算是否关闭
@@ -164,7 +164,7 @@ export class HedgeProcessor extends AbstractProcessor {
         // 平仓
         const profit = this.engine._calcRealtimeProfit(orders);
         if (profit > 0) {
-          if(this._enable_trade) close_position(tradeId);
+          if (this._enable_trade) close_position(tradeId);
         } else {
           console.log(
             `[${tradeId}][${orders.map(it => it.instId).join('->')}]满足平仓条件：固定${(diff_rate_fixed * 100).toFixed(2)}% or 实时${(diff_rate_realtime * 100).toFixed(2)}% <= 门限${(close_gate * 100).toFixed(2)}% 但利润为负:$${profit.toFixed(2)}`
@@ -178,7 +178,7 @@ export class HedgeProcessor extends AbstractProcessor {
    * 捕捉开仓机会
    * @param {*} args
    */
-  captureOpening(args) {
+  captureOpening() {
     const open_gate = this._open_gate;
     const close_gate = this._close_gate;
     const return_rate = this._return_rate;
@@ -298,9 +298,10 @@ export class HedgeProcessor extends AbstractProcessor {
           );
 
           // 开仓
-          if(this._enable_trade)  spx1 > spx2
-            ? open_position(instId1, instId2, this._position_size)
-            : open_position(instId2, instId1, this._position_size);
+          if (this._enable_trade)
+            spx1 > spx2
+              ? open_position(instId1, instId2, this._position_size)
+              : open_position(instId2, instId1, this._position_size);
           console.log(
             `- 执行开仓，买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
           );
@@ -317,9 +318,10 @@ export class HedgeProcessor extends AbstractProcessor {
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
-        if(this._enable_trade)  spx1 > spx2
-          ? open_position(instId1, instId2, this._position_size)
-          : open_position(instId2, instId1, this._position_size);
+        if (this._enable_trade)
+          spx1 > spx2
+            ? open_position(instId1, instId2, this._position_size)
+            : open_position(instId2, instId1, this._position_size);
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );

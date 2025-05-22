@@ -355,7 +355,8 @@ export class VisualEngine {
               // 绘制历史订单信息
               if (group_orders && group_orders.length)
                 group_orders.forEach(order => {
-                  const { ts, avgPx, accFillSz, side, grid_count, order_status } = order;
+                  const { ts, avgPx, accFillSz, side, grid_count, order_status, target_price } =
+                    order;
                   const time = formatTimestamp(ts, TradeEngine._bar_type);
                   // 超出时间范围的订单不绘制
                   const labels = chart.data.labels;
@@ -365,15 +366,29 @@ export class VisualEngine {
                   const price = parseFloat(avgPx);
                   const xCoord = chart.scales.x.getPixelForValue(time);
                   const yCoord = chart.scales.y.getPixelForValue(price);
+
+                  let ghost = null;
+                  if (target_price) {
+                    const ghost_price = parseFloat(target_price);
+                    const ghost_yCoord = chart.scales.y.getPixelForValue(ghost_price);
+                    const ghost_label = `${ghost_price.toFixed(3)}`;
+                    ghost = {
+                      y: ghost_yCoord,
+                      label: ghost_label,
+                    };
+                  }
+
                   // 绘制订单标签
                   const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(3)})/${-grid_count} 倍/[${order_status}]`;
+
                   this._paintSingleOrder(
                     chart.ctx,
                     xCoord,
                     yCoord,
                     label,
                     side,
-                    collisionAvoidance
+                    collisionAvoidance,
+                    ghost
                   );
                 });
 
@@ -711,7 +726,7 @@ export class VisualEngine {
    * 绘制单个订单点位及标签
    * @private
    */
-  static _paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance) {
+  static _paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance, ghost = null) {
     // 绘制圆点
     ctx.beginPath();
     ctx.arc(fx, fy, 1.5, 0, 2 * Math.PI);
@@ -734,6 +749,16 @@ export class VisualEngine {
     ctx.strokeStyle = ctx.fillStyle;
     ctx.stroke();
     ctx.setLineDash([]);
+
+    if (ghost) {
+      ctx.save();
+      const { y: ghost_y, label: ghost_label } = ghost;
+      ctx.beginPath();
+      ctx.arc(fx, ghost_y, 1.5, 0, 2 * Math.PI);
+      ctx.fillStyle = '#8b32a8';
+      ctx.fill();
+      ctx.restore();
+    }
 
     // 绘制文字标签
     ctx.font = `12px bold ${font_style}`;

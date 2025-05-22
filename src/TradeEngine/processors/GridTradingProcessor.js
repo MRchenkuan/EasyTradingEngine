@@ -712,6 +712,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       ...order,
       order_status: 'pending', // 修改 pendding -> pending
       grid_count: gridCount,
+      target_price: this._current_price,
       avgPx: this._current_price,
       accFillSz: Math.abs(amount),
       ts: this._current_price_ts,
@@ -725,7 +726,6 @@ export class GridTradingProcessor extends AbstractProcessor {
       result = await executeOrders([order]);
     } catch (error) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
-      this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
         order_status: 'failed', // 修改 faild -> failed
         error: error.message,
@@ -757,13 +757,11 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       console.log(`✅${this.asset_name} 交易成功: ${orderDesc}`);
       // 重置关键参数
-      this._resetKeyPrices(this._current_price, this._current_price_ts);
       this._saveState(); // 立即保存状态
       try {
         // todo 3.2.1 开始查询订单信息，更新关键参数
         const [o] = (await fetchOrders(result.data)) || [];
         if (o && o.avgPx && o.fillTime) {
-          this._resetKeyPrices(parseFloat(o.avgPx), parseFloat(o.fillTime));
           console.log(
             `✅${this.asset_name} 远程重置关键参数成功`,
             parseFloat(o.avgPx),
@@ -772,6 +770,8 @@ export class GridTradingProcessor extends AbstractProcessor {
           // todo 3.2.2 最终完成记录
           // todo 3.2 成功则先查询
           await updateGridTradeOrder(order.clOrdId, null, {
+            avgPx: o.avgPx,
+            ts: o.fillTime,
             order_status: 'confirmed',
           });
         } else {

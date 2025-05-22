@@ -67,5 +67,5 @@ export class MarketMakerProcessor extends AbstractProcessor {
    * 时间触发器
    * @param {*} args 引擎的上下文
    */
-  tick(args) {}
+  tick() {}
 }
