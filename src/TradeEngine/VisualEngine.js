@@ -41,7 +41,7 @@ export class VisualEngine {
   static _asset_themes = [];
   static _asset_names = [];
   static _show_order_his = [];
-  static _painting_interval = 1000; //
+  static _painting_interval = 5000; //
   static _boll_cache = new Map();
   static _boll_timer = null;
 

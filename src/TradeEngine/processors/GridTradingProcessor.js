@@ -440,15 +440,27 @@ export class GridTradingProcessor extends AbstractProcessor {
         const isTrendUp = tendency > 0;
         // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
         if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
-          if (price_distance_count >= 3.5 && price_grid_count >= 3) {
+          if (price_grid_count >= 3) {
             deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
             thresholdAdjustment = 1.5;
-          } else if (price_distance_count >= 2.1) {
-            thresholdAdjustment = 0.5;
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，➡️ ⬅️ 阈值减少`;
-          } else {
-            deviationMessage += `，不足2格，⬅️ ➡️ 阈值增加`;
-            thresholdAdjustment = 1.2;
+            if (price_distance_count >= 3.5) {
+              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
+              thresholdAdjustment = 0.5;
+            }
+          } else if (price_grid_count >= 2) {
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
+            thresholdAdjustment = 1.25;
+            if (price_distance_count >= 2.5) {
+              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
+              thresholdAdjustment = 0.5;
+            }
+          } else if (price_grid_count >= 1) {
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
+            thresholdAdjustment = 1;
+            if (price_distance_count >= 1.5) {
+              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
+              thresholdAdjustment = 0.5;
+            }
           }
         } else {
           deviationMessage += `，反向触界，⬅️ ➡️ 阈值增加`;
@@ -482,7 +494,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超买区域
         if (rsi_fast > rsi_slow) {
           // RSI快线上穿慢线，超买加强，降低阈值
-          rsiFactor = Math.max(0.25, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📈 超买加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线下穿慢线，超买减弱，轻微提高阈值
@@ -493,7 +505,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超卖区域
         if (rsi_fast < rsi_slow) {
           // RSI快线下穿慢线，超卖加强，降低阈值
-          rsiFactor = Math.max(0.25, 1 - rsiDivergence / 30);
+          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
           rsi_msg = '🚀📉 超卖加强，降低阈值➡️ ⬅️';
         } else {
           // RSI快线上穿慢线，超卖减弱，轻微提高阈值
@@ -591,15 +603,30 @@ export class GridTradingProcessor extends AbstractProcessor {
         );
         return;
       }
-
-      //  todo 不论是回撤还是反弹，都不能超过一个格子，否则会过度反弹高位买入
+      
+      // 满足超过一格
       if (grid_count_abs >= 1) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
+        
         await this._placeOrder(gridCount, '- 回调下单');
         return;
+      }
+
+      //
+      if(price_distance_grid > 1.5){
+        // 正常满足条件下单
+        console.log(
+          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+        );
+        if(this._tendency > 0 ){
+          await this._placeOrder(1, '- 回调下单:格内');
+        } else {
+          await this._placeOrder(-1, '- 回调下单:格内');
+        }
+       
       }
 
       // console.log(`[${this.asset_name}]未触发任何交易条件，继续等待...`);
@@ -739,7 +766,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
-        order_status: 'failed', // 保持一致使用 failed
+        order_status: 'unsucess', // 保持一致使用 failed
         error: result.error,
       });
       return;
