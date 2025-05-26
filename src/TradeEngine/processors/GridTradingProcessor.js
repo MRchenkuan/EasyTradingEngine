@@ -163,7 +163,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     ctx.save();
     // 绘制指标信息
     const volatility = this.getVolatility(30);
-    const atr = this.getATR();
+    const atr_28 = this.getATR(28);
     const { vol, vol_avg_fast, vol_avg_slow, second } = this.getVolumeStandard();
     const vol_power = vol_avg_fast / vol_avg_slow;
 
@@ -178,7 +178,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     const lineHeight = 22;
 
     // 绘制各项指标
-    ctx.fillText(`${(atr * 100).toFixed(2)}% : ATR`, rightMargin, topMargin);
+    ctx.fillText(`${(atr_28 * 100).toFixed(2)}% : ATR(28)`, rightMargin, topMargin);
     topMargin += lineHeight;
 
     ctx.fillText(`${(volatility * 100).toFixed(2)}% : 瞬时波动率`, rightMargin, topMargin);
@@ -373,36 +373,42 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 获取指标数据
     const volatility = this.getVolatility(30); // 30秒瞬时波动率（百分比）
-    const atr = this.getATR(10); // 10分钟ATR（绝对值）
-    const rsi_fast = this.getFastRSI(7); // 快速RSI(10)
+    const atr_6 = this.getATR(6); // 10分钟ATR（绝对值）
+    const atr_18 = this.getATR(18); // 10分钟ATR（绝对值）
+    const rsi_fast = this.getFastRSI(60); // 快速RSI(10)
     const rsi_slow = this.getFastRSI(300); // 快速RSI(10)
     // const rsi_slow = this.getSlowRSI(10); // 慢速RSI(30)
     const { vol_avg_fast, vol_avg_slow } = this.getVolumeStandard();
     const boll = this.getBOLL(20); // 20分钟BOLL(20)
     const vol_power = vol_avg_fast / vol_avg_slow; // 量能
+
+    // 默认两倍atr作为阈值
     console.log(`=========指标数据========`);
     console.log(`- 💵价格:${this._current_price.toFixed(3)}`);
     // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
-    console.log(`- ↕️ 价距格数:${price_distance_count.toFixed(2)}`);
+    console.log(`- 📏价距格数:${price_distance_count.toFixed(2)}`);
 
     // 2. 网格跨越因子（price_grid_count）：离散格数强化趋势强度
-    console.log(`- 📶价差格数:${price_grid_count}`);
+    console.log(`- 🔲价差格数:${price_grid_count}`);
 
     // 3. 波动率因子：波动率>2%时放大阈值
     console.log(`- 🌪️ 瞬时波动:${(100 * volatility).toFixed(2)}%`);
 
     // 3. 波动率因子：波动率>2%时放大阈值
-    console.log(`- 🌡️ 真实波动(ATR):${(100 * atr).toFixed(2)}%`);
+    console.log(`- 🌡️ ATR(6):${(100 * atr_6).toFixed(2)}%`);
+    console.log(`- 🌡️ ATR(18):${(100 * atr_18).toFixed(2)}%`);
 
+    console.log(`- 🎢布林带宽: ${(100 * boll.bandwidth).toFixed(2)}%`);
     // 4. 时间因子：每20分钟阈值递增0.1%
-    const timeFactor = Math.log1p(time_passed_seconds / 3600);
+    const timeFactor = 1 - Math.min(Math.log1p(time_passed_seconds / 3600 / 24), 0.5);
     console.log(
       `- 🕒时间因子:${timeFactor.toFixed(2)} / ${(time_passed_seconds / 60).toFixed(2)}分钟`
     );
     console.log(`- 🌊量能因子: ${(100 * vol_power).toFixed(2)}%`);
     // 输出清晰的日志信息
-    console.log(`- 🎢布林带宽: [${(100 * boll.bandwidth).toFixed(2)}%]`);
+    threshold = Math.max(atr_18 * 3, boll.bandwidth * 1.5);
     console.log(`- 🚀动量因子(RSI): ${rsi_fast.toFixed(0)} / ${rsi_slow.toFixed(0)}`);
+    console.log(`- 🚧初始阈值: ${(threshold * 100).toFixed(2)}%`);
     console.log(`-------------------`);
     /**
      * 一定需要判断上穿下穿方向
@@ -435,41 +441,34 @@ export class GridTradingProcessor extends AbstractProcessor {
       const isNearUpper = bandDeviation > 35;
       const isNearLower = bandDeviation < -35;
 
-      deviationMessage = `🚧价格正在${isNearUpper ? '📈 触及上轨' : '📉 触及下轨'}`;
+      deviationMessage = `${isNearUpper ? '📈价格正在 触及上轨' : '📉价格正在 触及下轨'}`;
       if (tendency !== 0) {
         const isTrendUp = tendency > 0;
         // 上升趋势接近上轨或下降趋势接近下轨时减小阈值
         if ((isTrendUp && isNearUpper) || (!isTrendUp && isNearLower)) {
           if (price_grid_count >= 3) {
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，🚧🔺 许更大回撤`;
             thresholdAdjustment = 1.5;
             if (price_distance_count >= 3.5) {
-              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
+              deviationMessage += `，且超过${price_grid_count}格，先确保利润，🚧🔻 阈值减少`;
               thresholdAdjustment = 0.5;
             }
           } else if (price_grid_count >= 2) {
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
+            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，🚧🔺 许更大回撤`;
             thresholdAdjustment = 1.25;
             if (price_distance_count >= 2.5) {
-              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
-              thresholdAdjustment = 0.5;
-            }
-          } else if (price_grid_count >= 1) {
-            deviationMessage += `，且超过${price_distance_count.toFixed(2)}格，已有利润空间，⬅️ ➡️ 许更大回撤`;
-            thresholdAdjustment = 1;
-            if (price_distance_count >= 1.5) {
-              deviationMessage += `，且超过${price_grid_count}格，先确保利润，➡️ ⬅️ 阈值减少`;
-              thresholdAdjustment = 0.5;
+              deviationMessage += `，且超过${price_grid_count}格，先确保利润，🚧🔻 阈值减少`;
+              thresholdAdjustment = 0.75;
             }
           }
         } else {
-          deviationMessage += `，反向触界，⬅️ ➡️ 阈值增加`;
+          deviationMessage += `，反向触界，🚧🔺 阈值增加`;
           // 反向触及边界时增加阈值
           thresholdAdjustment = 1.75;
         }
       }
     } else {
-      deviationMessage = '♻️ 价格在正常区间';
+      deviationMessage = '♻️ 价格在正常区间，🚧🔹 阈值不变';
     }
 
     // 应用阈值调整
@@ -478,8 +477,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     [
       `📐价格偏离度：${bandDeviation.toFixed(2)}%`,
       `${deviationMessage}`,
-      `⛩ 阈值调整：${thresholdAdjustment === 1 ? '⭕️ 不变' : thresholdAdjustment > 1 ? '⬅️ ➡️ 扩大' : '➡️ ⬅️ 缩小'}`,
-      `⛩ 当前阈值：${(threshold * 100).toFixed(2)}%`,
+      `🎯调整阈值至：🚧 ${(threshold * 100).toFixed(2)}%`,
     ].map(msg => console.log(` * ${msg}`));
 
     // 5. RSI动量因子：超买/超卖反向调整
@@ -494,30 +492,30 @@ export class GridTradingProcessor extends AbstractProcessor {
         // 超买区域
         if (rsi_fast > rsi_slow) {
           // RSI快线上穿慢线，超买加强，降低阈值
-          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
-          rsi_msg = '🚀📈 超买加强，降低阈值➡️ ⬅️';
+          rsiFactor = Math.max(0.75, 1 - rsiDivergence / 30);
+          rsi_msg = '🚀📈 超买加强，降低阈值🔻';
         } else {
           // RSI快线下穿慢线，超买减弱，轻微提高阈值
           rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
-          rsi_msg = '🐢📈 超买减弱，轻微提高阈值⬅️ ➡️';
+          rsi_msg = '🐢📈 超买减弱，轻微提高阈值🔺';
         }
       } else if (rsi_fast < 30) {
         // 超卖区域
         if (rsi_fast < rsi_slow) {
           // RSI快线下穿慢线，超卖加强，降低阈值
-          rsiFactor = Math.max(0.3, 1 - rsiDivergence / 30);
-          rsi_msg = '🚀📉 超卖加强，降低阈值➡️ ⬅️';
+          rsiFactor = Math.max(0.75, 1 - rsiDivergence / 30);
+          rsi_msg = '🚀📉 超卖加强，降低阈值🔻';
         } else {
           // RSI快线上穿慢线，超卖减弱，轻微提高阈值
           rsiFactor = Math.min(1.5, 1 + rsiDivergence / 50);
-          rsi_msg = '🐢📉 超卖减弱，轻微提高阈值⬅️ ➡️';
+          rsi_msg = '🐢📉 超卖减弱，轻微提高阈值🔺';
         }
       }
     }
     threshold = threshold * rsiFactor;
     console.log(` * ${rsi_msg}(${rsiFactor.toFixed(2)})`);
-    console.log(` * 🎯调整阈值至：⛩ ${(threshold * 100).toFixed(2)}%`);
-    console.log(` * ↩️ 当前回撤：⛩ ${(100 * diff_rate).toFixed(2)}%`);
+    console.log(` * 🎯调整阈值至：🚧 ${(threshold * 100).toFixed(2)}%`);
+    console.log(` * ↩️ 当前回撤：🚧 ${(100 * diff_rate).toFixed(2)}%`);
     console.log(`-------------------`);
 
     // --- 合成动态阈值 ---
@@ -594,7 +592,6 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
-      // const atr = this.getATR();
       const is_return_arrived = Math.abs(correction) > this._threshold;
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
@@ -603,30 +600,29 @@ export class GridTradingProcessor extends AbstractProcessor {
         );
         return;
       }
-      
+
       // 满足超过一格
       if (grid_count_abs >= 1) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
-        
+
         await this._placeOrder(gridCount, '- 回调下单');
         return;
       }
 
       //
-      if(price_distance_grid > 1.5){
+      if (price_distance_grid > 1.5) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
-        if(this._tendency > 0 ){
+        if (this._tendency > 0) {
           await this._placeOrder(1, '- 回调下单:格内');
         } else {
           await this._placeOrder(-1, '- 回调下单:格内');
         }
-       
       }
 
       // console.log(`[${this.asset_name}]未触发任何交易条件，继续等待...`);

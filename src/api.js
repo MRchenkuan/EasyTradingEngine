@@ -4,8 +4,8 @@ import * as firm from './config.security.js';
 import { calcProfit, generateSignature, hashString } from './tools.js';
 
 const base_url = 'https://www.okx.com';
+// const MIMIC = false;
 const MIMIC = true;
-
 export async function marketCandles(instId, bar, after, before, limit) {
   const { data } = await axios.get(base_url + '/api/v5/market/candles', {
     params: {
