@@ -191,7 +191,19 @@ export class GridTradingProcessor extends AbstractProcessor {
   }
 
   _recordPrice() {
+    // 获取当前时间戳（秒级）
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+
+    // 如果与上次记录时间戳相同，则跳过
+    if (currentTimestamp === this._last_record_timestamp) {
+      return;
+    }
+
+    // 记录价格并更新时间戳
     this._recent_prices.push(this._current_price);
+    this._last_record_timestamp = currentTimestamp;
+
+    // 限制数组长度
     if (this._recent_prices.length > 350) {
       this._recent_prices = this._recent_prices.slice(-300);
     }
@@ -276,12 +288,30 @@ export class GridTradingProcessor extends AbstractProcessor {
     // console.log(this.engine.market_candle['1m']['XRP-USDT']);
   }
 
+  getGridBox(price) {
+    if (price <= this._grid[0]) {
+      return { floor: price, ceil: this._grid[0] };
+    }
+
+    if (price >= this._grid[this._grid.length - 1]) {
+      return { floor: this._grid[this._grid.length - 1], ceil: price };
+    }
+
+    // 处理空数组情况
+    for (let i = 0; i < this._grid.length - 1; i++) {
+      const floor = this._grid[i];
+      const ceil = this._grid[i + 1];
+      if (price >= floor && price <= ceil) {
+        return { floor, ceil };
+      }
+    }
+    return {
+      floor: price,
+      ceil: price,
+    };
+  }
+
   async _orderStrategy(gridCount) {
-    console.log(
-      '反转概率:',
-      (calculateReversalProbability(this.engine.getCandleData(this.asset_name)) * 100).toFixed(2) +
-        '%'
-    );
     if (this._stratage_locked) return;
     // this._stratage_locked = true;
     // await this._placeOrder(-1, '下单测试');
@@ -334,6 +364,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       const price_distance_grid = diff_rate / this._grid_width;
       const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
+      const grid_box = this.getGridBox(this._current_price);
+
       this._threshold = trendReversalThreshold(
         this.engine.getCandleData(this.asset_name),
         this._recent_prices,
@@ -343,8 +375,8 @@ export class GridTradingProcessor extends AbstractProcessor {
         grid_count_abs,
         timeDiff,
         correction,
-        this._direction,
-        this._tendency
+        this._tendency,
+        grid_box
       );
 
       console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);

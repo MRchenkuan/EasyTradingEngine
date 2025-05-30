@@ -58,13 +58,17 @@ export function calculateBOLL(priceData, last_window = 20, multiplier = 2) {
  * @param {Array} priceData K线数据
  * @param {Number} last_window 计算窗口大小，默认20
  * @param {Number} multiplier 标准差倍数，默认2
- * @returns {Object} 最新的布林带值
+ * @param {Number} offset 偏移量，0表示最新值，1表示倒数第二个值，默认0
+ * @returns {Object} 指定位置的布林带值
  */
-export function calculateBOLLLast(priceData, last_window = 20, multiplier = 2) {
-  if (priceData.length < last_window) throw '价格数据不足以计算BOLL';
+export function calculateBOLLLast(priceData, last_window = 20, multiplier = 2, offset = 0) {
+  if (priceData.length < last_window + offset) throw '价格数据不足以计算BOLL';
 
-  // 获取最新窗口的收盘价数据
-  const closes = priceData.slice(-last_window).map(candle => parseFloat(candle.close));
+  // 获取指定位置的窗口数据
+  const targetIndex = priceData.length - 1 - offset;
+  const closes = priceData
+    .slice(targetIndex - last_window + 1, targetIndex + 1)
+    .map(candle => parseFloat(candle.close));
 
   // 计算中轨（简单移动平均线）
   const sma = closes.reduce((sum, price) => sum + price, 0) / last_window;
@@ -78,12 +82,12 @@ export function calculateBOLLLast(priceData, last_window = 20, multiplier = 2) {
   const upperBand = sma + (multiplier * standardDeviation);
   const lowerBand = sma - (multiplier * standardDeviation);
 
-  // 返回最新的布林带值
+  // 返回指定位置的布林带值
   return {
     middle: sma,
     upper: upperBand,
     lower: lowerBand,
     bandwidth: (upperBand - lowerBand) / sma,
-    ts: priceData.at(-1).ts
+    ts: priceData[targetIndex].ts
   };
 }
