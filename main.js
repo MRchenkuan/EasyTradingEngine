@@ -69,7 +69,7 @@ TradeEngine.setMetaInfo({
 
 TradeEngine.createGridTrading('XRP-USDT', {
   // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0065,
+  _upper_drawdown: 0.006,
   _lower_drawdown: 0.005,
   _grid_width: 0.005,
   _trade_amount: 20,

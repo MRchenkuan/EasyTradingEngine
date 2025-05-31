@@ -346,7 +346,7 @@ export function trendReversalThreshold(
   // 输出清晰的日志信息
 
   // 初始化阈值
-  threshold = Math.min(atr_120 * Math.sqrt(5), threshold);
+  threshold = Math.min(atr_120 * Math.sqrt(3), threshold);
 
   // 确保阈值在合理范围内
   threshold = Math.max(min_threshold, Math.min(threshold, max_threshold));
