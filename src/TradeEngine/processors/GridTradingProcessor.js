@@ -366,7 +366,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       const grid_box = this.getGridBox(this._current_price);
 
-      this._threshold = trendReversalThreshold(
+      const {threshold, snapshot} = trendReversalThreshold(
         this.engine.getCandleData(this.asset_name),
         this._recent_prices,
         this._current_price,
@@ -378,6 +378,8 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._tendency,
         grid_box
       );
+      this._threshold = threshold;
+      this._snapshot = snapshot;
 
       console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);
 
@@ -525,6 +527,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     await updateGridTradeOrder(order.clOrdId, null, {
       ...order,
       order_status: 'pending', // 修改 pendding -> pending
+      snapshot: Object.keys(this._snapshot).map(key => `${key}:${this._snapshot[key]}`).join('|'),
       grid_count: gridCount,
       target_price: this._current_price,
       avgPx: this._current_price,

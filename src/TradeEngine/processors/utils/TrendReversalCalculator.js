@@ -36,19 +36,19 @@ function situations({
   } else if (band_deviation_abs <= 49) {
     boll_factor = 0.7;
     boll_msg = middle_offset > 0 ? '📈价格正在 触及上轨' : '📉价格正在 触及下轨';
-  } else if (band_deviation_abs <= 59) {
+  } else if (band_deviation_abs <= 55) {
     boll_factor = 0.4;
     boll_msg = middle_offset > 0 ? '📈价格突破上轨' : '📉价格突破下轨';
   }
-  if (band_deviation_abs > 59) {
+  if (band_deviation_abs > 55) {
     boll_factor = 0.3;
     boll_msg = middle_offset > 0 ? '📈价格显著突破上轨' : '📉价格显著突破下轨';
   }
-  if (band_deviation_abs > 69) {
+  if (band_deviation_abs > 65) {
     boll_factor = 0.2;
     boll_msg = middle_offset > 0 ? '📈价格极速突破上轨' : '📉价格极速突破下轨';
   }
-  if (band_deviation_abs > 89) {
+  if (band_deviation_abs > 85) {
     boll_factor = 0.1;
     boll_msg = middle_offset > 0 ? '📈价格猛烈突破上轨' : '📉价格猛烈突破下轨';
   }
@@ -346,7 +346,7 @@ export function trendReversalThreshold(
   // 输出清晰的日志信息
 
   // 初始化阈值
-  threshold = Math.min(atr_120 * Math.sqrt(3), threshold);
+  const initial_threshold = threshold = Math.min(atr_120 * Math.sqrt(5) * 1.5, threshold);
 
   // 确保阈值在合理范围内
   threshold = Math.max(min_threshold, Math.min(threshold, max_threshold));
@@ -388,5 +388,17 @@ export function trendReversalThreshold(
   // --- 合成动态阈值 ---
 
   // 硬性限制：阈值范围0.2%~5%
-  return Math.min(Math.max(threshold, min_threshold), max_threshold);
+  return {
+    threshold: Math.min(Math.max(threshold, min_threshold), max_threshold),
+    snapshot: {
+      initial_threshold,
+      boll_factor,
+      boll_msg,
+      grid_factor,
+      grid_msg,
+      rsi_factor,
+      rsi_msg,
+      timeFactor,
+    },
+  }
 }
