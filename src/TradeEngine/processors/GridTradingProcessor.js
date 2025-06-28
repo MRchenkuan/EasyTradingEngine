@@ -557,7 +557,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(order.clOrdId, null, {
         order_status: 'unsucess', // 保持一致使用 failed
-        error: result.error,
+        error: result.msg,
       });
       return;
     } else {
