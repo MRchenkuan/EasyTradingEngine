@@ -343,7 +343,8 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._last_reset_grid_count = currentGridCountAbs;
       }
 
-      const timeDiff = (this._current_price_ts - this._last_grid_count_overtime_reset_ts) / 1000;
+      const timeDiff =
+        (this._current_price_ts - this._last_grid_count_overtime_reset_ts || 1) / 1000;
 
       const correction = this._correction();
       const grid_count_abs = Math.abs(gridCount);
@@ -366,7 +367,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       const grid_box = this.getGridBox(this._current_price);
 
-      const {threshold, snapshot} = trendReversalThreshold(
+      const { threshold, snapshot } = trendReversalThreshold(
         this.engine.getCandleData(this.asset_name),
         this._recent_prices,
         this._current_price,
@@ -527,7 +528,9 @@ export class GridTradingProcessor extends AbstractProcessor {
     await updateGridTradeOrder(order.clOrdId, null, {
       ...order,
       order_status: 'pending', // 修改 pendding -> pending
-      snapshot: Object.keys(this._snapshot).map(key => `${key}:${this._snapshot[key]}`).join('|'),
+      snapshot: Object.keys(this._snapshot)
+        .map(key => `${key}:${this._snapshot[key]}`)
+        .join('|'),
       grid_count: gridCount,
       target_price: this._current_price,
       avgPx: this._current_price,
