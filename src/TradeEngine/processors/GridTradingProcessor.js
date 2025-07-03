@@ -529,7 +529,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       ...order,
       order_status: 'pending', // 修改 pendding -> pending
       snapshot: Object.keys(this._snapshot)
-        .map(key => `${key}:${this._snapshot[key]}`)
+        .map(key => `[${key}]:${this._snapshot[key]};`)
         .join('|'),
       grid_count: gridCount,
       target_price: this._current_price,

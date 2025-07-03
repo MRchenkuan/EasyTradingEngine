@@ -65,7 +65,7 @@ function situations({
   if (price_grid_count >= 1) {
     grid_msg = `只超过${price_distance_count.toFixed(2)}格，越过格子${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
     grid_factor = 1;
-    if (over_grid_distance <= 0.2) {
+    if (over_grid_distance <= 0.1) {
       grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
       grid_factor = 1;
     }
@@ -74,7 +74,7 @@ function situations({
   if (price_grid_count >= 2) {
     grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔹 逐步放宽阈值`;
     grid_factor = 1;
-    if (over_grid_distance <= 0.2) {
+    if (over_grid_distance <= 0.1) {
       grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
@@ -82,7 +82,7 @@ function situations({
   if (price_grid_count >= 3) {
     grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 允许更大回撤`;
     grid_factor = 1.25;
-    if (over_grid_distance <= 0.2) {
+    if (over_grid_distance <= 0.1) {
       grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
@@ -90,7 +90,7 @@ function situations({
   if (price_grid_count >= 4) {
     grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 许更大回撤`;
     grid_factor = 1.5;
-    if (over_grid_distance <= 0.2) {
+    if (over_grid_distance <= 0.1) {
       grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
@@ -346,7 +346,8 @@ export function trendReversalThreshold(
   // 输出清晰的日志信息
 
   // 初始化阈值
-  const initial_threshold = threshold = Math.min(atr_120 * Math.sqrt(5) * 1.5, threshold);
+  // const initial_threshold = threshold = Math.min(atr_120 * Math.sqrt(5) * 1.5, threshold);
+  const initial_threshold = (threshold = Math.min(atr_120 * 2, threshold));
 
   // 确保阈值在合理范围内
   threshold = Math.max(min_threshold, Math.min(threshold, max_threshold));
@@ -391,14 +392,14 @@ export function trendReversalThreshold(
   return {
     threshold: Math.min(Math.max(threshold, min_threshold), max_threshold),
     snapshot: {
-      initial_threshold,
+      initial: initial_threshold,
       boll_factor,
       boll_msg,
       grid_factor,
       grid_msg,
       rsi_factor,
       rsi_msg,
-      timeFactor,
+      time_factor: timeFactor,
     },
-  }
+  };
 }

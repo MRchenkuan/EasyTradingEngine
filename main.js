@@ -8,7 +8,7 @@ import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '1m';
+const bar_type = '5m';
 const duration = 32; // 12天前
 const price_type = 'close';
 const once_limit = 300;
@@ -69,10 +69,10 @@ TradeEngine.setMetaInfo({
 
 TradeEngine.createGridTrading('XRP-USDT', {
   // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.006,
-  _lower_drawdown: 0.005,
+  _upper_drawdown: 0.0075,
+  _lower_drawdown: 0.0075,
   _grid_width: 0.005,
-  _trade_amount: 20,
+  _trade_amount: 30,
   _max_position: 200,
   _min_price: 1.5,
   _max_price: 2.7,
