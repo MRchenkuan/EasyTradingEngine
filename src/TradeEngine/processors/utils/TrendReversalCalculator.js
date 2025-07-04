@@ -63,19 +63,19 @@ function situations({
   const cell_width = Math.abs(grid_ceil_line - grid_floor_line);
   const over_grid_distance = remain_distance / cell_width;
   if (price_grid_count >= 1) {
-    grid_msg = `只超过${price_distance_count.toFixed(2)}格，越过格子${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
+    grid_msg = `只超过${price_distance_count.toFixed(2)}格，越过网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
     grid_factor = 1;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
+      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
       grid_factor = 1;
     }
   }
 
   if (price_grid_count >= 2) {
-    grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔹 逐步放宽阈值`;
+    grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔹 放宽阈值`;
     grid_factor = 1;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
@@ -83,7 +83,7 @@ function situations({
     grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 允许更大回撤`;
     grid_factor = 1.25;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
@@ -91,7 +91,7 @@ function situations({
     grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 许更大回撤`;
     grid_factor = 1.5;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，刚超过${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
