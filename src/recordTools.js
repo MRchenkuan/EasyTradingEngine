@@ -17,7 +17,11 @@ const filePath_trade_results_makert_maker = path.join(
   '../records/trade-market-maker.json'
 );
 const filePath_beta_map = path.join(__dirname, '../records/realtime-beta-map.json');
-const filePath_trade_results_grid = path.join(__dirname, '../records/trade-results-grid.json');
+
+function getGridTradeFilePath(asset_name='default'){
+  return path.join(__dirname, `../records/trade-results-grid-${asset_name.toLowerCase()}.json`);
+}
+
 
 export function getOpeningTransaction(transId) {
   const file_path = filePath_trade_results_opening;
@@ -248,7 +252,8 @@ export function recordMarketMakerTransactions(tradeId, orders) {
   }
 }
 
-export function getGridTradeOrders() {
+export function getGridTradeOrders(asset_name) {
+  const filePath_trade_results_grid = getGridTradeFilePath(asset_name);
   try {
     // 读取现有内容
     let data = [];
@@ -263,7 +268,9 @@ export function getGridTradeOrders() {
   }
 }
 
-export function updateGridTradeOrder(clOrdId, ordId, args) {
+export function updateGridTradeOrder(asset_name, clOrdId, ordId, args) {
+  const filePath_trade_results_grid = getGridTradeFilePath(asset_name);
+
   try {
     // 参数验证
     if (!clOrdId && !ordId) {

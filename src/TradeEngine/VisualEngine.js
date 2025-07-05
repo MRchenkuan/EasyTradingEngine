@@ -117,9 +117,8 @@ export class VisualEngine {
 
   static drawGridTrading() {
     const assets = this._asset_names;
-    const orders = getGridTradeOrders().filter(
-      orderGroup => orderGroup !== null && this._asset_names.includes(orderGroup.instId)
-    );
+    let orders = []
+    ;assets.forEach(instId => orders=orders.concat(getGridTradeOrders(instId)))
     // .filter(order => order.order_status === 'confirmed');
     // 先对order按照instId进行分组
     const groupedOrders = orders.reduce((acc, orderGroup) => {
@@ -159,6 +158,7 @@ export class VisualEngine {
         _max_price,
         _min_price,
         _grid_width,
+        _threshold,
       } = new LocalVariable(`GridTradingProcessor/${instId}`) || {};
 
       if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
@@ -324,6 +324,15 @@ export class VisualEngine {
               // 绘制当前价格
               if (current_price) {
                 this._drawIndicator(chart, current_price_ts, current_price, '当前价格');
+              }
+
+              // 绘制回撤位置
+              if (_threshold) {
+                if(tendency > 0){
+                  this._drawIndicator(chart, current_price_ts, last_upper_turning_price * (1-_threshold), `回踩点：${(_threshold*100).toFixed(2)}%`, 0 , 'style2');
+                } else if(tendency < 0){
+                  this._drawIndicator(chart, current_price_ts, last_lower_turning_price * (1+_threshold), `回踩点：${(_threshold*100).toFixed(2)}%`, 0 , 'style2');
+                }
               }
 
               const current_point_y = yAxias.getPixelForValue(current_price);
@@ -501,7 +510,7 @@ export class VisualEngine {
    * @param {number} y 拐点的Y轴坐标
    * @private
    */
-  static _drawIndicator(chart, ts, price, label, direction = 0) {
+  static _drawIndicator(chart, ts, price, label, direction = 0, style='style1') {
     const ctx = chart.ctx;
     const yAxias = chart.scales.y;
     const xAxias = chart.scales.x;
@@ -514,6 +523,11 @@ export class VisualEngine {
     ctx.beginPath();
     ctx.strokeStyle = '#8b32a8';
     ctx.lineWidth = 0.5;
+
+    if (style === 'style2') {
+      ctx.setLineDash([5, 5]);
+      ctx.strokeStyle = 'red';
+    }
 
     // 在图表右侧绘制指示线
     ctx.moveTo(x, y);
@@ -530,6 +544,9 @@ export class VisualEngine {
     ctx.font = `12px ${font_style}`;
     ctx.fillStyle = '#8b32a8';
     ctx.textAlign = 'right';
+    if (style === 'style2') {
+      ctx.fillStyle = 'red';
+    }
     // 测试文字宽度
     const textWidth = ctx.measureText(`${label}(${value.toFixed(2)})`).width;
     ctx.fillText(

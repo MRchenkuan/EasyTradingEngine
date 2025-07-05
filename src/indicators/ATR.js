@@ -7,14 +7,19 @@ export function calculateATR(priceData, period = 14) {
   let trSum = 0;
   const trs = [];
   for (let i = 1; i < recentData.length; i++) {
-    const prevClose = recentData[i - 1].close;
+    const prevClose = parseFloat(recentData[i - 1].close);
+    const currentHigh = parseFloat(recentData[i].high);
+    const currentLow = parseFloat(recentData[i].low);
+    
     const tr = Math.max(
-      recentData[i].high - recentData[i].low,
-      Math.abs(recentData[i].high - prevClose),
-      Math.abs(recentData[i].low - prevClose)
+      currentHigh - currentLow,
+      Math.abs(currentHigh - prevClose),
+      Math.abs(currentLow - prevClose)
     );
-    trs.push(tr);
-    if (i <= period) trSum += tr;
+    
+    // 如果需要百分比，则除以当前收盘价
+    trs.push(tr / prevClose);
+    if (i <= period) trSum += trs[i - 1];
   }
 
   let atr = trSum / period;

@@ -1,7 +1,7 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
 import { createOrder_market, executeOrders, fetchOrders } from '../../trading.js';
-import { getGridTradeOrders, updateGridTradeOrder } from '../../recordTools.js';
+import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
 import { calculateReversalProbability } from './utils/trend2.js';
 export class GridTradingProcessor extends AbstractProcessor {
@@ -49,6 +49,10 @@ export class GridTradingProcessor extends AbstractProcessor {
   _last_reset_grid_count = 0;
   // 外部因子
   factor_is_people_bullish = false;
+
+  _threshold =0.05;
+  _snapshot = 'none'
+
 
   constructor(asset_name, params = {}, engine) {
     super();
@@ -109,8 +113,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables._max_price = this._max_price;
     this.local_variables._grid_width = this._grid_width;
     this.local_variables._last_reset_grid_count = this._last_reset_grid_count;
-    this.local_variables._last_grid_count_overtime_reset_ts =
-      this._last_grid_count_overtime_reset_ts;
+    this.local_variables._last_grid_count_overtime_reset_ts = this._last_grid_count_overtime_reset_ts;
+    this.local_variables._threshold = this._threshold;
   }
 
   _refreshTurningPoint() {
@@ -156,38 +160,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   }
 
   display(chart) {
-    // const ctx = chart.ctx;
-    // ctx.save();
-    // // 绘制指标信息
-    // const volatility = this.getVolatility(30);
-    // const atr_28 = this.getATR(28);
-    // const { vol, vol_avg_fast, vol_avg_slow, second } = this.getVolumeStandard();
-    // const vol_power = vol_avg_fast / vol_avg_slow;
-    // // 设置文本样式
-    // ctx.font = '16px Monaco, Menlo, Consolas, monospace';
-    // ctx.fillStyle = '#6c3483';
-    // ctx.textAlign = 'right';
-    // // 计算右上角位置（留出一些边距）
-    // const rightMargin = chart.width - 60;
-    // let topMargin = 40;
-    // const lineHeight = 22;
-    // // 绘制各项指标
-    // ctx.fillText(`${(atr_28 * 100).toFixed(2)}% : ATR(28)`, rightMargin, topMargin);
-    // topMargin += lineHeight;
-    // ctx.fillText(`${(volatility * 100).toFixed(2)}% : 瞬时波动率`, rightMargin, topMargin);
-    // topMargin += lineHeight;
-    // ctx.fillText(`${(this._threshold * 100).toFixed(2)}% : 回撤门限`, rightMargin, topMargin);
-    // topMargin += lineHeight;
-    // ctx.fillText(
-    //   `${(vol / 1000).toFixed(0)}k/${(vol_avg_fast / 1000).toFixed(0)}k/${(vol_avg_slow / 1000).toFixed(0)}k : VOL`,
-    //   rightMargin,
-    //   topMargin
-    // );
-    // topMargin += lineHeight;
-    // ctx.fillText(`${(vol_power * 100).toFixed(2)}% : 量能`, rightMargin, topMargin);
-    // topMargin += lineHeight;
-    // ctx.fillText(`${60 - second}s : 剩余`, rightMargin, topMargin);
-    // ctx.restore();
+    // 将来在此处实现绘制接口
   }
 
   _recordPrice() {
@@ -525,7 +498,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       true
     );
 
-    await updateGridTradeOrder(order.clOrdId, null, {
+    await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
       ...order,
       order_status: 'pending', // 修改 pendding -> pending
       snapshot: Object.keys(this._snapshot)
@@ -546,7 +519,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       result = await executeOrders([order]);
     } catch (error) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
-      await updateGridTradeOrder(order.clOrdId, null, {
+      await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
         order_status: 'failed', // 修改 faild -> failed
         error: error.message,
       });
@@ -558,7 +531,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       // todo 3.1 失败则直接记录为失败订单
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
-      await updateGridTradeOrder(order.clOrdId, null, {
+      await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
         order_status: 'unsucess', // 保持一致使用 failed
         error: result.msg,
       });
@@ -566,7 +539,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     } else {
       // todo 3.2 成功则先查询
       const { originalOrder, clOrdId, ordId, tag, ...rest } = result.data[0];
-      await updateGridTradeOrder(clOrdId, ordId, {
+      await updateGridTradeOrder(this.asset_name,clOrdId, ordId, {
         clOrdId,
         ordId,
         ...rest,
@@ -589,20 +562,20 @@ export class GridTradingProcessor extends AbstractProcessor {
           );
           // todo 3.2.2 最终完成记录
           // todo 3.2 成功则先查询
-          await updateGridTradeOrder(order.clOrdId, null, {
+          await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
             avgPx: o.avgPx,
             ts: o.fillTime,
             order_status: 'confirmed',
           });
         } else {
-          await updateGridTradeOrder(order.clOrdId, null, {
+          await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
             order_status: 'confirm_failed',
             error: '未获取到订单信息',
           });
           console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
         }
       } catch (e) {
-        await updateGridTradeOrder(order.clOrdId, null, {
+        await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
           order_status: 'confirm_error',
           error: '订单确认错误',
         });
@@ -628,7 +601,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         );
 
         // 更新订单状态为已确认
-        await updateGridTradeOrder(order.clOrdId, null, {
+        await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
           order_status: 'confirmed',
           ...orderInfo,
         });
@@ -639,7 +612,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         };
       } else {
         // 未获取到订单信息
-        await updateGridTradeOrder(order.clOrdId, null, {
+        await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
           order_status: 'confirm_failed', // 修改 unconfirmed -> confirm_failed
           error: '未获取到订单信息',
         });
@@ -652,7 +625,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       }
     } catch (error) {
       // 确认过程发生错误
-      await updateGridTradeOrder(order.clOrdId, null, {
+      await updateGridTradeOrder(this.asset_name,order.clOrdId, null, {
         order_status: 'confirm_error', // 修改 unconfirmed:error -> confirm_error
         error: error.message,
       });

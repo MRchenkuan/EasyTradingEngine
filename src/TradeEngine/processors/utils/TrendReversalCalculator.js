@@ -347,7 +347,7 @@ export function trendReversalThreshold(
 
   // 初始化阈值
   // const initial_threshold = threshold = Math.min(atr_120 * Math.sqrt(5) * 1.5, threshold);
-  const initial_threshold = (threshold = Math.min(atr_120 * 2, threshold));
+  const initial_threshold = (threshold = Math.min(atr_120 * 3, threshold));
 
   // 确保阈值在合理范围内
   threshold = Math.max(min_threshold, Math.min(threshold, max_threshold));
