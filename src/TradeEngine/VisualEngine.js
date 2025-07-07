@@ -1,6 +1,6 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import fs from 'fs';
-import { blendColors, createMapFrom, formatTimestamp, hashString } from '../tools.js';
+import { blendColors, createMapFrom, formatTimestamp, hashString, shortDcm } from '../tools.js';
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import {
   getClosingTransaction,
@@ -117,8 +117,8 @@ export class VisualEngine {
 
   static drawGridTrading() {
     const assets = this._asset_names;
-    let orders = []
-    ;assets.forEach(instId => orders=orders.concat(getGridTradeOrders(instId)))
+    let orders = [];
+    assets.forEach(instId => (orders = orders.concat(getGridTradeOrders(instId))));
     // .filter(order => order.order_status === 'confirmed');
     // 先对order按照instId进行分组
     const groupedOrders = orders.reduce((acc, orderGroup) => {
@@ -328,10 +328,24 @@ export class VisualEngine {
 
               // 绘制回撤位置
               if (_threshold) {
-                if(tendency > 0){
-                  this._drawIndicator(chart, current_price_ts, last_upper_turning_price * (1-_threshold), `回踩点：${(_threshold*100).toFixed(2)}%`, 0 , 'style2');
-                } else if(tendency < 0){
-                  this._drawIndicator(chart, current_price_ts, last_lower_turning_price * (1+_threshold), `回踩点：${(_threshold*100).toFixed(2)}%`, 0 , 'style2');
+                if (tendency > 0) {
+                  this._drawIndicator(
+                    chart,
+                    current_price_ts,
+                    last_upper_turning_price * (1 - _threshold),
+                    `回踩点：${(_threshold * 100).toFixed(2)}%`,
+                    0,
+                    'style2'
+                  );
+                } else if (tendency < 0) {
+                  this._drawIndicator(
+                    chart,
+                    current_price_ts,
+                    last_lower_turning_price * (1 + _threshold),
+                    `回踩点：${(_threshold * 100).toFixed(2)}%`,
+                    0,
+                    'style2'
+                  );
                 }
               }
 
@@ -380,7 +394,7 @@ export class VisualEngine {
                   if (target_price) {
                     const ghost_price = parseFloat(target_price);
                     const ghost_yCoord = chart.scales.y.getPixelForValue(ghost_price);
-                    const ghost_label = `${ghost_price.toFixed(3)}`;
+                    const ghost_label = `${shortDcm(ghost_price, 3)}`;
                     ghost = {
                       y: ghost_yCoord,
                       label: ghost_label,
@@ -388,7 +402,7 @@ export class VisualEngine {
                   }
 
                   // 绘制订单标签
-                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${parseFloat(accFillSz).toFixed(2)} 份/(${price.toFixed(3)})/${-grid_count} 倍/[${order_status}]`;
+                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${shortDcm(accFillSz, 4)} 份/(${shortDcm(price, 3)})/${-grid_count} 倍/[${order_status}]`;
 
                   this._paintSingleOrder(
                     chart.ctx,
@@ -510,7 +524,7 @@ export class VisualEngine {
    * @param {number} y 拐点的Y轴坐标
    * @private
    */
-  static _drawIndicator(chart, ts, price, label, direction = 0, style='style1') {
+  static _drawIndicator(chart, ts, price, label, direction = 0, style = 'style1') {
     const ctx = chart.ctx;
     const yAxias = chart.scales.y;
     const xAxias = chart.scales.x;
@@ -548,9 +562,9 @@ export class VisualEngine {
       ctx.fillStyle = 'red';
     }
     // 测试文字宽度
-    const textWidth = ctx.measureText(`${label}(${value.toFixed(2)})`).width;
+    const textWidth = ctx.measureText(`${label}(${shortDcm(value, 2)})`).width;
     ctx.fillText(
-      `${label}(${value.toFixed(2)})`,
+      `${label}(${shortDcm(value, 2)})`,
       chart.chartArea.right + 40 + 10 + textWidth,
       y - direction * 10
     );

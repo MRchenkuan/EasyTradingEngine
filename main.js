@@ -114,10 +114,10 @@ TradeEngine.createGridTrading('ETH-USDT', {
 //   _grid_width: 0.005,
 //   _upper_drawdown: 0.003,
 //   _lower_drawdown: 0.003,
-//   _trade_amount: 0.002,
-//   _max_position: 0.05,
+//   _trade_amount: 0.0005,
+//   _max_position: 1000,
 //   _min_price: 60000,
-//   _max_price: 100000,
+//   _max_price: 130000,
 // });
 
 /**

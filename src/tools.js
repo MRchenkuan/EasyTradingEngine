@@ -338,3 +338,8 @@ export function calculateGridProfit(trades) {
 
   return results;
 }
+
+
+export function shortDcm(num, n=2) {
+  return parseFloat(parseFloat(num).toFixed(n));
+}
