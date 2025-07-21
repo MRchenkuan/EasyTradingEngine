@@ -72,22 +72,23 @@ TradeEngine.createGridTrading('XRP-USDT', {
   _upper_drawdown: 0.0075,
   _lower_drawdown: 0.0075,
   _grid_width: 0.005,
-  _trade_amount: 30,
-  _max_position: 200,
-  _min_price: 1.5,
-  _max_price: 2.7,
+  _trade_amount: 5,
+  _max_position: 1000,
+  _min_price: 3.0,
+  _max_price: 4.0,
+  _turtle: 1000 * 8,
 });
 
-TradeEngine.createGridTrading('ETH-USDT', {
-  // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0075,
-  _lower_drawdown: 0.0075,
-  _grid_width: 0.005,
-  _trade_amount: 0.02,
-  _max_position: 1000,
-  _min_price: 1500,
-  _max_price: 3000,
-});
+// TradeEngine.createGridTrading('ETH-USDT', {
+//   // _grid_base_price: 2.0, //建仓基准价
+//   _upper_drawdown: 0.0075,
+//   _lower_drawdown: 0.0075,
+//   _grid_width: 0.005,
+//   _trade_amount: 0.02,
+//   _max_position: 1000,
+//   _min_price: 1500,
+//   _max_price: 3000,
+// });
 
 // TradeEngine.createGridTrading('SOL-USDT', {
 //   // _grid_base_price: 2.0, //建仓基准价
