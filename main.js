@@ -76,7 +76,7 @@ TradeEngine.createGridTrading('XRP-USDT', {
   _max_position: 1000,
   _min_price: 3.0,
   _max_price: 4.0,
-  _turtle: 1000 * 8,
+  turtle: 1000 * 8,
 });
 
 // TradeEngine.createGridTrading('ETH-USDT', {
