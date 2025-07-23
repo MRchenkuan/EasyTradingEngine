@@ -66,7 +66,7 @@ TradeEngine.createGridTrading('XRP-USDT-SWAP', {
   _min_price: 2.0,
   _max_price: 4.0,
   turtle: 1000 * 15, // 海龟间隔
-  _base_amount: 10, // 每笔交易量
+  _base_amount: 20, // 每笔交易量
   _base_lots: 10,// 每笔交易的份数
   _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
 });
@@ -78,7 +78,8 @@ TradeEngine.createGridTrading('ETH-USDT-SWAP', {
   _grid_width: 0.005,
   _min_price: 1500,
   _max_price: 4200,
-  _base_amount: 10,
+  turtle: 1000 * 15, // 海龟间隔
+  _base_amount: 20,
   _base_lots: 10,
   _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
 });
@@ -90,7 +91,8 @@ TradeEngine.createGridTrading('SOL-USDT-SWAP', {
   _grid_width: 0.005,
   _min_price: 120,
   _max_price: 220,
-  _base_amount: 10,
+  turtle: 1000 * 15, // 海龟间隔
+  _base_amount: 20,
   _base_lots: 10,
   _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
 });
@@ -102,8 +104,9 @@ TradeEngine.createGridTrading('BTC-USDT-SWAP', {
   _grid_width: 0.005,
   _min_price: 90000,
   _max_price: 130000,
+  turtle: 1000 * 15, // 海龟间隔
   _swap_value: 0.01, //合约面值
-  _base_amount: 10,
+  _base_amount: 20,
   _base_lots: 10,
   _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
 });
