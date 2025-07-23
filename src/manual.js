@@ -1,5 +1,6 @@
-import { getOrderHistory } from './api.js';
-import { close_position, open_position } from './trading.js';
+import { getInstruments, getOrderHistory } from './api.js';
+import { LocalVariable } from './LocalVariable.js';
+import { close_position, open_position, create_order_market, executeOrders } from './trading.js';
 
 // const tradeId = await open_position('ETH-USDT','SOL-USDT',300)
 // await open_position('BTC-USDT','SOL-USDT',200)
@@ -28,7 +29,6 @@ import { close_position, open_position } from './trading.js';
 // });
 // debugger
 
-
 // getLastTransactions(100, 'opening').map(it=>{
 //   const orders = it.orders;
 //   orders.map(o=>{
@@ -36,3 +36,13 @@ import { close_position, open_position } from './trading.js';
 //   })
 //   updateTransaction(it.tradeId, 'opening', {orders})
 // })
+
+// const size = 100;
+// const assetId = 'SOL-USDT-SWAP';
+// const {
+//   data: [{ ctVal }],
+// } = await getInstruments('SWAP', assetId);
+// // console.log(data);
+// const price = new LocalVariable('TradeEngine/realtime_price')[assetId] * ctVal;
+// const amount = (size / price).toFixed(2);
+// executeOrders([create_order_market(assetId, amount, 1)]);

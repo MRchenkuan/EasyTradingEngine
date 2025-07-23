@@ -101,9 +101,7 @@ export async function executeOrders(orderList) {
     orderDetails = processOrderDetails(orderDetails);
 
     // 验证订单状态
-    const invalidOrders = orderDetails.filter(
-      order => !['filled'].includes(order.state)
-    );
+    const invalidOrders = orderDetails.filter(order => !['filled'].includes(order.state));
 
     if (invalidOrders.length > 0) {
       return {
@@ -135,8 +133,8 @@ export async function open_position(short, long, size) {
   const short_size = size / short_price;
   const long_size = size;
 
-  const order_long = createOrder_market(long, long_size, 1);
-  const order_short = createOrder_market(short, short_size, 0, true);
+  const order_long = create_order_market(long, long_size, 1);
+  const order_short = create_order_market(short, short_size, 0);
 
   const execResult = await executeOrders([order_long, order_short]);
   if (!execResult.success) {
@@ -165,7 +163,7 @@ export async function close_position(tradeId) {
   const { orders: opening_orders } = openingRecord;
   const orders_info = opening_orders.map(opening_order => {
     const { instId, side, avgPx: price, accFillSz: count } = opening_order;
-    return createOrder_market(instId, count, side === 'sell' ? 1 : 0, true);
+    return create_order_market(instId, count, side === 'sell' ? 1 : 0);
   });
 
   console.log('平仓...');
@@ -200,16 +198,19 @@ export function createOrder_limit(instId, price, size, side) {
   };
 }
 
-export function createOrder_market(instId, size, side, is_base_ccy) {
+export function create_order_market(instId, size, side) {
   return {
     instId,
-    // "tdMode":"cross", // isolated
-    tdMode: side > 0 ? 'cash' : 'cash', // isolated 逐仓 cross 全仓 cash 现金非保证金
+    tdMode: 'cross', // isolated 逐仓 cross 全仓 cash 现货交易
     side: side > 0 ? 'buy' : 'sell',
     ordType: 'market',
     clOrdId: hashString(`${instId}${side}${size}${Date.now()}`),
     sz: size + '',
-    tgtCcy: is_base_ccy ? 'base_ccy' : 'quote_ccy', //base_ccy: 交易货币 ；quote_ccy：计价货币, 买单默认quote_ccy， 卖单默认base_ccy
+    ccy: 'USDT', // 保证金币种
+    tradeQuoteCcy: 'USDT',
+    // posSide: side < 0 ? 'long' : 'short',
+    // tgtCcy: is_base_ccy ? 'base_ccy' : 'quote_ccy', //base_ccy: 交易货币 ；quote_ccy：计价货币, 买单默认quote_ccy， 卖单默认base_ccy
+    // tgtCcy: 'base_ccy', //base_ccy: 交易货币 ；quote_ccy：计价货币, 买单默认quote_ccy， 卖单默认base_ccy
   };
 }
 

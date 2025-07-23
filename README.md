@@ -166,8 +166,7 @@ TradeEngine.createGridTrading('SOL-USDT', {
   _grid_width: 0.0025, // 网格宽度，相邻网格价格间隔
   _upper_drawdown: 0.0012, // 最大回撤，超过此值触发买入
   _lower_drawdown: 0.0012, // 最大反弹，超过此值触发卖出
-  _trade_amount: 0.1, // 每次交易数量
-  _max_position: 10, // 最大持仓数量
+  _base_lots: 100, // 每次交易金额
   _start_position: 0, // 起始仓位
   _min_price: 50, // 最低触发价格
   _max_price: 300, // 最高触发价格
@@ -180,8 +179,8 @@ TradeEngine.createGridTrading('SOL-USDT', {
     - \_grid_width：网格宽度，相邻网格价格间隔
     - \_upper_drawdown：最大回撤，超过此值触发买入
     - \_lower_drawdown：最大反弹，超过此值触发卖出
-    - \_trade_amount：每次交易数量
-    - \_max_position：最大持仓数量
+    - \_base_lots：每次交易金额
+    - \_trade_count：每次交易分数
     - \_start_position：起始仓位
     - \_min_price：最低触发价格
     - \_max_price：最高触发价格

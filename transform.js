@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { OrderStatus } from './src/enum.js';
 
 // 获取 __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -20,7 +21,7 @@ const transformedData = data
     // 返回处理后的对象
     return {
       ...rest,
-      order_status: 'confirmed',
+      order_status: OrderStatus.CONFIRMED,
       order_desc: '- 反弹下单',
       grid_count: item.gridCount || item.grid_count, // 保持原有的grid_count值
     };

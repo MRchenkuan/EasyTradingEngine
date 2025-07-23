@@ -1,9 +1,9 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
-import { createOrder_market, executeOrders, fetchOrders } from '../../trading.js';
+import { create_order_market, executeOrders, fetchOrders } from '../../trading.js';
 import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
-import { calculateReversalProbability } from './utils/trend2.js';
+import { OrderStatus, SettlementType } from '../../enum.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -15,8 +15,10 @@ export class GridTradingProcessor extends AbstractProcessor {
   _grid_width = 0.025; // 网格宽度
   _upper_drawdown = 0.012; // 最大回撤
   _lower_drawdown = 0.012; // 最大反弹
-  _trade_amount = 9000; // 每次交易数量
-  _max_position = 100000; // 最大持仓
+  _base_lots = 10; // 每次交易数量
+  _base_amount = 10; // 每次交易的金额
+  _instrument_info = {}; // 每次交易数量
+  _settlement_type = SettlementType.AMOUNT; //交易单位 amount 等额，lots 等数量
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
   _backoff_1st_time = 30 * 60; // 15 分钟
@@ -191,6 +193,9 @@ export class GridTradingProcessor extends AbstractProcessor {
   tick() {
     // 获取最新价格
     this._current_price = this.engine.getRealtimePrice(this.asset_name) || this._prev_price;
+
+    // 获取最新的产品信息
+    this._instrument_info = this.engine.getInstrumentInfo(this.asset_name);
 
     if (!this._last_trade_price) {
       // 冷启动没有历史价格时记录当时价格
@@ -487,25 +492,23 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {string} orderDesc 订单类型
    */
   async _placeOrder(gridCount, orderDesc) {
-    const amount = -gridCount * this._trade_amount;
-
-    if (Math.abs(amount) > this._max_position) {
-      console.warn(`⚠️ 交易量${amount}超过最大持仓限制${this._max_position}`);
-      return;
+    const { ctVal } = this._instrument_info;
+    let amount = 0;
+    if (this._settlement_type === SettlementType.AMOUNT) {
+      const swap_price = this._current_price * ctVal;
+      const swap_amount = this._base_amount / swap_price;
+      amount = (-gridCount * swap_amount).toFixed(2);
+    } else if (this._settlement_type === SettlementType.LOTS) {
+      amount = (-gridCount * this._base_lots) / ctVal;
     }
 
     console.log(`💰${orderDesc}：${this._current_price} ${amount} 个`);
     // 然后执行交易
-    const order = createOrder_market(
-      this.asset_name,
-      Math.abs(amount),
-      amount / Math.abs(amount),
-      true
-    );
+    const order = create_order_market(this.asset_name, Math.abs(amount), amount / Math.abs(amount));
 
     await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
       ...order,
-      order_status: 'pending', // 修改 pendding -> pending
+      order_status: OrderStatus.PENDING,
       snapshot: Object.keys(this._snapshot)
         .map(key => `[${key}]:${this._snapshot[key]};`)
         .join('|'),
@@ -525,7 +528,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     } catch (error) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: 'failed', // 修改 faild -> failed
+        order_status: OrderStatus.FAILED,
         error: error.message,
       });
       return;
@@ -537,7 +540,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: 'unsucess', // 保持一致使用 failed
+        order_status: OrderStatus.UNSUCESS,
         error: result.msg,
       });
       return;
@@ -550,7 +553,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         ...rest,
         ...order,
         ...originalOrder,
-        order_status: 'placed',
+        order_status: OrderStatus.PLACED,
       });
 
       console.log(`✅${this.asset_name} 交易成功: ${orderDesc}`);
@@ -570,18 +573,18 @@ export class GridTradingProcessor extends AbstractProcessor {
           await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
             avgPx: o.avgPx,
             ts: o.fillTime,
-            order_status: 'confirmed',
+            order_status: OrderStatus.CONFIRMED,
           });
         } else {
           await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-            order_status: 'confirm_failed',
+            order_status: OrderStatus.CONFIRM_FAILED,
             error: '未获取到订单信息',
           });
           console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
         }
       } catch (e) {
         await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: 'confirm_error',
+          order_status: OrderStatus.CONFIRM_ERROR,
           error: '订单确认错误',
         });
         // todo 3.3 报错，记录为查询失败
@@ -607,7 +610,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
         // 更新订单状态为已确认
         await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: 'confirmed',
+          order_status: OrderStatus.CONFIRMED,
           ...orderInfo,
         });
 
@@ -618,7 +621,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       } else {
         // 未获取到订单信息
         await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: 'confirm_failed', // 修改 unconfirmed -> confirm_failed
+          order_status: OrderStatus.CONFIRM_FAILED, // 修改 unconfirmed -> confirm_failed
           error: '未获取到订单信息',
         });
         console.error(`⛔${this.asset_name} 订单确认失败：未获取到订单信息`);
@@ -631,7 +634,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     } catch (error) {
       // 确认过程发生错误
       await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: 'confirm_error', // 修改 unconfirmed:error -> confirm_error
+        order_status: OrderStatus.CONFIRM_ERROR,
         error: error.message,
       });
       console.error(`⛔${this.asset_name} 订单确认错误：${error.message}`);

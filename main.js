@@ -5,20 +5,21 @@ import { base_url } from './src/config.security.js';
 import { subscribeKlineChanel } from './src/api.js';
 import { TradeEngine } from './src/TradeEngine/TradeEngine.js';
 import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
+import { BarType, SettlementType } from './src/enum.js';
 
 const ws_connection_pool = {};
 
-const bar_type = '5m';
+const bar_type = BarType.MINUTE;
 const duration = 32; // 12天前
 const price_type = 'close';
 const once_limit = 300;
 const candle_limit = 2000;
 const assets = [
-  { id: 'BTC-USDT', theme: '#f0b27a' },
-  { id: 'SOL-USDT', theme: '#ad85e9' },
-  { id: 'ETH-USDT', theme: '#85c1e9' },
+  { id: 'BTC-USDT-SWAP', theme: '#f0b27a' },
+  { id: 'SOL-USDT-SWAP', theme: '#ad85e9' },
+  { id: 'ETH-USDT-SWAP', theme: '#85c1e9' },
   // { id: 'TRUMP-USDT', theme: '#90a4ae' },
-  { id: 'XRP-USDT', theme: '#ffafde' },
+  { id: 'XRP-USDT-SWAP', theme: '#ffafde' },
   // { id: 'OKB-USDT', theme: '#52be80' },
   // { id: 'ADA-USDT', theme: '#85dfe9' },
 ];
@@ -56,70 +57,56 @@ TradeEngine.setMetaInfo({
 /**
  * 启动网格交易
  */
-// TradeEngine.createGridTrading('SOL-USDT', {
-//   _grid_width: 0.005,
-//   _upper_drawdown: 0.003,
-//   _lower_drawdown: 0.003,
-//   _trade_amount: 0.8,
-//   _max_position: 20,
-//   _start_position: 0,
-//   _min_price: 50,
-//   _max_price: 250,
-// });
 
-TradeEngine.createGridTrading('XRP-USDT', {
+TradeEngine.createGridTrading('XRP-USDT-SWAP', {
   // _grid_base_price: 2.0, //建仓基准价
   _upper_drawdown: 0.0075,
   _lower_drawdown: 0.0075,
   _grid_width: 0.005,
-  _trade_amount: 5,
-  _max_position: 1000,
-  _min_price: 3.0,
+  _min_price: 2.0,
   _max_price: 4.0,
-  turtle: 1000 * 8,
+  turtle: 1000 * 15, // 海龟间隔
+  _base_amount: 10, // 每笔交易量
+  _base_lots: 10,// 每笔交易的份数
+  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
 });
 
-// TradeEngine.createGridTrading('ETH-USDT', {
-//   // _grid_base_price: 2.0, //建仓基准价
-//   _upper_drawdown: 0.0075,
-//   _lower_drawdown: 0.0075,
-//   _grid_width: 0.005,
-//   _trade_amount: 0.02,
-//   _max_position: 1000,
-//   _min_price: 1500,
-//   _max_price: 3000,
-// });
+TradeEngine.createGridTrading('ETH-USDT-SWAP', {
+  // _grid_base_price: 2.0, //建仓基准价
+  _upper_drawdown: 0.0075,
+  _lower_drawdown: 0.0075,
+  _grid_width: 0.005,
+  _min_price: 1500,
+  _max_price: 4200,
+  _base_amount: 10,
+  _base_lots: 10,
+  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
+});
 
-// TradeEngine.createGridTrading('SOL-USDT', {
-//   // _grid_base_price: 2.0, //建仓基准价
-//   _upper_drawdown: 0.0075,
-//   _lower_drawdown: 0.0075,
-//   _grid_width: 0.005,
-//   _trade_amount: 0.3,
-//   _max_position: 1000,
-//   _min_price: 90,
-//   _max_price: 180,
-// });
+TradeEngine.createGridTrading('SOL-USDT-SWAP', {
+  // _grid_base_price: 2.0, //建仓基准价
+  _upper_drawdown: 0.0075,
+  _lower_drawdown: 0.0075,
+  _grid_width: 0.005,
+  _min_price: 120,
+  _max_price: 220,
+  _base_amount: 10,
+  _base_lots: 10,
+  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
+});
 
-// TradeEngine.createGridTrading('ETH-USDT', {
-//   _grid_width: 0.005,
-//   _upper_drawdown: 0.003,
-//   _lower_drawdown: 0.003,
-//   _trade_amount: 0.06,
-//   _max_position: 1,
-//   _min_price: 1500,
-//   _max_price: 2800,
-// });
-
-// TradeEngine.createGridTrading('BTC-USDT', {
-//   _grid_width: 0.005,
-//   _upper_drawdown: 0.003,
-//   _lower_drawdown: 0.003,
-//   _trade_amount: 0.0005,
-//   _max_position: 1000,
-//   _min_price: 60000,
-//   _max_price: 130000,
-// });
+TradeEngine.createGridTrading('BTC-USDT-SWAP', {
+  // _grid_base_price: 2.0, //建仓基准价
+  _upper_drawdown: 0.0075,
+  _lower_drawdown: 0.0075,
+  _grid_width: 0.005,
+  _min_price: 90000,
+  _max_price: 130000,
+  _swap_value: 0.01, //合约面值
+  _base_amount: 10,
+  _base_lots: 10,
+  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
+});
 
 /**
  * 启动图像引擎

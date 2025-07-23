@@ -1,4 +1,4 @@
-import { getOrderHistory } from '../api.js';
+import { getInstruments, getOrderHistory } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import {
   getClosingTransaction,
@@ -31,6 +31,8 @@ export class TradeEngine {
   static _show_order_his = [];
   static _positionCost = new LocalVariable('TradeEngine/positionCost');
   static _max_candle_size = 3000;
+  static _instrument_timers = {}; // 存储每个品种的定时器
+  static _instrument_info = {}; // 存储品种信息
 
   /**
    * 对冲监听器
@@ -595,7 +597,9 @@ export class TradeEngine {
         if (Object.values(this.getAllMarketData() || {}).length === this._asset_names.length) {
           // 初始化中
           this._status = 1;
-          if (this._asset_names.every(a_n => this._beta_map[a_n]?.length == 2)) {
+          const isBetaMapReady = this._asset_names.every(a_n => this._beta_map[a_n]?.length == 2);
+          // 检查beta映射和instruments信息是否都准备就绪
+          if (isBetaMapReady) {
             this._status = 2;
           }
           // if(Object.values(this._beta_map).length >= this._asset_names.length){
@@ -612,9 +616,13 @@ export class TradeEngine {
 
   static runAllProcessors() {
     this.processors.forEach(p => {
-      setTimeout(() => {
-        p.tick();
-      });
+      if (this._instrument_info[p.asset_name]) {
+        setTimeout(() => {
+          p.tick();
+        });
+      } else {
+        console.warn(`未找到合约产品信息: ${p.asset_name}，暂不执行交易策略`);
+      }
     });
   }
 
@@ -649,6 +657,12 @@ export class TradeEngine {
 
   static stop() {
     clearTimeout(this._timer.start);
+    // 清除所有定时器
+    Object.values(this._instrument_timers).forEach(timer => {
+      clearInterval(timer);
+    });
+    // 重置定时器对象
+    this._instrument_timers = {};
   }
 
   /**
@@ -726,12 +740,55 @@ export class TradeEngine {
   }
 
   /**
+   * 注册品种并定期更新信息
+   * @param {string} assetName - 品种名称
+   * @param {string} instType - 品种类型 (SPOT/SWAP等)
+   * @param {number} interval - 更新间隔(毫秒)，默认10秒
+   */
+  static registerInstrument(assetName, instType, interval = 10000) {
+    // 清除已存在的定时器
+    if (this._instrument_timers[assetName]) {
+      clearInterval(this._instrument_timers[assetName]);
+    }
+    // 创建定时更新任务
+    const updateInstrument = async () => {
+      // 从API获取品种信息
+      const { data } = await getInstruments(instType, assetName);
+      const inst = data.find(it => it.instId === assetName);
+      if (inst) {
+        this._instrument_info[assetName] = {
+          ...inst,
+          lastUpdateTime: Date.now(),
+        };
+      }
+    };
+
+    // 立即执行一次
+    updateInstrument();
+
+    // 设置定时器
+    this._instrument_timers[assetName] = setInterval(updateInstrument, interval);
+  }
+
+  /**
+   * 获取品种信息
+   * @param {string} assetName - 品种名称
+   * @returns {Object|null} 品种信息
+   */
+  static getInstrumentInfo(assetName) {
+    return this._instrument_info[assetName] || null;
+  }
+
+  /**
    * 创建网格交易处理器
    * @param {string} assetName - 交易资产名称
    * @param {object} params - 网格参数
    * @returns {GridTradingProcessor}
    */
   static createGridTrading(assetName, params = {}) {
+    const instType = assetName.endsWith('-SWAP') ? 'SWAP' : 'SPOT';
+    this._instrument_info[assetName] ??= null;
+    this.registerInstrument(assetName, instType);
     const gp = new GridTradingProcessor(assetName, params, this);
     this.processors.push(gp);
     return gp;

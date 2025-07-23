@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { calculateGridProfit, formatTimestamp } from '../tools.js';
+import { OrderStatus } from '../enum.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +36,7 @@ function displayGridTrades(monit = false) {
   }
 
   const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8')).filter(
-    order => order.order_status === 'confirmed'
+    order => order.order_status === OrderStatus.CONFIRMED
   );
   if (trades.length === 0) {
     console.log('没有网格交易记录');
@@ -192,7 +193,7 @@ function displayGridTradeList(filterSymbol) {
   }
 
   const trades = JSON.parse(fs.readFileSync(gridPath, 'utf8')).filter(
-    order => order.order_status === 'confirmed'
+    order => order.order_status === OrderStatus.CONFIRMED
   );
   const filteredTrades = filterSymbol
     ? trades.filter(order => order.instId.toUpperCase().startsWith(filterSymbol.toUpperCase()))
