@@ -12,9 +12,9 @@ export class AbstractProcessor {
     if (typeof this.tick !== 'function') {
       throw new Error('子类必须实现 tick 方法');
     }
-    // if (typeof this.display !== 'function') {
-    //   throw new Error('子类必须实现 display 方法');
-    // }
+    if (typeof this.display !== 'function') {
+      throw new Error('子类必须实现 display 方法');
+    }
   }
 
   /**

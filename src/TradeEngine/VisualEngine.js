@@ -4,7 +4,6 @@ import { blendColors, createMapFrom, formatTimestamp, hashString, shortDcm } fro
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import {
   getClosingTransaction,
-  getGridTradeOrders,
   getLastTransactions,
   getOpeningTransaction,
 } from '../recordTools.js';
@@ -12,28 +11,14 @@ import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js'
 import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
-import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 import { calculateBOLL } from '../indicators/BOLL.js';
+import { GridTradingSlice } from './painters/GridTradingSlice.js';
+import { MainGraph } from './painters/MainGraph.js';
+import { HedgeTransactionSlice } from './painters/HedgeTransactionSlice.js';
+import { HedgeProfitDistance } from './painters/HedgeProfitDistance.js';
 
 const width = 2560,
   height = 1440;
-const chartJSNodeCanvas = new ChartJSNodeCanvas({ width, height, backgroundColour: '#fff' });
-const font_style = 'Monaco, Menlo, Consolas, monospace';
-const MAX_CANDLE = 800;
-
-const styles = {
-  borderWidth: 1,
-  pointRadius: 0, // 设置点的大小
-  tension: 0, // 设置曲线平滑度 (0 为折线)
-};
-
-const styles_2 = {
-  borderWidth: 0.5,
-  tension: 0.2, // 设置曲线平滑度 (0 为折线)
-  pointRadius: 0, // 设置点的大小
-  borderColor: '#f39c12', // 设置边框颜色
-  pointBackgroundColor: '#f39c12',
-};
 
 export class VisualEngine {
   static charts = [];
@@ -44,15 +29,15 @@ export class VisualEngine {
   static _painting_interval = 5000; //
   static _boll_cache = new Map();
   static _boll_timer = null;
+  static font_style = 'Monaco, Menlo, Consolas, monospace';
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
   static _config = new LocalVariable('config');
+  static modules = new Map();
 
   static createChart(...args) {
     this.charts.push(new this(...args));
   }
-
-  constructor() {}
 
   /**
    * 设置引擎基本信息
@@ -72,15 +57,20 @@ export class VisualEngine {
     return createMapFrom(this._asset_names, this._asset_themes);
   }
 
+  /**
+   * 注册模块
+   * @param {*} moduleClass
+   */
+  static use(moduleClass) {
+    this.modules.set(moduleClass.name, new moduleClass(this));
+  }
+
   static start() {
     const status = TradeEngine.checkEngine();
     if (status == 2) {
-      this.drawMainGraph();
-      this.drawTransctionSlices();
-      this.drawGridTrading(TradeEngine._bar_type);
-      // TradeEngine.processors.forEach(it => {
-      //   it.display();
-      // });
+      this.modules.forEach(it => {
+        it.draw();
+      });
     }
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
@@ -113,327 +103,6 @@ export class VisualEngine {
     }, 5000);
 
     return result;
-  }
-
-  static drawGridTrading() {
-    const assets = this._asset_names;
-    let orders = [];
-    assets.forEach(instId => (orders = orders.concat(getGridTradeOrders(instId))));
-    // .filter(order => order.order_status === 'confirmed');
-    // 先对order按照instId进行分组
-    const groupedOrders = orders.reduce((acc, orderGroup) => {
-      const instId = orderGroup.instId; // 使用第一个订单的instId作为key
-      if (!acc[instId]) {
-        acc[instId] = [];
-      }
-      acc[instId].push(orderGroup); // 保持订单组的完整性
-      return acc;
-    }, {});
-
-    assets.forEach(instId => {
-      const group_orders = groupedOrders[instId];
-      const themes_map = this.getThemes();
-      const color = themes_map[instId] || '#666666';
-
-      const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
-      const candle_data = (TradeEngine.getCandleData(instId) || []).map(it => [
-        parseFloat(it.open),
-        parseFloat(it.close),
-        parseFloat(it.low),
-        parseFloat(it.high),
-      ]);
-      const {
-        _grid_base_price,
-        _grid_base_price_ts,
-        last_lower_turning_price_ts,
-        last_lower_turning_price,
-        last_upper_turning_price_ts,
-        last_upper_turning_price,
-        current_price,
-        current_price_ts,
-        last_trade_price,
-        last_trade_price_ts,
-        tendency,
-        direction,
-        _max_price,
-        _min_price,
-        _grid_width,
-        _threshold,
-      } = new LocalVariable(`GridTradingProcessor/${instId}`) || {};
-
-      if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
-      const grid_lines = GridTradingProcessor._initPriceGrid(
-        _grid_base_price,
-        _min_price,
-        _max_price,
-        _grid_width
-      );
-
-      const labels = ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
-      const file_path = path.join('grid', `/${instId}.jpg`);
-
-      const boll = this.getBOLL(instId);
-
-      // 计算差值并添加注释
-      const configuration = {
-        // type: 'scatter',
-        type: 'line',
-        data: {
-          labels: labels.slice(-MAX_CANDLE),
-          datasets: [
-            // 低到高
-            {
-              ...styles,
-              type: 'bar',
-              label: instId,
-              data: candle_data.slice(-MAX_CANDLE),
-              backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [open, close, low, hight] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-              },
-              borderWidth: 0,
-              barThickness: 1.5, // 默认宽度
-            },
-            // 高点
-            {
-              ...styles,
-              type: 'bar',
-              label: instId,
-              data: candle_data
-                .map(it => [Math.max(it[0], it[1]), it[3], it[0], it[1]])
-                .slice(-MAX_CANDLE),
-              borderWidth: 0,
-              backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-                // return '#aeaeae';
-              },
-              barThickness: 0.5,
-            },
-            // 低点
-            {
-              ...styles,
-              type: 'bar',
-              label: instId,
-              data: candle_data
-                .map(it => [Math.min(it[0], it[1]), it[2], it[0], it[1]])
-                .slice(-MAX_CANDLE),
-              borderWidth: 0,
-              backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-                // return '#aeaeae';
-              },
-              barThickness: 0.5,
-            },
-            // 绘制布林线
-            {
-              ...styles_2,
-              type: 'line',
-              label: 'BOLL',
-              data: boll.upperArray.slice(-MAX_CANDLE),
-            },
-            {
-              ...styles_2,
-              type: 'line',
-              label: 'BOLL',
-              data: boll.lowerArray.slice(-MAX_CANDLE),
-            },
-            {
-              ...styles_2,
-              type: 'line',
-              label: 'BOLL',
-              data: boll.middleArray.slice(-MAX_CANDLE),
-            },
-          ],
-        },
-        options: {
-          responsive: true, // 确保响应式布局
-          maintainAspectRatio: false, // 允许自定义宽高比例
-          plugins: {
-            legend: {
-              display: false,
-              labels: { color: 'black' },
-            },
-          },
-          scales: {
-            y: {
-              // type: 'logarithmic',
-              beginAtZero: false,
-              ticks: {
-                callback: function (value) {
-                  const baseValue = prices[0];
-                  return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
-                },
-                stepSize: value => {
-                  const baseValue = prices[0];
-                  return baseValue * 0.025; // 2.5% 的实际价格变化值
-                },
-              },
-            },
-            x: {
-              stacked: true,
-            },
-          },
-          layout: {
-            padding: {
-              top: 140,
-              bottom: 60,
-              left: 60,
-              right: 200,
-            },
-          },
-        },
-        plugins: [
-          {
-            afterDraw: chart => {
-              const yAxias = chart.scales.y;
-              const xAxias = chart.scales.x;
-              // 绘制转折点 - 下
-              if (last_lower_turning_price) {
-                this._drawIndicator(
-                  chart,
-                  last_lower_turning_price_ts,
-                  last_lower_turning_price,
-                  '下拐点',
-                  -1
-                );
-              }
-              // 绘制转折点 - 上
-              if (last_upper_turning_price) {
-                this._drawIndicator(
-                  chart,
-                  last_upper_turning_price_ts,
-                  last_upper_turning_price,
-                  '上拐点',
-                  1
-                );
-              }
-              // 绘制基准点
-              if (_grid_base_price) {
-                this._drawIndicator(chart, chart.chartArea.right, _grid_base_price, '基准点');
-              }
-              // 绘制最近成交点
-              if (last_trade_price) {
-                this._drawIndicator(chart, last_trade_price_ts, last_trade_price, '最近成交点');
-              }
-
-              // 绘制当前价格
-              if (current_price) {
-                this._drawIndicator(chart, current_price_ts, current_price, '当前价格');
-              }
-
-              // 绘制回撤位置
-              if (_threshold) {
-                if (tendency > 0) {
-                  this._drawIndicator(
-                    chart,
-                    current_price_ts,
-                    last_upper_turning_price * (1 - _threshold),
-                    `回踩点：${(_threshold * 100).toFixed(2)}%`,
-                    0,
-                    'style2'
-                  );
-                } else if (tendency < 0) {
-                  this._drawIndicator(
-                    chart,
-                    current_price_ts,
-                    last_lower_turning_price * (1 + _threshold),
-                    `回踩点：${(_threshold * 100).toFixed(2)}%`,
-                    0,
-                    'style2'
-                  );
-                }
-              }
-
-              const current_point_y = yAxias.getPixelForValue(current_price);
-              const current_point_x = xAxias.getPixelForValue(
-                formatTimestamp(current_price_ts, TradeEngine._bar_type)
-              );
-              // 绘制趋势箭头
-              this._drawTrendArrow(chart, current_point_x + 20, current_point_y, tendency, 'bold');
-              this._drawTrendArrow(chart, current_point_x + 20, current_point_y, direction, 'thin');
-
-              // 绘制零基准线
-              const baseValue = prices[0];
-              // 绘制起点基线
-              this._drawHorizontalLine(chart, baseValue);
-
-              // 为了避免标签重叠先搞个位置收集器
-              const collisionAvoidance = createCollisionAvoidance();
-
-              // 绘制信息表格
-              this._drawInfoTable(chart, width * 0.01, height * 0.01);
-
-              this._drawDateTime(chart);
-
-              // 绘制交易信息
-              TradeEngine.processors
-                .find(it => it.type === 'GridTradingProcessor' && it.asset_name === instId)
-                ?.display(chart);
-
-              // 绘制历史订单信息
-              if (group_orders && group_orders.length)
-                group_orders.forEach(order => {
-                  const { ts, avgPx, accFillSz, side, grid_count, order_status, target_price } =
-                    order;
-                  const time = formatTimestamp(ts, TradeEngine._bar_type);
-                  // 超出时间范围的订单不绘制
-                  const labels = chart.data.labels;
-                  if (!labels.includes(time)) {
-                    return; // 跳过超出范围的订单
-                  }
-                  const price = parseFloat(avgPx);
-                  const xCoord = chart.scales.x.getPixelForValue(time);
-                  const yCoord = chart.scales.y.getPixelForValue(price);
-
-                  let ghost = null;
-                  if (target_price) {
-                    const ghost_price = parseFloat(target_price);
-                    const ghost_yCoord = chart.scales.y.getPixelForValue(ghost_price);
-                    const ghost_label = `${shortDcm(ghost_price, 3)}`;
-                    ghost = {
-                      y: ghost_yCoord,
-                      label: ghost_label,
-                    };
-                  }
-
-                  // 绘制订单标签
-                  const label = `${side === 'buy' ? '[B]' : '[S]'} ${shortDcm(accFillSz, 4)} 份/(${shortDcm(price, 3)})/${-grid_count} 倍/[${order_status}]`;
-
-                  this._paintSingleOrder(
-                    chart.ctx,
-                    xCoord,
-                    yCoord,
-                    label,
-                    side,
-                    collisionAvoidance,
-                    ghost
-                  );
-                });
-
-              // 绘制网格线
-              grid_lines.forEach((grid, index) => {
-                // 绘制网格线，但不能超过图表区域
-                const yCoord = yAxias.getPixelForValue(grid);
-                if (yCoord >= chart.chartArea.top && yCoord <= chart.chartArea.bottom) {
-                  // 绘制网格线
-                  this._drawHorizontalLine(chart, grid, [2, 5]);
-                }
-              });
-            },
-          },
-        ],
-      };
-
-      (async () => {
-        const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-        this.writeChartFile(file_path, image);
-      })();
-    });
   }
 
   static _drawTrendArrow(chart, x, y, trend, style = 'default') {
@@ -519,222 +188,6 @@ export class VisualEngine {
   }
 
   /**
-   * 绘制指示器
-   * @param {*} chart Chart对象
-   * @param {number} y 拐点的Y轴坐标
-   * @private
-   */
-  static _drawIndicator(chart, ts, price, label, direction = 0, style = 'style1') {
-    const ctx = chart.ctx;
-    const yAxias = chart.scales.y;
-    const xAxias = chart.scales.x;
-    const y = yAxias.getPixelForValue(price);
-    const x = xAxias.getPixelForValue(formatTimestamp(ts, TradeEngine._bar_type));
-    // 保存当前上下文状态
-    ctx.save();
-
-    // 设置指示器样式
-    ctx.beginPath();
-    ctx.strokeStyle = '#8b32a8';
-    ctx.lineWidth = 0.5;
-
-    if (style === 'style2') {
-      ctx.setLineDash([5, 5]);
-      ctx.strokeStyle = 'red';
-    }
-
-    // 在图表右侧绘制指示线
-    ctx.moveTo(x, y);
-    ctx.lineTo(chart.chartArea.right + 40, y);
-    if (direction === 0) {
-      ctx.lineTo(chart.chartArea.right + 40 + 5, y - 10 * direction);
-    } else {
-      ctx.lineTo(chart.chartArea.right + 40 + 10, y - 10 * direction);
-    }
-    ctx.stroke();
-
-    // 显示拐点数值
-    const value = chart.scales.y.getValueForPixel(y);
-    ctx.font = `12px ${font_style}`;
-    ctx.fillStyle = '#8b32a8';
-    ctx.textAlign = 'right';
-    if (style === 'style2') {
-      ctx.fillStyle = 'red';
-    }
-    // 测试文字宽度
-    const textWidth = ctx.measureText(`${label}(${shortDcm(value, 2)})`).width;
-    ctx.fillText(
-      `${label}(${shortDcm(value, 2)})`,
-      chart.chartArea.right + 40 + 10 + textWidth,
-      y - direction * 10
-    );
-    // 恢复上下文状态
-    ctx.restore();
-  }
-
-  /**
-   * 单独绘制每个头寸的分片
-   */
-  static drawTransctionSlices() {
-    // 绘制每次开仓的截图
-    const opening_transactions = [...getLastTransactions(100, 'opening')];
-    opening_transactions.map(({ tradeId, closed }) => {
-      // if(!closed){
-      this._paintTransactionSlice(tradeId);
-      // }
-    });
-  }
-
-  /**
-   * 绘制成本线
-   * @private
-   */
-  static _addCostLines(chart) {
-    this._show_order_his.forEach(it => {
-      const { position, totalCost, avgCost, updateTime, instId } = TradeEngine.getPositionCost(it);
-      const themes_map = this.getThemes();
-      // 只在有持仓时显示成本线
-      if (position !== 0 && avgCost !== 0) {
-        const [a, b] = TradeEngine._beta_map[instId] || [1, 0];
-        const scaledCost = avgCost * a + b;
-
-        const ctx = chart.ctx;
-        const yPixel = chart.scales.y.getPixelForValue(scaledCost);
-
-        // 绘制 0% 参考线
-        ctx.beginPath();
-        ctx.setLineDash([5, 5]);
-        ctx.strokeStyle = themes_map[instId] || '#666666';
-        ctx.lineWidth = 1;
-        ctx.moveTo(chart.chartArea.left, yPixel);
-        ctx.lineTo(chart.chartArea.right, yPixel);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // 添加成本标签
-        ctx.font = `12px ${font_style}`;
-        ctx.fillStyle = themes_map[instId] || '#666666';
-        ctx.textAlign = 'left';
-        ctx.fillText(
-          `${simpAssetName(instId)} 成本: ${avgCost.toFixed(2)}`,
-          chart.chartArea.left + 10,
-          yPixel - 5
-        );
-      }
-    });
-  }
-
-  /**
-   * 渲染图片
-   */
-  static drawMainGraph() {
-    try {
-      const refer_kline = TradeEngine.getMainAsset();
-      if (!refer_kline) return;
-      const x_label = refer_kline.ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
-      const scaled_prices = TradeEngine.getAllScaledPrices();
-
-      // 计算差值并添加注释
-      const configuration = {
-        type: 'line', // 改回折线图
-        data: {
-          labels: x_label,
-          datasets: scaled_prices.map((it, id) => {
-            return {
-              label: this._asset_names[id],
-              data: it.prices,
-              borderColor: this._asset_themes[id],
-              pointBackgroundColor: this._asset_themes[id],
-              ...styles,
-            };
-          }),
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              // position: 'bottom',
-              // display: false,
-            },
-          },
-          scales: {
-            y: {
-              ticks: {
-                callback: function (value) {
-                  const baseValue = scaled_prices[0].prices[0];
-                  return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
-                },
-                stepSize: value => {
-                  const baseValue = scaled_prices[0].prices[0];
-                  return baseValue * 0.025; // 2.5% 的实际价格变化值
-                },
-              },
-            },
-          },
-          layout: {
-            padding: {
-              top: 180,
-              bottom: 60,
-              left: 60,
-              right: 60,
-            },
-          },
-        },
-        plugins: [
-          {
-            afterDraw: async chart => {
-              const baseValue = scaled_prices[0].prices[0];
-
-              this._drawHorizontalLine(chart, baseValue);
-              const collisionAvoidance = createCollisionAvoidance();
-
-              // 绘制相关性表格
-              this._drawRhoTable(chart);
-
-              // 信息表格绘制
-              this._drawInfoTable(chart);
-
-              // 绘制实时利润空间表格
-              this._drawProfitTable(chart);
-
-              const beta_map = TradeEngine._beta_map;
-              if (this._config.show_transactions !== false) {
-                // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
-                const transactions = [
-                  ...getLastTransactions(100, 'opening'),
-                  ...getLastTransactions(100, 'closing'),
-                ].filter(it => !it.closed);
-                this._drawTransactions(chart, transactions, beta_map, collisionAvoidance);
-              }
-
-              // 实时利润绘制
-              this._paintProfit();
-
-              // 绘制时间
-              this._drawDateTime(chart);
-
-              // 绘制历史订单信息
-              this._config.show_orders !== false &&
-                this._paintOrders(chart, TradeEngine._asset_names, beta_map, collisionAvoidance);
-
-              // 绘制各个品种的成本线
-              this._addCostLines(chart);
-            },
-          },
-        ],
-      };
-
-      (async () => {
-        const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-        this.writeChartFile('main_chart.jpg', image);
-      })();
-    } catch (e) {
-      console.log(e);
-    }
-  }
-
-  /**
    * 绘制0%参考线
    * @private
    */
@@ -792,7 +245,7 @@ export class VisualEngine {
     }
 
     // 绘制文字标签
-    ctx.font = `12px bold ${font_style}`;
+    ctx.font = `12px bold ${this.font_style}`;
     ctx.textAlign = 'center';
     const lines = labels.split('/');
     const lineHeight = 14;
@@ -890,56 +343,6 @@ export class VisualEngine {
         }
       }
     }
-  }
-
-  static _paintProfit() {
-    const labels = TradeEngine.getMainAssetLabels();
-    let profits = TradeEngine.getAllHistoryProfits();
-    const themes_map = this.getThemes();
-
-    // 计算差值并添加注释
-    const configuration = {
-      // type: 'scatter',
-      type: 'line',
-      data: {
-        labels,
-        datasets: Object.keys(profits).map(key => {
-          const label = key;
-          const [assetId1, assetId2] = label.split(':');
-          const color1 = themes_map[assetId1];
-          const color2 = themes_map[assetId2];
-          const color = blendColors(color1, color2);
-          return {
-            label: label
-              .split(':')
-              .map(k => simpAssetName(k))
-              .join(':'),
-            data: profits[key].map(it => it * 100),
-            borderColor: color,
-            pointBackgroundColor: color,
-            borderWidth: 1,
-            fill: false, // 不填充颜色
-            pointRadius: 0.5, // 设置点的大小
-            tension: 0.3, // 设置曲线平滑度 (0 为折线)
-          };
-        }),
-      },
-      options: {
-        responsive: true, // 确保响应式布局
-        maintainAspectRatio: false, // 允许自定义宽高比例
-        plugins: {
-          legend: { labels: { color: 'black' } },
-        },
-        layout: {
-          padding: 40,
-        },
-      },
-    };
-
-    (async () => {
-      const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-      this.writeChartFile(`distance.jpg`, image);
-    })();
   }
 
   /**
@@ -1207,11 +610,11 @@ export class VisualEngine {
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距
     ctx.fillStyle = '#808b96';
-    ctx.font = '14px ' + font_style;
+    ctx.font = '14px ' + this.font_style;
     ctx.fillText('利润空间', left + padding, top + cellHeight / 2 + 5);
     // 绘制表头文本
     ctx.fillStyle = 'black';
-    ctx.font = '12px ' + font_style;
+    ctx.font = '12px ' + this.font_style;
     headers.forEach((header, index) => {
       ctx.fillStyle = themes[index];
       ctx.fillText(
@@ -1227,7 +630,7 @@ export class VisualEngine {
 
       // 绘制首列文本
       ctx.fillStyle = 'black';
-      ctx.font = '12px ' + font_style;
+      ctx.font = '12px ' + this.font_style;
       ctx.fillStyle = themes[rowIndex];
       ctx.fillText(
         simpAssetName(headers[rowIndex]),
@@ -1285,7 +688,7 @@ export class VisualEngine {
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距
     ctx.fillStyle = '#808b96';
-    ctx.font = '12px ' + font_style;
+    ctx.font = '12px ' + this.font_style;
     // 绘制表头文本
     headers.forEach((header, index) => {
       ctx.fillText(header, (index + 1) * cellWidth + padding + left, top + cellHeight / 2 + 5);
@@ -1296,7 +699,7 @@ export class VisualEngine {
       const yOffset = (rowIndex + 1) * cellHeight;
 
       // 绘制首列文本
-      ctx.font = '12px ' + font_style;
+      ctx.font = '12px ' + this.font_style;
       ctx.fillStyle = themes[rowIndex];
       ctx.fillText(assetIds[rowIndex], padding + left, yOffset + top + cellHeight / 2 + 5);
       // 绘制数据单元格内容
@@ -1333,11 +736,11 @@ export class VisualEngine {
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距
     ctx.fillStyle = '#808b96';
-    ctx.font = '18px ' + font_style;
+    ctx.font = '18px ' + this.font_style;
     ctx.fillText('-- ρ --', left + padding, top + cellHeight / 2 + 5);
     // 绘制表头文本
     ctx.fillStyle = 'black';
-    ctx.font = '12px ' + font_style;
+    ctx.font = '12px ' + this.font_style;
     headers.forEach((header, index) => {
       ctx.fillStyle = themes[index];
       ctx.fillText(header, (index + 1) * cellWidth + padding + left, top + cellHeight / 2 + 5);
@@ -1349,7 +752,7 @@ export class VisualEngine {
 
       // 绘制首列文本
       ctx.fillStyle = 'black';
-      ctx.font = '12px ' + font_style;
+      ctx.font = '12px ' + this.font_style;
       ctx.fillStyle = themes[rowIndex];
       ctx.fillText(headers[rowIndex], padding + left, yOffset + top + cellHeight / 2 + 5);
 
@@ -1363,144 +766,6 @@ export class VisualEngine {
         );
       });
     });
-  }
-
-  /**
-   * 绘制每一笔交易的切片
-   * @param {*} tradeId
-   */
-  static _paintTransactionSlice(tradeId) {
-    const open_transaction = getOpeningTransaction(tradeId);
-    const close_transaction = getClosingTransaction(tradeId);
-    const klines = Object.values(TradeEngine.getAllMarketData());
-    const labels = TradeEngine.getMainAssetLabels();
-
-    const orders_open = open_transaction.orders;
-    const orders_close = close_transaction ? close_transaction.orders : [];
-
-    const orders = [...orders_open, ...orders_close];
-
-    const isClosed = open_transaction.closed && close_transaction;
-    const slug = orders_open
-      .sort((a, b) => a.instId.localeCompare(b.instId))
-      .map(o => o.instId.split('-')[0].toLowerCase())
-      .join('-');
-    const file_path = `slices/${slug}/${isClosed ? 'closed/' : ''}${tradeId}.jpg`;
-    if (isClosed && this.existChartFile(file_path)) {
-      // 已关闭的不重复绘制
-      if (this.existChartFile(`slices/${slug}/${tradeId}.jpg`)) {
-        this.deleteChartFile(`slices/${slug}/${tradeId}.jpg`);
-      }
-      return;
-    }
-
-    const order_map = {};
-    const beta_map = {};
-    orders_open.forEach(({ beta, instId, avgPx, accFillSz, sz, ts }) => {
-      order_map[instId] = { beta, instId, avgPx, accFillSz, sz, ts };
-      beta_map[instId] = beta;
-    });
-
-    const scaled_prices = klines
-      .filter(({ id }) => orders.find(it => it.instId === id))
-      .map(({ id, prices, ts }) => {
-        const [a, b] = beta_map[id];
-        const beta = p => a * p + b;
-        return {
-          color: this.getThemes()[id],
-          prices: prices.map(it => beta(it)),
-          id,
-        };
-      });
-
-    if (!scaled_prices.length) return;
-
-    // 计算差值并添加注释
-    const configuration = {
-      // type: 'scatter',
-      type: 'line',
-      data: {
-        labels,
-        datasets: scaled_prices.map((it, id) => {
-          return {
-            label: it.id,
-            data: it.prices,
-            borderColor: it.color,
-            pointBackgroundColor: it.color,
-            ...styles,
-          };
-        }),
-      },
-      options: {
-        responsive: true, // 确保响应式布局
-        maintainAspectRatio: false, // 允许自定义宽高比例
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { labels: { color: 'black' } },
-        },
-        scales: {
-          y: {
-            ticks: {
-              callback: function (value) {
-                const baseValue = scaled_prices[0].prices[0];
-                return (((value - baseValue) / baseValue) * 100).toFixed(2) + '%';
-              },
-              stepSize: value => {
-                const baseValue = scaled_prices[0].prices[0];
-                return baseValue * 0.025; // 2.5% 的实际价格变化值
-              },
-            },
-          },
-        },
-        layout: {
-          padding: {
-            top: 140,
-            bottom: 60,
-            left: 60,
-            right: 60,
-          },
-        },
-      },
-      plugins: [
-        {
-          afterDraw: chart => {
-            // 绘制零基准线
-            const baseValue = scaled_prices[0].prices[0];
-            this._drawHorizontalLine(chart, baseValue);
-
-            // 为了避免标签重叠先搞个位置收集器
-            const collisionAvoidance = createCollisionAvoidance();
-
-            // 绘制实时利润空间表格
-            this._drawProfitTable(chart);
-
-            // 开平仓信息绘制
-            const transactions = [open_transaction, close_transaction].filter(it => it);
-            this._drawTransactions(chart, transactions, beta_map, collisionAvoidance, true);
-
-            // 绘制实时距离
-            this._drawRealtimeDistance(chart, tradeId, collisionAvoidance);
-
-            // 绘制信息表格
-            this._drawInfoTable(chart);
-
-            this._drawRhoTable(chart);
-
-            this._drawDateTime(chart);
-
-            // 绘制历史订单信息
-            const asset_names = transactions.flatMap(it => it.orders.map(o => o.instId));
-            this._paintOrders(chart, asset_names, beta_map, collisionAvoidance);
-          },
-        },
-      ],
-    };
-
-    (async () => {
-      const image = await chartJSNodeCanvas.renderToBuffer(configuration);
-      this.writeChartFile(file_path, image);
-    })();
   }
 
   /**
@@ -1524,7 +789,7 @@ export class VisualEngine {
     const top = height * 0.97;
 
     ctx.fillStyle = '#808b96';
-    ctx.font = '12px' + font_style;
+    ctx.font = '12px' + this.font_style;
     ctx.fillText(stamp, left, top);
   }
 
@@ -1595,3 +860,9 @@ export class VisualEngine {
     ctx.closePath();
   }
 }
+
+// 网格交易绘制模块
+VisualEngine.use(GridTradingSlice);
+VisualEngine.use(MainGraph);
+VisualEngine.use(HedgeTransactionSlice);
+VisualEngine.use(HedgeProfitDistance);
