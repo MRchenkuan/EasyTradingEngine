@@ -4,7 +4,7 @@ import { AbstractPainter } from './AbstractPainter.js';
 import { blendColors } from '../../tools.js';
 import { simpAssetName } from '../../paint.js';
 
-export class HedgeProfitDistance extends AbstractPainter {
+export class Sample extends AbstractPainter {
   static chartJSNodeCanvas = new ChartJSNodeCanvas({
     width: 2560,
     height: 1440,

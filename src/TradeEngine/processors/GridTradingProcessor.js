@@ -9,7 +9,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   engine = null;
   asset_name = '';
   _timer = {};
-  turtle = 1000; // 频率控制
+  turtle = 0; // 频率控制
 
   // 网格参数
   _grid_width = 0.025; // 网格宽度
@@ -296,12 +296,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     const now = Date.now();
     if (now - this._last_turtle_ts < this.turtle) return;
     this._last_turtle_ts = now;
-    // this._stratage_locked = true;
-    // await this._placeOrder(-1, '下单测试');
-    // // 等待1秒
-    // await new Promise(resolve => setTimeout(resolve, 3000));
-    // this._stratage_locked = false;
-    // return;
     try {
       this._stratage_locked = true;
       // 趋势和方向一致时不交易

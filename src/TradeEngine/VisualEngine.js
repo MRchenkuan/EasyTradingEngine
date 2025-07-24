@@ -2,11 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import fs from 'fs';
 import { blendColors, createMapFrom, formatTimestamp, hashString, shortDcm } from '../tools.js';
 import { calculateCorrelationMatrix } from '../mathmatic.js';
-import {
-  getClosingTransaction,
-  getLastTransactions,
-  getOpeningTransaction,
-} from '../recordTools.js';
+import { getOpeningTransaction } from '../recordTools.js';
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
 import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
@@ -17,10 +13,9 @@ import { MainGraph } from './painters/MainGraph.js';
 import { HedgeTransactionSlice } from './painters/HedgeTransactionSlice.js';
 import { HedgeProfitDistance } from './painters/HedgeProfitDistance.js';
 
-const width = 2560,
-  height = 1440;
-
 export class VisualEngine {
+  static width = 3840;
+  static height = 2160;
   static charts = [];
   static _timer = {};
   static _asset_themes = [];
@@ -604,8 +599,8 @@ export class VisualEngine {
       .filter(p => p.type === 'HedgeProcessor')
       .map(it => it.asset_names);
 
-    const left = width * 0.7;
-    const top = height * 0.01;
+    const left = this.width * 0.7;
+    const top = this.height * 0.01;
     const cellWidth = 80; // 单元格宽度
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距
@@ -668,7 +663,7 @@ export class VisualEngine {
   /**
    * 绘制价格、对冲比信息表格
    */
-  static _drawInfoTable(chart, left = width * 0.35, top = height * 0.01) {
+  static _drawInfoTable(chart, left = this.width * 0.35, top = this.height * 0.01) {
     const ctx = chart.ctx;
     const headers = ['β(对冲比)', '价格', '涨跌幅'];
     const themes = this._asset_themes;
@@ -730,8 +725,8 @@ export class VisualEngine {
     const themes = this._asset_themes;
     const data = calculateCorrelationMatrix(klines.map(it => it.prices));
 
-    const left = width * 0.01;
-    const top = height * 0.01;
+    const left = this.width * 0.01;
+    const top = this.height * 0.01;
     const cellWidth = 80; // 单元格宽度
     const cellHeight = 20; // 单元格高度
     const padding = 5; // 单元格内边距
@@ -785,11 +780,11 @@ export class VisualEngine {
 
     const stamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
-    const left = width * 0.9;
-    const top = height * 0.97;
+    const left = chart.width * 0.95;
+    const top = chart.height * 0.98;
 
     ctx.fillStyle = '#808b96';
-    ctx.font = '12px' + this.font_style;
+    ctx.font = '22px' + this.font_style;
     ctx.fillText(stamp, left, top);
   }
 

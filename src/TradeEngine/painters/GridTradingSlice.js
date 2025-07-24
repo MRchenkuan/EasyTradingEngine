@@ -9,8 +9,9 @@ import path from 'path';
 import { AbstractPainter } from './AbstractPainter.js';
 
 export class GridTradingSlice extends AbstractPainter {
-  static width = 2560;
-  static height = 1440;
+  static width = 3840;
+  static height = 2160;
+  static vol_erea_height = 0.2;
   static chartJSNodeCanvas = new ChartJSNodeCanvas({
     width: this.width,
     height: this.height,
@@ -48,7 +49,7 @@ export class GridTradingSlice extends AbstractPainter {
     // 设置指示器样式
     ctx.beginPath();
     ctx.strokeStyle = '#8b32a8';
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = 1;
 
     if (style === 'style2') {
       ctx.setLineDash([5, 5]);
@@ -67,7 +68,7 @@ export class GridTradingSlice extends AbstractPainter {
 
     // 显示拐点数值
     const value = chart.scales.y.getValueForPixel(y);
-    ctx.font = `12px ${this.font_style}`;
+    ctx.font = `22px ${this.font_style}`;
     ctx.fillStyle = '#8b32a8';
     ctx.textAlign = 'right';
     if (style === 'style2') {
@@ -116,6 +117,7 @@ export class GridTradingSlice extends AbstractPainter {
         parseFloat(it.close),
         parseFloat(it.low),
         parseFloat(it.high),
+        parseFloat(it.vol),
       ]);
       const {
         _grid_base_price,
@@ -149,6 +151,8 @@ export class GridTradingSlice extends AbstractPainter {
 
       const boll = engine.getBOLL(instId);
 
+      const max_vol = candle_data.slice(-MAX_CANDLE).reduce((acc, cur) => Math.max(acc, cur[4]), 0);
+
       // 计算差值并添加注释
       const configuration = {
         // type: 'scatter',
@@ -168,7 +172,7 @@ export class GridTradingSlice extends AbstractPainter {
                 return close < open ? '#52be80' : '#ec7063';
               },
               borderWidth: 0,
-              barThickness: 1.5, // 默认宽度
+              barThickness: 3, // 默认宽度
             },
             // 高点
             {
@@ -185,7 +189,7 @@ export class GridTradingSlice extends AbstractPainter {
                 return close < open ? '#52be80' : '#ec7063';
                 // return '#aeaeae';
               },
-              barThickness: 0.5,
+              barThickness: 1,
             },
             // 低点
             {
@@ -202,7 +206,25 @@ export class GridTradingSlice extends AbstractPainter {
                 return close < open ? '#52be80' : '#ec7063';
                 // return '#aeaeae';
               },
-              barThickness: 0.5,
+              barThickness: 1,
+            },
+            // 成交量
+            {
+              ...styles,
+              type: 'bar',
+              label: instId,
+              data: candle_data
+                .map(it => [0, (it[4] / max_vol) * this.constructor.vol_erea_height, it[0], it[1]])
+                .slice(-MAX_CANDLE),
+              borderWidth: 0,
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
+                return close < open ? '#52be80' : '#ec7063';
+                // return '#aeaeae';
+              },
+              barThickness: 3,
+              yAxisID: 'vol',
             },
             // 绘制布林线
             {
@@ -252,13 +274,19 @@ export class GridTradingSlice extends AbstractPainter {
             x: {
               stacked: true,
             },
+            vol: {
+              position: 'right',
+              suggestedMin: 0,
+              suggestedMax: 1,
+              grid: { display: false, drawOnChartArea: false }, // 仅显示主轴网格线
+            },
           },
           layout: {
             padding: {
-              top: 140,
-              bottom: 60,
+              top: 200,
+              bottom: 120,
               left: 60,
-              right: 200,
+              right: 260,
             },
           },
         },
