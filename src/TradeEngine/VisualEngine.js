@@ -12,6 +12,7 @@ import { GridTradingSlice } from './painters/GridTradingSlice.js';
 import { MainGraph } from './painters/MainGraph.js';
 import { HedgeTransactionSlice } from './painters/HedgeTransactionSlice.js';
 import { HedgeProfitDistance } from './painters/HedgeProfitDistance.js';
+import { Env } from '../../config.js';
 
 export class VisualEngine {
   static width = 3840;
@@ -21,7 +22,7 @@ export class VisualEngine {
   static _asset_themes = [];
   static _asset_names = [];
   static _show_order_his = [];
-  static _painting_interval = 5000; //
+  static _painting_interval = Env === TradeEnv.MIMIC ? 1000 : 5000; //
   static _boll_cache = new Map();
   static _boll_timer = null;
   static font_style = 'Monaco, Menlo, Consolas, monospace';

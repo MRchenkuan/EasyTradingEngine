@@ -21,3 +21,15 @@ export const OrderStatus = Object.freeze({
   CONFIRM_FAILED: 'confirm_failed',
   CONFIRM_ERROR: 'confirm_error',
 });
+
+export const TradeEnv = Object.freeze({
+  MIMIC: 'mimic',
+  PRODUCTION: 'production',
+});
+
+
+export const StrategyType = Object.freeze({
+  GRID_TRADING: 'grid_trading',
+  SCALPING_TRADING: 'scalping_trading',
+  HEDGE_TRADING: 'hedge_trading',
+});

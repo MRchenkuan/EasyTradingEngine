@@ -112,7 +112,7 @@ export async function getPrices(
       id: assetId,
       prices: collections.map(it => safeParseFloat(parseCandleData(it)[feild])),
       ts: collections.map(it => parseCandleData(it)['ts']),
-      orign_data:collections,
+      orign_data: collections,
     };
   } catch (e) {
     console.error(e.message);
@@ -339,7 +339,28 @@ export function calculateGridProfit(trades) {
   return results;
 }
 
-
-export function shortDcm(num, n=2) {
+export function shortDcm(num, n = 2) {
   return parseFloat(parseFloat(num).toFixed(n));
+}
+
+export function calculateStep(price) {
+  if (price <= 0) return 0.01; // 非正数处理
+  if (price < 1) return 0.01; // 低价固定步长
+
+  const integerPart = Math.floor(Math.abs(price));
+  const magnitude = Math.floor(Math.log10(integerPart));
+  return Math.pow(10, magnitude - 1) / 100;
+}
+
+export function getFormattedTimeString() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始计算
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  const stamp = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  return stamp;
 }

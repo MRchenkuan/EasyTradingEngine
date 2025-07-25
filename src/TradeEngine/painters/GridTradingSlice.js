@@ -2,7 +2,7 @@ import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { LocalVariable } from '../../LocalVariable.js';
 import { createCollisionAvoidance } from '../../paint.js';
 import { getGridTradeOrders } from '../../recordTools.js';
-import { formatTimestamp, shortDcm } from '../../tools.js';
+import { formatTimestamp, getFormattedTimeString, shortDcm } from '../../tools.js';
 import { GridTradingProcessor } from '../processors/GridTradingProcessor.js';
 import { TradeEngine } from '../TradeEngine.js';
 import path from 'path';
@@ -11,7 +11,7 @@ import { AbstractPainter } from './AbstractPainter.js';
 export class GridTradingSlice extends AbstractPainter {
   static width = 3840;
   static height = 2160;
-  static vol_erea_height = 0.2;
+  static vol_erea_height = 0.15;
   static chartJSNodeCanvas = new ChartJSNodeCanvas({
     width: this.width,
     height: this.height,
@@ -112,13 +112,15 @@ export class GridTradingSlice extends AbstractPainter {
       const color = engine.getThemes()[instId] || '#666666';
 
       const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
-      const candle_data = (TradeEngine.getCandleData(instId) || []).map(it => [
-        parseFloat(it.open),
-        parseFloat(it.close),
-        parseFloat(it.low),
-        parseFloat(it.high),
-        parseFloat(it.vol),
-      ]);
+      const candle_data = (TradeEngine.getCandleData(instId) || [])
+        .map(it => [
+          parseFloat(it.open),
+          parseFloat(it.close),
+          parseFloat(it.low),
+          parseFloat(it.high),
+          parseFloat(it.vol),
+        ])
+        .slice(-MAX_CANDLE);
       const {
         _grid_base_price,
         _grid_base_price_ts,
@@ -137,6 +139,15 @@ export class GridTradingSlice extends AbstractPainter {
         _grid_width,
         _threshold,
       } = new LocalVariable(`GridTradingProcessor/${instId}`) || {};
+
+      const {
+        distribution: chip_distribution,
+        min_price,
+        max_price,
+        min_volume,
+        max_volume,
+        step: chip_step,
+      } = TradeEngine.getChipDistribution(instId);
 
       if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
       const grid_lines = GridTradingProcessor._initPriceGrid(
@@ -164,8 +175,7 @@ export class GridTradingSlice extends AbstractPainter {
             {
               ...styles,
               type: 'bar',
-              label: instId,
-              data: candle_data.slice(-MAX_CANDLE),
+              data: candle_data,
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
                 const [open, close, low, hight] = ctx.dataset.data[ctx.dataIndex];
@@ -178,10 +188,7 @@ export class GridTradingSlice extends AbstractPainter {
             {
               ...styles,
               type: 'bar',
-              label: instId,
-              data: candle_data
-                .map(it => [Math.max(it[0], it[1]), it[3], it[0], it[1]])
-                .slice(-MAX_CANDLE),
+              data: candle_data.map(it => [Math.max(it[0], it[1]), it[3], it[0], it[1]]),
               borderWidth: 0,
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
@@ -195,10 +202,7 @@ export class GridTradingSlice extends AbstractPainter {
             {
               ...styles,
               type: 'bar',
-              label: instId,
-              data: candle_data
-                .map(it => [Math.min(it[0], it[1]), it[2], it[0], it[1]])
-                .slice(-MAX_CANDLE),
+              data: candle_data.map(it => [Math.min(it[0], it[1]), it[2], it[0], it[1]]),
               borderWidth: 0,
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
@@ -212,10 +216,12 @@ export class GridTradingSlice extends AbstractPainter {
             {
               ...styles,
               type: 'bar',
-              label: instId,
-              data: candle_data
-                .map(it => [0, (it[4] / max_vol) * this.constructor.vol_erea_height, it[0], it[1]])
-                .slice(-MAX_CANDLE),
+              data: candle_data.map(it => [
+                0,
+                (it[4] / max_vol) * this.constructor.vol_erea_height,
+                it[0],
+                it[1],
+              ]),
               borderWidth: 0,
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
@@ -226,23 +232,41 @@ export class GridTradingSlice extends AbstractPainter {
               barThickness: 3,
               yAxisID: 'vol',
             },
+            // 筹码分布
+            {
+              ...styles,
+              type: 'bar',
+              indexAxis: 'y', // 关键！仅此数据集横向显示
+              data: chip_distribution.map(it => {
+                return {
+                  x: it.volume / max_volume, // X轴（横向长度）
+                  y: it.price, // Y轴（价格位置）
+                };
+              }),
+              borderWidth: 0,
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                const { y } = ctx.dataset.data[ctx.dataIndex];
+                return y > current_price ? '#52be80' : '#ec7063';
+              },
+              barThickness: 1,
+              yAxisID: 'chipY', // 关联分类轴
+              xAxisID: 'chipX',
+            },
             // 绘制布林线
             {
               ...styles_2,
               type: 'line',
-              label: 'BOLL',
               data: boll.upperArray.slice(-MAX_CANDLE),
             },
             {
               ...styles_2,
               type: 'line',
-              label: 'BOLL',
               data: boll.lowerArray.slice(-MAX_CANDLE),
             },
             {
               ...styles_2,
               type: 'line',
-              label: 'BOLL',
               data: boll.middleArray.slice(-MAX_CANDLE),
             },
           ],
@@ -260,6 +284,8 @@ export class GridTradingSlice extends AbstractPainter {
             y: {
               // type: 'logarithmic',
               beginAtZero: false,
+              min: min_price * 0.98,
+              max: max_price * 1.01,
               ticks: {
                 callback: function (value) {
                   const baseValue = prices[0];
@@ -278,16 +304,51 @@ export class GridTradingSlice extends AbstractPainter {
               position: 'right',
               suggestedMin: 0,
               suggestedMax: 1,
+              display: false,
+            },
+
+            chipY: {
+              // 分类轴（实际是价格轴）
+              type: 'linear',
+              position: 'left', // 显示在右侧
+              min: min_price * 0.98,
+              max: max_price * 1.01,
+              ticks: {
+                stepSize: chip_step * 10,
+              },
               grid: { display: false, drawOnChartArea: false }, // 仅显示主轴网格线
+            },
+            chipX: {
+              // 数值轴（成交量比例）
+              type: 'linear',
+              position: 'top', // 显示在顶部
+              min: 0,
+              max: 10,
+              display: false, // 可隐藏刻度
             },
           },
           layout: {
             padding: {
-              top: 200,
+              top: 100,
               bottom: 120,
               left: 60,
-              right: 260,
+              right: 360,
             },
+          },
+          plugins: {
+            title: {
+              display: true,
+              text: `${instId} @ ${getFormattedTimeString()}`,
+              align: 'end',
+              color: color,
+              font: {
+                size: 60,
+                // weight: 'bold',
+                lineHeight: 1.2,
+              },
+              padding: { top: 20, left: 0, right: 0, bottom: 40 },
+            },
+            legend: false,
           },
         },
         plugins: [
@@ -379,11 +440,6 @@ export class GridTradingSlice extends AbstractPainter {
 
               // 为了避免标签重叠先搞个位置收集器
               const collisionAvoidance = createCollisionAvoidance();
-
-              // 绘制信息表格
-              engine._drawInfoTable(chart, width * 0.01, height * 0.01);
-
-              engine._drawDateTime(chart);
 
               // 绘制交易信息
               TradeEngine.processors

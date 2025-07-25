@@ -1,28 +1,20 @@
-import './src/utils/logger.js';
+import './utils/logger.js';
 import WebSocket from 'ws';
-import { getPrices, parseCandleData, getLastWholeMinute } from './src/tools.js';
-import { base_url } from './src/config.security.js';
-import { subscribeKlineChanel } from './src/api.js';
-import { TradeEngine } from './src/TradeEngine/TradeEngine.js';
-import { VisualEngine } from './src/TradeEngine/VisualEngine.js';
-import { BarType, SettlementType } from './src/enum.js';
+import { getPrices, parseCandleData, getLastWholeMinute } from './tools.js';
+import { base_url } from './config.security.js';
+import { subscribeKlineChanel } from './api.js';
+import { TradeEngine } from './TradeEngine/TradeEngine.js';
+import { VisualEngine } from './TradeEngine/VisualEngine.js';
+import { KLine, MainGraph, Strategies } from '../config.js';
 
 const ws_connection_pool = {};
 
-const bar_type = BarType.MINUTE_5;
-const duration = 32; // 12天前
+const bar_type = KLine.bar_type;
+const duration = KLine.max_days;
 const price_type = 'close';
 const once_limit = 300;
-const candle_limit = 2000;
-const assets = [
-  { id: 'BTC-USDT-SWAP', theme: '#f0b27a' },
-  { id: 'SOL-USDT-SWAP', theme: '#ad85e9' },
-  { id: 'ETH-USDT-SWAP', theme: '#85c1e9' },
-  // { id: 'TRUMP-USDT', theme: '#90a4ae' },
-  { id: 'XRP-USDT-SWAP', theme: '#ffafde' },
-  // { id: 'OKB-USDT', theme: '#52be80' },
-  // { id: 'ADA-USDT', theme: '#85dfe9' },
-];
+const candle_limit = KLine.candle_limit;
+const assets = MainGraph.assets;
 const params = {
   bar_type,
   price_type,
@@ -58,53 +50,8 @@ TradeEngine.setMetaInfo({
  * 启动网格交易
  */
 
-TradeEngine.createGridTrading('XRP-USDT-SWAP', {
-  // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0075,
-  _lower_drawdown: 0.0075,
-  _grid_width: 0.005,
-  _min_price: 2.0,
-  _max_price: 4.0,
-  _base_amount: 20, // 每笔交易量
-  _base_lots: 10, // 每笔交易的份数
-  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
-});
-
-TradeEngine.createGridTrading('ETH-USDT-SWAP', {
-  // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0075,
-  _lower_drawdown: 0.0075,
-  _grid_width: 0.005,
-  _min_price: 1500,
-  _max_price: 4200,
-  _base_amount: 20,
-  _base_lots: 10,
-  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
-});
-
-TradeEngine.createGridTrading('SOL-USDT-SWAP', {
-  // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0075,
-  _lower_drawdown: 0.0075,
-  _grid_width: 0.005,
-  _min_price: 120,
-  _max_price: 220,
-  _base_amount: 20,
-  _base_lots: 10,
-  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
-});
-
-TradeEngine.createGridTrading('BTC-USDT-SWAP', {
-  // _grid_base_price: 2.0, //建仓基准价
-  _upper_drawdown: 0.0075,
-  _lower_drawdown: 0.0075,
-  _grid_width: 0.005,
-  _min_price: 90000,
-  _max_price: 130000,
-  _swap_value: 0.01, //合约面值
-  _base_amount: 40,
-  _base_lots: 10,
-  _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
+Strategies.forEach(strategy => {
+  TradeEngine.createGridTrading(strategy.params.assetId, strategy.params);
 });
 
 /**
@@ -112,15 +59,7 @@ TradeEngine.createGridTrading('BTC-USDT-SWAP', {
  */
 VisualEngine.setMetaInfo({
   assets,
-  show_order_his: [
-    // 'BTC-USDT',
-    // 'ETH-USDT',
-    // 'XRP-USDT',
-    // 'SOL-USDT',
-    // 'TRUMP-USDT',
-    // 'ADA-USDT',
-    // 'OKB-USDT',
-  ],
+  show_order_his: MainGraph.order_his_show,
 }).start();
 
 const assetIds = assets.map(it => it.id);

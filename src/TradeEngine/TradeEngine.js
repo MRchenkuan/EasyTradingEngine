@@ -7,10 +7,11 @@ import {
   updateTransaction,
 } from '../recordTools.js';
 import { findBestFitLine } from '../regression.js';
-import { formatTimestamp, parseCandleData } from '../tools.js';
+import { calculateStep, formatTimestamp, parseCandleData } from '../tools.js';
 import { HedgeProcessor } from './processors/HedgeProcessor.js';
 import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
+import { calculateChipDistribution } from '../indicators/CD.js';
 
 export class TradeEngine {
   static processors = [];
@@ -248,6 +249,14 @@ export class TradeEngine {
       processAsset(id); // 直接传递资产ID
     }
     // recordBetaMap(this._beta_map);
+  }
+
+  static getChipDistribution(assetId, bar_type = this._bar_type) {
+    // 计算筹码分布
+    const chip_distribution = calculateChipDistribution(
+      this.getCandleData(assetId, bar_type)
+    );
+    return chip_distribution;
   }
 
   /**
