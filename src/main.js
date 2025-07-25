@@ -1,6 +1,6 @@
 import './utils/logger.js';
 import WebSocket from 'ws';
-import { getPrices, parseCandleData, getLastWholeMinute } from './tools.js';
+import { getPrices, parseCandleData, getLastWholeMinute, getHistoryPrices } from './tools.js';
 import { base_url } from './config.security.js';
 import { subscribeKlineChanel } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
@@ -74,7 +74,16 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
 
     while (globalRetries < maxRetries && !success) {
       try {
-        const data = await getPrices(id, params);
+        const data_realtime = await getPrices(id, params);
+        const data_history = await getHistoryPrices(id, params);
+
+        const data = {
+          id,
+          prices: data_realtime.prices.concat(data_history.prices),
+          ts: data_realtime.ts.concat(data_history.ts),
+          orign_data: data_realtime.orign_data.concat(data_history.orign_data),
+        };
+
         if (data && data.prices && data.ts) {
           results.push(data);
           success = true;

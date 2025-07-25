@@ -5,7 +5,7 @@
  * @param {string} [model='uniform'] - 分布模型: 'uniform'(均匀)/'triangle'(三角形)
  * @returns {Object} {
  */
-export function calculateChipDistribution(data, model = 'triangle') {
+export function calculateChipDistribution(data, open_interest, model = 'triangle') {
   const circulation = Infinity; // todo 此处可以连接到交易所接口获取流通股本
 
   // 1. 参数校验
@@ -33,16 +33,14 @@ export function calculateChipDistribution(data, model = 'triangle') {
 
   // 3. 动态计算参数
   const params = {
-    // 衰减系数 (高频数据衰减更快)
-    decay: calculateDecayFactor(granularityMinutes),
     // 区间数量
-    bins: 1000,
+    bins: 500,
   };
 
   // 4. 获取计算窗口 (基于流通股本)
   const { windowData, minPrice, maxPrice } = getVolumeWindow(data, circulation);
   console.log(
-    `计算窗口: ${windowData.length}条数据, 价格范围: [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`
+    `计算窗口: ${windowData.length} 条数据, 价格范围: [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`
   );
 
   // 5. 动态生成价格轴
@@ -79,7 +77,7 @@ export function calculateChipDistribution(data, model = 'triangle') {
         : calcUniformDistribution(priceRange, volume, params.bins, minPrice, priceStep);
 
     // 应用衰减系数并累加
-    chips = chips.map(v => v * params.decay); // 先整体衰减
+    chips = chips.map(v => v * (1- volume / open_interest )); // 先整体衰减
     distribution.forEach((chip, i) => (chips[i] += chip)); // 再添加新筹码
   });
 
@@ -125,14 +123,6 @@ function detectGranularity(data) {
   );
 }
 
-// 动态衰减系数计算
-function calculateDecayFactor(granularityMinutes) {
-  // 高频数据(<=5分钟)使用快速衰减，低频使用慢速衰减
-  if (granularityMinutes <= 5) return 0.95; // 1-5分钟
-  if (granularityMinutes <= 60) return 0.85; // 15-60分钟
-  return 0.618; // 日线
-}
-
 // 获取基于流通股本的数据窗口
 function getVolumeWindow(data, circulation) {
   let totalVol = 0;
@@ -151,7 +141,7 @@ function getVolumeWindow(data, circulation) {
     // 覆盖80%流通股本时停止
     if (totalVol >= circulation * 0.8) break;
     // 限制数据量 (防止内存问题)
-    if (result.length >= 2000) break;
+    if (result.length >= 8000) break;
   }
   return { windowData: result, minPrice, maxPrice };
 }

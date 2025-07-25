@@ -22,7 +22,7 @@ export async function marketCandles(instId, bar, after, before, limit) {
 }
 
 export async function marketCandlesHistory(instId, bar, after, before, limit) {
-  return axios.get(base_url + '/api/v5/market/history-candles', {
+  const { data } = await axios.get(base_url + '/api/v5/market/history-candles', {
     params: {
       instId,
       bar,
@@ -31,8 +31,11 @@ export async function marketCandlesHistory(instId, bar, after, before, limit) {
       limit,
     },
     timeout: 10000, // 设置5秒超时
+    
   });
+  return data;
 }
+
 
 /**
  * 获取订单信息 - 实盘
@@ -264,10 +267,44 @@ export async function batchCancelOrders(orders) {
   return data;
 }
 
-// 获取订单信息
+
+// 获取持仓量
+export async function getOpenInterest(instType, instId, uly, instFamily) {
+   const security = MIMIC ? mimic : firm;
+
+  const timestamp = new Date().toISOString();
+  const method = 'GET';
+  const requestPath = `/api/v5/public/open-interest?instType=${instType}&instId=${instId}`;
+  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
+
+  const headers = {
+    'OK-ACCESS-KEY': security.api_key,
+    'OK-ACCESS-SIGN': sign,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    // 'x-simulated-trading': 1,
+  };
+
+  if (MIMIC) {
+    headers['x-simulated-trading'] = 1;
+  }
+
+  try {
+    const { data } = await axios.get(base_url + requestPath, { headers });
+    // 确保返回的数据格式正确
+    if (!data.data || !data.data.length) {
+      console.error(`获取交易品种持仓信息失败: ${instId} ${ordId}`);
+      return { data: [] };
+    }
+    return data;
+  } catch (error) {
+    console.error('获取交易品种持仓信息失败:', error.response?.data || error.message);
+    return { data: [] };
+  }
+}
+
+// 获取交易品种信息
 export async function getInstruments(instType, instId) {
-  // const security = firm;
-  // const security = mimic;
   const security = MIMIC ? mimic : firm;
 
   const timestamp = new Date().toISOString();

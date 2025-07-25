@@ -1,4 +1,4 @@
-import { getInstruments, getOrderHistory } from '../api.js';
+import { getInstruments, getOpenInterest, getOrderHistory } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import {
   getClosingTransaction,
@@ -254,7 +254,8 @@ export class TradeEngine {
   static getChipDistribution(assetId, bar_type = this._bar_type) {
     // 计算筹码分布
     const chip_distribution = calculateChipDistribution(
-      this.getCandleData(assetId, bar_type)
+      this.getCandleData(assetId, bar_type),
+      this.getInstrumentInfo(assetId).oi
     );
     return chip_distribution;
   }
@@ -762,11 +763,22 @@ export class TradeEngine {
     // 创建定时更新任务
     const updateInstrument = async () => {
       // 从API获取品种信息
-      const { data } = await getInstruments(instType, assetName);
-      const inst = data.find(it => it.instId === assetName);
-      if (inst) {
+      const { data: base } = await getInstruments(instType, assetName);
+      const { data: openInterest } = await getOpenInterest(instType, assetName);
+      const inst_base = base.find(it => it.instId === assetName);
+      const inst_open_interest = openInterest.find(it => it.instId === assetName);
+
+      if (inst_base) {
+        this._instrument_info[assetName] ??= {
+          ...inst_base,
+          lastUpdateTime: Date.now(),
+        };
+      }
+
+      if (inst_open_interest) {
         this._instrument_info[assetName] = {
-          ...inst,
+          ...this._instrument_info[assetName],
+          ...inst_open_interest,
           lastUpdateTime: Date.now(),
         };
       }

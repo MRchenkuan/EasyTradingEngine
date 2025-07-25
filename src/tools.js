@@ -1,4 +1,4 @@
-import { marketCandles } from './api.js';
+import { marketCandles, marketCandlesHistory } from './api.js';
 import crypto from 'crypto';
 
 // 生成签名的函数
@@ -104,6 +104,36 @@ export async function getPrices(
     while (times-- > 0) {
       const { data } = await marketCandles(assetId, bar, last_ts, to_when, once_limit);
       console.log(assetId, formatTimestamp(last_ts), bar, data.length);
+      if (!(data && data.length > 0)) break;
+      last_ts = parseCandleData(data[data.length - 1])['ts'];
+      collections = collections.concat(data);
+    }
+    return {
+      id: assetId,
+      prices: collections.map(it => safeParseFloat(parseCandleData(it)[feild])),
+      ts: collections.map(it => parseCandleData(it)['ts']),
+      orign_data: collections,
+    };
+  } catch (e) {
+    console.error(e.message);
+  }
+}
+
+
+export async function getHistoryPrices(
+  assetId,
+  { to_when, from_when, bar_type, price_type, once_limit, candle_limit }
+) {
+  const limit = candle_limit,
+    bar = bar_type,
+    feild = price_type;
+  try {
+    let times = Math.trunc(limit / once_limit);
+    let collections = [];
+    let last_ts = from_when || Date.now();
+    while (times-- > 0) {
+      const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
+      console.log(assetId+"(HIS)", formatTimestamp(last_ts), bar, data.length);
       if (!(data && data.length > 0)) break;
       last_ts = parseCandleData(data[data.length - 1])['ts'];
       collections = collections.concat(data);
