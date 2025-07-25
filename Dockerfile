@@ -28,4 +28,4 @@ RUN npm install
 COPY . .
 
 # 使用 PM2 启动应用
-CMD ["pm2-runtime", "start", "main.js", "--name", "okx-trading"]
+CMD ["pm2-runtime", "start", "src/main.js", "--name", "okx-trading"]

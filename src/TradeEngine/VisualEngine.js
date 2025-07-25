@@ -13,6 +13,7 @@ import { MainGraph } from './painters/MainGraph.js';
 import { HedgeTransactionSlice } from './painters/HedgeTransactionSlice.js';
 import { HedgeProfitDistance } from './painters/HedgeProfitDistance.js';
 import { Env } from '../../config.js';
+import { TradeEnv } from '../enum.js';
 
 export class VisualEngine {
   static width = 3840;
