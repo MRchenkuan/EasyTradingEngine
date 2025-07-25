@@ -6,7 +6,7 @@
  * @returns {Object} {
  */
 export function calculateChipDistribution(data, open_interest, model = 'triangle') {
-  const circulation = Infinity; // todo 此处可以连接到交易所接口获取流通股本
+  const circulation = open_interest; // todo 此处可以连接到交易所接口获取流通股本
 
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');
@@ -139,7 +139,7 @@ function getVolumeWindow(data, circulation) {
     result.unshift(bar);
 
     // 覆盖80%流通股本时停止
-    if (totalVol >= circulation * 0.8) break;
+    // if (totalVol >= circulation * 0.8) break;
     // 限制数据量 (防止内存问题)
     if (result.length >= 8000) break;
   }
