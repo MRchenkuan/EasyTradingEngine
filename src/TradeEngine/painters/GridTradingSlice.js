@@ -110,8 +110,6 @@ export class GridTradingSlice extends AbstractPainter {
       const color = engine.getThemes()[instId] || '#666666';
 
       const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
-      const candle_max_price = prices.reduce((a, b) => Math.max(a, b), -Infinity);
-      const candle_min_price = prices.reduce((a, b) => Math.min(a, b), Infinity);
       const candle_data = (TradeEngine.getCandleData(instId) || [])
         .map(it => [
           parseFloat(it.open),
@@ -121,6 +119,8 @@ export class GridTradingSlice extends AbstractPainter {
           parseFloat(it.vol),
         ])
         .slice(-MAX_CANDLE);
+      const candle_max_price = candle_data.reduce((a, b) => Math.max(a, b[3]), -Infinity);
+      const candle_min_price = candle_data.reduce((a, b) => Math.min(a, b[2]), Infinity);
       const {
         _grid_base_price,
         _grid_base_price_ts,

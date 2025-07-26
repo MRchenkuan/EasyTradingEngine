@@ -6,8 +6,7 @@
  * @returns {Object} {
  */
 export function calculateChipDistribution(data, open_interest, model = 'triangle') {
-  const circulation = open_interest; // todo 此处可以连接到交易所接口获取流通股本
-
+  const circulation = open_interest; 
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');
   if (circulation <= 0) throw new Error('流通股本必须大于0');
