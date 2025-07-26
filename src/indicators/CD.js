@@ -77,7 +77,7 @@ export function calculateChipDistribution(data, open_interest, model = 'triangle
         : calcUniformDistribution(priceRange, volume, params.bins, minPrice, priceStep);
 
     // 应用衰减系数并累加
-    chips = chips.map(v => v * (1- volume / open_interest )); // 先整体衰减
+    chips = chips.map(v => v * (1 - volume / open_interest)); // 先整体衰减
     distribution.forEach((chip, i) => (chips[i] += chip)); // 再添加新筹码
   });
 

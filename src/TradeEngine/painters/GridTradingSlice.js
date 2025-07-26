@@ -86,8 +86,6 @@ export class GridTradingSlice extends AbstractPainter {
   }
 
   draw() {
-    const width = this.constructor.width;
-    const height = this.constructor.height;
     const engine = this.engine;
     const MAX_CANDLE = this.constructor.MAX_CANDLE;
     const styles = this.constructor.styles;
@@ -112,6 +110,8 @@ export class GridTradingSlice extends AbstractPainter {
       const color = engine.getThemes()[instId] || '#666666';
 
       const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
+      const candle_max_price = prices.reduce((a, b) => Math.max(a, b), -Infinity);
+      const candle_min_price = prices.reduce((a, b) => Math.min(a, b), Infinity);
       const candle_data = (TradeEngine.getCandleData(instId) || [])
         .map(it => [
           parseFloat(it.open),
@@ -142,8 +142,8 @@ export class GridTradingSlice extends AbstractPainter {
 
       const {
         distribution: chip_distribution,
-        min_price,
-        max_price,
+        min_price: chip_min_price,
+        max_price: chip_max_price,
         min_volume,
         max_volume,
         step: chip_step,
@@ -284,8 +284,8 @@ export class GridTradingSlice extends AbstractPainter {
             y: {
               // type: 'logarithmic',
               beginAtZero: false,
-              min: min_price * 0.98,
-              max: max_price * 1.01,
+              min: candle_min_price * 0.98,
+              max: candle_max_price * 1.02,
               ticks: {
                 callback: function (value) {
                   const baseValue = prices[0];
@@ -311,8 +311,8 @@ export class GridTradingSlice extends AbstractPainter {
               // 分类轴（实际是价格轴）
               type: 'linear',
               position: 'left', // 显示在右侧
-              min: min_price * 0.98,
-              max: max_price * 1.01,
+              min: candle_min_price * 0.98,
+              max: candle_max_price * 1.02,
               ticks: {
                 stepSize: chip_step * 10,
               },
