@@ -34,6 +34,8 @@ export class TradeEngine {
   static _max_candle_size = 3000;
   static _instrument_timers = {}; // 存储每个品种的定时器
   static _instrument_info = {}; // 存储品种信息
+  static _chip_distribution = {};
+  static _chip_distribution_cache_duration = 1000 * 9;
 
   /**
    * 对冲监听器
@@ -252,12 +254,15 @@ export class TradeEngine {
   }
 
   static getChipDistribution(assetId, bar_type = this._bar_type) {
-    // 计算筹码分布
-    const chip_distribution = calculateChipDistribution(
-      this.getCandleData(assetId, bar_type),
-      this.getInstrumentInfo(assetId).oi
-    );
-    return chip_distribution;
+    const last_time = this._chip_distribution[assetId]?.last_time || 0;
+    if (Date.now() - last_time > this._chip_distribution_cache_duration) {
+      this._chip_distribution[assetId] = calculateChipDistribution(
+        this.getCandleData(assetId, bar_type),
+        this.getInstrumentInfo(assetId).oi
+      );
+      this._chip_distribution[assetId].last_time = Date.now();
+    }
+    return this._chip_distribution[assetId];
   }
 
   /**

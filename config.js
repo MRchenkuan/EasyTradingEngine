@@ -6,7 +6,7 @@ export const Env = TradeEnv.PRODUCTION;
 export const KLine = {
   bar_type: BarType.MINUTE_5,
   max_days: 720,
-  candle_limit: 2000,
+  candle_limit: 4000,
 };
 
 export const MainGraph = {

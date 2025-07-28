@@ -1,3 +1,5 @@
+import { formatTimestamp } from '../tools.js';
+
 /**
  * 多粒度筹码分布计算器（自动适应1m/5m/1H/1D数据）
  * @param {Array} data - K线数据(按时间升序), 格式: [{open, high, low, close, vol, ts}]
@@ -5,8 +7,8 @@
  * @param {string} [model='uniform'] - 分布模型: 'uniform'(均匀)/'triangle'(三角形)
  * @returns {Object} {
  */
-export function calculateChipDistribution(data, open_interest, model = 'triangle') {
-  const circulation = open_interest; 
+export function calculateChipDistribution(data, open_interest) {
+  const circulation = open_interest;
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');
   if (circulation <= 0) throw new Error('流通股本必须大于0');
@@ -18,6 +20,7 @@ export function calculateChipDistribution(data, open_interest, model = 'triangle
     vol: parseFloat(it.vol),
     ts: it.ts,
   }));
+
   // 2. 自动检测数据粒度
   const granularityMinutes = detectGranularity(data);
   const granularity =
@@ -49,38 +52,104 @@ export function calculateChipDistribution(data, open_interest, model = 'triangle
     (_, i) => minPrice + priceStep * (i + 0.5) // 使用区间中心点
   );
 
-  // 6. 初始化筹码数组
+  // 6. 初始化筹码数组和历史记录
   let chips = new Array(params.bins).fill(0);
+  const allPeriods = []; // 存储所有周期的筹码分布
 
   // 7. 处理计算窗口内所有K线
-  windowData.forEach(bar => {
+  windowData.forEach((bar, index) => {
     const { open, high, low, close, vol: volume } = bar;
     const priceRange = [low, high];
 
-    if (priceRange[0] >= priceRange[1] || volume <= 0) return;
+    if (priceRange[0] >= priceRange[1] || volume <= 0) {
+      // 即使当前K线无效，也要记录当前状态（如果需要返回所有周期）
+      const currentDistribution = [];
+      for (let i = 0; i < priceAxis.length; i++) {
+        currentDistribution.push({
+          price: priceAxis[i],
+          volume: chips[i],
+        });
+      }
+
+      let min_volume = Infinity;
+      let max_volume = -Infinity;
+      for (let i = 0; i < chips.length; i++) {
+        if (chips[i] < min_volume) min_volume = chips[i];
+        if (chips[i] > max_volume) max_volume = chips[i];
+      }
+
+      const concentration = calculateConcentration(chips, priceAxis);
+
+      allPeriods.push({
+        ts: bar.ts,
+        period: index + 1,
+        distribution: currentDistribution,
+        max_price: maxPrice,
+        min_price: minPrice,
+        min_volume: min_volume,
+        max_volume: max_volume,
+        open,
+        close,
+        volume,
+        step: priceStep,
+        concentration,
+      });
+      return;
+    }
 
     // 计算单根K线在各价位的筹码分布
-    const distribution =
-      model === 'triangle'
-        ? calcTriangleDistribution(
-            priceRange,
-            open,
-            high,
-            low,
-            close,
-            volume,
-            params.bins,
-            minPrice,
-            priceStep
-          )
-        : calcUniformDistribution(priceRange, volume, params.bins, minPrice, priceStep);
+    const distribution = calcTriangleDistribution(
+      priceRange,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      params.bins,
+      minPrice,
+      priceStep
+    );
 
     // 应用衰减系数并累加
     chips = chips.map(v => v * (1 - volume / open_interest)); // 先整体衰减
+    // console.log(`[${formatTimestamp(bar.ts)}] 换手率: ${(volume / open_interest).toFixed(4)}%`);
     distribution.forEach((chip, i) => (chips[i] += chip)); // 再添加新筹码
+
+    // 如果需要返回所有周期，保存当前周期的筹码分布
+    const currentDistribution = [];
+    for (let i = 0; i < priceAxis.length; i++) {
+      currentDistribution.push({
+        price: priceAxis[i],
+        volume: chips[i],
+      });
+    }
+
+    let min_volume = Infinity;
+    let max_volume = -Infinity;
+    for (let i = 0; i < chips.length; i++) {
+      if (chips[i] < min_volume) min_volume = chips[i];
+      if (chips[i] > max_volume) max_volume = chips[i];
+    }
+
+    const concentration = calculateConcentration(chips, priceAxis);
+
+    allPeriods.push({
+      ts: bar.ts,
+      period: index + 1,
+      distribution: currentDistribution,
+      max_price: maxPrice,
+      min_price: minPrice,
+      min_volume: min_volume,
+      max_volume: max_volume,
+      open,
+      close,
+      volume,
+      step: priceStep,
+      concentration,
+    });
   });
 
-  // 8. 计算筹码集中度
+  // 8. 计算最终的筹码集中度
   const concentration = calculateConcentration(chips, priceAxis);
 
   const distribution = [];
@@ -98,8 +167,10 @@ export function calculateChipDistribution(data, open_interest, model = 'triangle
     if (chips[i] > max_volume) max_volume = chips[i];
   }
 
-  return {
+  const result = {
     distribution,
+    allPeriods,
+    totalPeriods: allPeriods.length,
     max_price: maxPrice,
     min_price: minPrice,
     min_volume: min_volume,
@@ -107,6 +178,8 @@ export function calculateChipDistribution(data, open_interest, model = 'triangle
     step: priceStep,
     concentration,
   };
+
+  return result;
 }
 
 // 自动检测数据粒度 (单位:分钟)

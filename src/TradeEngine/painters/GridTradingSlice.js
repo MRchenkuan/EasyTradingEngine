@@ -105,6 +105,26 @@ export class GridTradingSlice extends AbstractPainter {
       return acc;
     }, {});
 
+    const findDistribution = (data, ts) => {
+      if (data.length === 0) return null;
+
+      let minDiff = Infinity;
+      let closestElement = null;
+
+      for (let i = 0; i < data.length; i++) {
+        const diff = Math.abs(data[i].ts - ts);
+
+        // 遇到完全匹配时提前退出
+        if (diff === 0) return data[i];
+
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestElement = data[i];
+        }
+      }
+      return closestElement;
+    };
+
     assets.forEach(instId => {
       const group_orders = groupedOrders[instId];
       const color = engine.getThemes()[instId] || '#666666';
@@ -146,8 +166,18 @@ export class GridTradingSlice extends AbstractPainter {
         max_price: chip_max_price,
         min_volume,
         max_volume,
+        allPeriods,
         step: chip_step,
       } = TradeEngine.getChipDistribution(instId);
+
+      const chip_distribution_1day_before = findDistribution(
+        allPeriods,
+        Date.now() - 1000 * 60 * 60 * 24
+      );
+      const chip_distribution_1hour_before = findDistribution(
+        allPeriods,
+        Date.now() - 1000 * 60 * 60
+      );
 
       if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
       const grid_lines = GridTradingProcessor._initPriceGrid(
@@ -253,6 +283,50 @@ export class GridTradingSlice extends AbstractPainter {
               yAxisID: 'chipY', // 关联分类轴
               xAxisID: 'chipX',
             },
+            // 筹码分布-1day
+            {
+              ...styles,
+              type: 'bar',
+              indexAxis: 'y', // 关键！仅此数据集横向显示
+              data: chip_distribution_1day_before.distribution.map(it => {
+                return {
+                  x: it.volume / max_volume, // X轴（横向长度）
+                  y: it.price, // Y轴（价格位置）
+                };
+              }),
+              borderWidth: 0,
+              backgroundColor: ctx => {
+                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+                // const { y } = ctx.dataset.data[ctx.dataIndex];
+                return '#85C1E9';
+                // return '#85929E';
+              },
+              barThickness: 1,
+              yAxisID: 'chipY', // 关联分类轴
+              xAxisID: 'chipX',
+            },
+            // 筹码分布-1Hour
+            // {
+            //   ...styles,
+            //   type: 'bar',
+            //   indexAxis: 'y', // 关键！仅此数据集横向显示
+            //   data: chip_distribution_1hour_before.distribution.map(it => {
+            //     return {
+            //       x: it.volume / max_volume, // X轴（横向长度）
+            //       y: it.price, // Y轴（价格位置）
+            //     };
+            //   }),
+            //   borderWidth: 0,
+            //   backgroundColor: ctx => {
+            //     // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
+            //     // const { y } = ctx.dataset.data[ctx.dataIndex];
+            //     return '#85929E';
+            //     // return '#85C1E9';
+            //   },
+            //   barThickness: 1,
+            //   yAxisID: 'chipY', // 关联分类轴
+            //   xAxisID: 'chipX',
+            // },
             // 绘制布林线
             {
               ...styles_2,
