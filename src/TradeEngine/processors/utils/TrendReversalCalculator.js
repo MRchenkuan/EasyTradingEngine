@@ -308,6 +308,11 @@ export function trendReversalThreshold(
   tendency,
   grid_box
 ) {
+
+  if(price_distance_count > 1.75 && price_grid_count < 2) {
+    threshold = threshold * 0.75;
+  }
+
   // 基础阈值（初始回撤/反弹容忍度）
   const min_threshold = 0.001; // 最小阈值，避免阈值过小
   const max_threshold = 0.012; // 最大阈值，避免阈值过大
