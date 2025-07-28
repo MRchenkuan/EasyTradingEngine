@@ -12,7 +12,7 @@
 <img width="3840" height="2160" alt="image" src="https://github.com/user-attachments/assets/aeca8668-31a8-4bb2-97cb-a9468fe6e9b2" />
 - 左侧是筹码分布
 - 右侧是价格游标
-- 底部是成交量
+- - 底部是成交量
 策略，总体上遵循高卖，低买，但会根据成交量、ATR、时间来择时。
 
 # 秘钥配置
