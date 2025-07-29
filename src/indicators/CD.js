@@ -7,8 +7,11 @@ import { formatTimestamp } from '../tools.js';
  * @param {string} [model='uniform'] - 分布模型: 'uniform'(均匀)/'triangle'(三角形)
  * @returns {Object} {
  */
-export function calculateChipDistribution(data, open_interest) {
-  const circulation = open_interest;
+export function calculateChipDistribution(data, f_get_open_interest_by_time, f_get_volume_by_time) {
+  const now = Date.now();
+  const now_volume = f_get_volume_by_time(now).vol;
+  const circulation = f_get_open_interest_by_time(now).oi;
+  const now_turnover = now_volume / circulation;
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');
   if (circulation <= 0) throw new Error('流通股本必须大于0');
@@ -40,7 +43,7 @@ export function calculateChipDistribution(data, open_interest) {
   };
 
   // 4. 获取计算窗口 (基于流通股本)
-  const { windowData, minPrice, maxPrice } = getVolumeWindow(data, circulation);
+  const { windowData, minPrice, maxPrice } = getVolumeWindow(data);
   console.log(
     `计算窗口: ${windowData.length} 条数据, 价格范围: [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`
   );
@@ -56,10 +59,15 @@ export function calculateChipDistribution(data, open_interest) {
   let chips = new Array(params.bins).fill(0);
   const allPeriods = []; // 存储所有周期的筹码分布
 
+  let max_turnover = -Infinity;
+  let min_turnover = Infinity;
   // 7. 处理计算窗口内所有K线
   windowData.forEach((bar, index) => {
-    const { open, high, low, close, vol: volume } = bar;
+    const { open, high, low, close, vol: volume, ts } = bar;
     const priceRange = [low, high];
+    const turnover = f_get_volume_by_time(ts).vol / f_get_open_interest_by_time(ts).oi;
+    max_turnover = Math.max(max_turnover, turnover);
+    min_turnover = Math.min(min_turnover, turnover);
 
     if (priceRange[0] >= priceRange[1] || volume <= 0) {
       // 即使当前K线无效，也要记录当前状态（如果需要返回所有周期）
@@ -90,7 +98,11 @@ export function calculateChipDistribution(data, open_interest) {
         max_volume: max_volume,
         open,
         close,
-        volume,
+        volume: f_get_volume_by_time(ts).vol,
+        turnover: turnover,
+        max_turnover: max_turnover,
+        min_turnover: min_turnover,
+        open_interest: f_get_open_interest_by_time(ts).oi,
         step: priceStep,
         concentration,
       });
@@ -111,7 +123,7 @@ export function calculateChipDistribution(data, open_interest) {
     );
 
     // 应用衰减系数并累加
-    chips = chips.map(v => v * (1 - volume / open_interest)); // 先整体衰减
+    chips = chips.map(v => v * (1 - Math.min(turnover, 1))); // 先整体衰减
     // console.log(`[${formatTimestamp(bar.ts)}] 换手率: ${(volume / open_interest).toFixed(4)}%`);
     distribution.forEach((chip, i) => (chips[i] += chip)); // 再添加新筹码
 
@@ -143,7 +155,11 @@ export function calculateChipDistribution(data, open_interest) {
       max_volume: max_volume,
       open,
       close,
-      volume,
+      volume: f_get_volume_by_time(ts).vol,
+      turnover: turnover,
+      max_turnover: max_turnover,
+      min_turnover: min_turnover,
+      open_interest: f_get_open_interest_by_time(ts).oi,
       step: priceStep,
       concentration,
     });
@@ -175,6 +191,9 @@ export function calculateChipDistribution(data, open_interest) {
     min_price: minPrice,
     min_volume: min_volume,
     max_volume: max_volume,
+    turnover: now_turnover,
+    volume: now_volume,
+    open_interest: circulation,
     step: priceStep,
     concentration,
   };
@@ -196,7 +215,7 @@ function detectGranularity(data) {
 }
 
 // 获取基于流通股本的数据窗口
-function getVolumeWindow(data, circulation) {
+function getVolumeWindow(data) {
   let totalVol = 0;
   let minPrice = Number.MAX_VALUE;
   let maxPrice = Number.MIN_VALUE;
@@ -210,34 +229,9 @@ function getVolumeWindow(data, circulation) {
     maxPrice = Math.max(maxPrice, parseFloat(bar.high));
     result.unshift(bar);
 
-    // 覆盖80%流通股本时停止
-    // if (totalVol >= circulation * 0.8) break;
-    // 限制数据量 (防止内存问题)
     if (result.length >= 8000) break;
   }
   return { windowData: result, minPrice, maxPrice };
-}
-
-// 均匀分布模型
-function calcUniformDistribution(priceRange, volume, bins, minPrice, priceStep) {
-  const dist = new Array(bins).fill(0);
-  const rangeWidth = priceRange[1] - priceRange[0];
-  if (rangeWidth === 0) return dist;
-
-  // 找出影响的区间范围
-  const startIdx = Math.max(0, Math.floor((priceRange[0] - minPrice) / priceStep));
-  const endIdx = Math.min(bins - 1, Math.ceil((priceRange[1] - minPrice) / priceStep));
-
-  // 有效区间数
-  const validBins = endIdx - startIdx + 1;
-  if (validBins <= 0) return dist;
-
-  // 均匀分配成交量
-  const volumePerBin = volume / validBins;
-  for (let i = startIdx; i <= endIdx; i++) {
-    dist[i] += volumePerBin;
-  }
-  return dist;
 }
 
 // 三角形分布模型

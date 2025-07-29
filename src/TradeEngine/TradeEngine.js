@@ -34,6 +34,7 @@ export class TradeEngine {
   static _max_candle_size = 3000;
   static _instrument_timers = {}; // 存储每个品种的定时器
   static _instrument_info = {}; // 存储品种信息
+  static _interest_history = {}; // 存储品种历史数据
   static _chip_distribution = {};
   static _chip_distribution_cache_duration = 1000 * 9;
 
@@ -258,7 +259,12 @@ export class TradeEngine {
     if (Date.now() - last_time > this._chip_distribution_cache_duration) {
       this._chip_distribution[assetId] = calculateChipDistribution(
         this.getCandleData(assetId, bar_type),
-        this.getInstrumentInfo(assetId).oi
+        ts => {
+          return this.getHisInterestByTime(assetId, bar_type, ts);
+        },
+        ts => {
+          return this.getHisVolumeByTime(assetId, bar_type, ts);
+        }
       );
       this._chip_distribution[assetId].last_time = Date.now();
     }
@@ -794,6 +800,56 @@ export class TradeEngine {
 
     // 设置定时器
     this._instrument_timers[assetName] = setInterval(updateInstrument, interval);
+  }
+
+  static getHisInterestByTime(assetName, bar_type, ts = Date.now()) {
+    const _interest_history = this._interest_history[assetName]?.[bar_type];
+    // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
+    let last = _interest_history[0];
+    let minDiff = Math.abs(ts - last.ts);
+    for (let i = 1; i < _interest_history.length; i++) {
+      const diff = Math.abs(ts - _interest_history[i].ts);
+      if (diff < minDiff) {
+        minDiff = diff;
+        last = _interest_history[i];
+      }
+    }
+    return last;
+  }
+
+  static getHisVolumeByTime(assetName, bar_type, ts = Date.now()) {
+    const candle_data = this.market_candle[bar_type]?.[assetName];
+
+    // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
+    let last = candle_data.at(-1);
+    let minDiff = Math.abs(ts - last.ts);
+    for (let i = 1; i < candle_data.length; i++) {
+      const diff = Math.abs(ts - candle_data[i].ts);
+      if (diff < minDiff) {
+        minDiff = diff;
+        last = candle_data[i];
+      }
+    }
+    return last;
+  }
+
+  //
+  static setOpenInterest(assetName, bar_type, data) {
+    // 按照 data.item[0] 去重
+    const interest_map = new Map();
+    data.forEach(it => {
+      interest_map.set(it[0], it);
+    });
+    const unique_data = Array.from(interest_map.values()).map(it => {
+      return {
+        ts: it[0],
+        oi: it[1],
+        oiCcy: it[2],
+        oiUsd: it[3],
+      };
+    });
+    this._interest_history[assetName] ??= {};
+    this._interest_history[assetName][bar_type] = unique_data;
   }
 
   /**

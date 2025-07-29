@@ -31,6 +31,15 @@ export class GridTradingSlice extends AbstractPainter {
     pointBackgroundColor: '#f39c12',
   };
 
+  static graph_position = {
+    top: 100,
+    bottom: 120,
+    left: 60,
+    right: 360,
+  };
+
+  static chip_distribution_compare_with = 60 * 60 * 24 * 7 * 1000;
+
   /**
    * 绘制指示器
    * @param {*} chart Chart对象
@@ -139,8 +148,12 @@ export class GridTradingSlice extends AbstractPainter {
           parseFloat(it.vol),
         ])
         .slice(-MAX_CANDLE);
-      const candle_max_price = candle_data.reduce((a, b) => Math.max(a, b[3]), -Infinity);
-      const candle_min_price = candle_data.reduce((a, b) => Math.min(a, b[2]), Infinity);
+      const candle_max_price = candle_data
+        .slice(-MAX_CANDLE)
+        .reduce((a, b) => Math.max(a, b[3]), -Infinity);
+      const candle_min_price = candle_data
+        .slice(-MAX_CANDLE)
+        .reduce((a, b) => Math.min(a, b[2]), Infinity);
       const {
         _grid_base_price,
         _grid_base_price_ts,
@@ -167,16 +180,15 @@ export class GridTradingSlice extends AbstractPainter {
         min_volume,
         max_volume,
         allPeriods,
+        turnover,
+        volume: period_volume,
+        open_interest: market_open_interest,
         step: chip_step,
       } = TradeEngine.getChipDistribution(instId);
 
-      const chip_distribution_1day_before = findDistribution(
+      const chip_distribution_before = findDistribution(
         allPeriods,
-        Date.now() - 1000 * 60 * 60 * 24
-      );
-      const chip_distribution_1hour_before = findDistribution(
-        allPeriods,
-        Date.now() - 1000 * 60 * 60
+        Date.now() - this.constructor.chip_distribution_compare_with
       );
 
       if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
@@ -242,6 +254,18 @@ export class GridTradingSlice extends AbstractPainter {
               },
               barThickness: 1,
             },
+            // 换手率
+            {
+              ...styles_2,
+              type: 'line',
+              data: allPeriods.slice(-MAX_CANDLE).map(it => ({
+                x: formatTimestamp(it.ts, TradeEngine._bar_type),
+                y: (it.turnover - it.min_turnover) / (it.max_turnover - it.min_turnover),
+              })),
+              borderWidth: 1,
+              borderColor: '#3498DB',
+              yAxisID: 'turnover',
+            },
             // 成交量
             {
               ...styles,
@@ -283,12 +307,12 @@ export class GridTradingSlice extends AbstractPainter {
               yAxisID: 'chipY', // 关联分类轴
               xAxisID: 'chipX',
             },
-            // 筹码分布-1day
+            // 筹码分布- prev-period
             {
               ...styles,
               type: 'bar',
               indexAxis: 'y', // 关键！仅此数据集横向显示
-              data: chip_distribution_1day_before.distribution.map(it => {
+              data: chip_distribution_before.distribution.map(it => {
                 return {
                   x: it.volume / max_volume, // X轴（横向长度）
                   y: it.price, // Y轴（价格位置）
@@ -305,28 +329,6 @@ export class GridTradingSlice extends AbstractPainter {
               yAxisID: 'chipY', // 关联分类轴
               xAxisID: 'chipX',
             },
-            // 筹码分布-1Hour
-            // {
-            //   ...styles,
-            //   type: 'bar',
-            //   indexAxis: 'y', // 关键！仅此数据集横向显示
-            //   data: chip_distribution_1hour_before.distribution.map(it => {
-            //     return {
-            //       x: it.volume / max_volume, // X轴（横向长度）
-            //       y: it.price, // Y轴（价格位置）
-            //     };
-            //   }),
-            //   borderWidth: 0,
-            //   backgroundColor: ctx => {
-            //     // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-            //     // const { y } = ctx.dataset.data[ctx.dataIndex];
-            //     return '#85929E';
-            //     // return '#85C1E9';
-            //   },
-            //   barThickness: 1,
-            //   yAxisID: 'chipY', // 关联分类轴
-            //   xAxisID: 'chipX',
-            // },
             // 绘制布林线
             {
               ...styles_2,
@@ -399,6 +401,12 @@ export class GridTradingSlice extends AbstractPainter {
               min: 0,
               max: 10,
               display: false, // 可隐藏刻度
+            },
+            turnover: {
+              position: 'right',
+              suggestedMin: 0,
+              suggestedMax: 10,
+              display: false,
             },
           },
           layout: {
@@ -560,6 +568,12 @@ export class GridTradingSlice extends AbstractPainter {
                   );
                 });
 
+              this.drawText(
+                chart,
+                `换手率: ${(turnover * 100).toFixed(4)}% (${parseFloat(period_volume).toFixed(0)} 量/${parseFloat(market_open_interest).toFixed(0)} 持仓)`,
+                this.constructor.graph_position.left,
+                this.constructor.graph_position.top
+              );
               // 绘制网格线
               grid_lines.forEach((grid, index) => {
                 // 绘制网格线，但不能超过图表区域
@@ -575,5 +589,15 @@ export class GridTradingSlice extends AbstractPainter {
       };
       this.flush(file_path, configuration);
     });
+  }
+
+  drawText(chart, text, x, y) {
+    chart.ctx.save();
+    chart.ctx.font = '48px "Fira Sans"';
+    chart.ctx.fillStyle = '#52be80';
+    chart.ctx.textAlign = 'left';
+    chart.ctx.textBaseline = 'top';
+    chart.ctx.fillText(text, x, y);
+    chart.ctx.restore();
   }
 }

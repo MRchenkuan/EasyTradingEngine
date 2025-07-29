@@ -1,6 +1,6 @@
 import './utils/logger.js';
 import WebSocket from 'ws';
-import { getPrices, parseCandleData, getLastWholeMinute, getHistoryPrices } from './tools.js';
+import { getPrices, parseCandleData, getLastWholeMinute, getHistoryPrices, getHistoryOpenInterest } from './tools.js';
 import { base_url } from './config.security.js';
 import { subscribeKlineChanel } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
@@ -76,6 +76,14 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
       try {
         const data_realtime = await getPrices(id, params);
         const data_history = await getHistoryPrices(id, params);
+        const data_open_interest = await getHistoryOpenInterest(id, {
+          to_when: params.to_when,
+          from_when: params.from_when,
+          bar_type: params.bar_type,
+          once_limit: 100,
+          total_limit: params.candle_limit,
+        });
+        TradeEngine.setOpenInterest(id, params.bar_type, data_open_interest);
 
         const data = {
           id,

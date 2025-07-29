@@ -4,9 +4,9 @@ export const Env = TradeEnv.MIMIC;
 // export const Env = TradeEnv.PRODUCTION;
 
 export const KLine = {
-  bar_type: BarType.DAY,
-  max_days: 720,
-  candle_limit: 4000,
+  bar_type: BarType.HOUR,
+  max_days: 3650,
+  candle_limit: 2000,
 };
 
 export const MainGraph = {

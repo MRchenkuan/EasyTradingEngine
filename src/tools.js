@@ -1,4 +1,9 @@
-import { marketCandles, marketCandlesHistory } from './api.js';
+import {
+  getOpenInterest,
+  getOpenInterestHistory,
+  marketCandles,
+  marketCandlesHistory,
+} from './api.js';
 import crypto from 'crypto';
 
 // 生成签名的函数
@@ -119,7 +124,6 @@ export async function getPrices(
   }
 }
 
-
 export async function getHistoryPrices(
   assetId,
   { to_when, from_when, bar_type, price_type, once_limit, candle_limit }
@@ -133,7 +137,7 @@ export async function getHistoryPrices(
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
       const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
-      console.log(assetId+"(HIS)", formatTimestamp(last_ts), bar, data.length);
+      console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length);
       if (!(data && data.length > 0)) break;
       last_ts = parseCandleData(data[data.length - 1])['ts'];
       collections = collections.concat(data);
@@ -144,6 +148,37 @@ export async function getHistoryPrices(
       ts: collections.map(it => parseCandleData(it)['ts']),
       orign_data: collections,
     };
+  } catch (e) {
+    console.error(e.message);
+  }
+}
+
+export async function getHistoryOpenInterest(
+  assetId,
+  { to_when, from_when, bar_type, once_limit, total_limit }
+) {
+  const limit = total_limit,
+    bar = bar_type;
+  try {
+    let page = Math.trunc(limit / once_limit);
+    let times = page;
+    let collections = [];
+    let last_ts = from_when || Date.now();
+    while (times-- > 0) {
+      const { data } = await getOpenInterestHistory(assetId, bar, to_when, last_ts, once_limit);
+      console.log(
+        assetId + `(INTEREST - HIS ${page - times}/${page})`,
+        formatTimestamp(last_ts),
+        bar,
+        data.length
+      );
+      if (!(data && data.length > 1)) break;
+      last_ts = parseCandleData(data[data.length - 1])['ts'];
+      collections = collections.concat(data);
+      // 等待 300ms
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    return collections;
   } catch (e) {
     console.error(e.message);
   }
