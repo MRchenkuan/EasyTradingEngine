@@ -57,6 +57,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _threshold = 0.05;
   _snapshot = 'none';
 
+  _mix_mgn_ratio = 4000; // 最小保证金倍数 4000%
+
   constructor(asset_name, params = {}, engine) {
     super();
     this.engine = engine;
@@ -296,6 +298,21 @@ export class GridTradingProcessor extends AbstractProcessor {
     const now = Date.now();
     if (now - this._last_turtle_ts < this.turtle) return;
     this._last_turtle_ts = now;
+
+    const {
+      posSide, // long short net
+      pos, // 持仓
+      avgPx, // 开仓均价
+      upl, // 未实现盈亏
+      uplRatio, // 未实现盈亏比例
+      mgnRatio, // 保证金比例
+      adl, // 信号强弱
+      notionalUsd,
+    } = this.engine.getPositionList(this.asset_name) || {};
+
+    // 是否开仓优先
+    const is_buy_first = 100 * mgnRatio < this._mix_mgn_ratio && parseFloat(pos) < 0;
+    const is_sell_first = 100 * mgnRatio < this._mix_mgn_ratio && parseFloat(pos) > 0;
     try {
       this._stratage_locked = true;
       // 趋势和方向一致时不交易
@@ -360,6 +377,16 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._snapshot = snapshot;
 
       console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);
+
+      if (is_buy_first && this._tendency < 0) {
+        this._threshold = this._threshold / 2;
+        console.log(`- 当前保证金率：${(mgnRatio *100).toFixed(2)}%； 看多优先，趋势向下，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`);
+      }
+
+      if (is_sell_first && this._tendency > 0) {
+        this._threshold = this._threshold / 2;
+        console.log(`- 当前保证金率：${(mgnRatio *100).toFixed(2)}%；看空优先，趋势向上，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`);
+      }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤

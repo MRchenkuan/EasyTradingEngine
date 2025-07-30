@@ -31,11 +31,9 @@ export async function marketCandlesHistory(instId, bar, after, before, limit) {
       limit,
     },
     timeout: 10000, // 设置5秒超时
-    
   });
   return data;
 }
-
 
 /**
  * 获取订单信息 - 实盘
@@ -267,8 +265,7 @@ export async function batchCancelOrders(orders) {
   return data;
 }
 
-export async function getOpenInterestHistory(instId, period, begin, end, limit=100) {
-
+export async function getOpenInterestHistory(instId, period, begin, end, limit = 100) {
   const security = MIMIC ? mimic : firm;
 
   const timestamp = new Date().toISOString();
@@ -302,9 +299,56 @@ export async function getOpenInterestHistory(instId, period, begin, end, limit=1
   }
 }
 
+/**
+ * 获取持仓信息
+ * @returns
+ */
+export async function getPositions(instId, instType, posId) {
+  const security = MIMIC ? mimic : firm;
+
+  const timestamp = new Date().toISOString();
+  const method = 'GET';
+  const params = {
+    instId,
+    instType,
+    posId,
+  };
+  const queryString = Object.entries(params)
+    .map(([key, value]) =>
+      key && value ? `${encodeURIComponent(key)}=${encodeURIComponent(value)}` : undefined
+    ).filter(it=>it).join('&');
+  const requestPath = `/api/v5/account/positions?${queryString}`;
+  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
+
+  const headers = {
+    'OK-ACCESS-KEY': security.api_key,
+    'OK-ACCESS-SIGN': sign,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    // 'x-simulated-trading': 1,
+  };
+
+  if (MIMIC) {
+    headers['x-simulated-trading'] = 1;
+  }
+
+  try {
+    const { data } = await axios.get(base_url + requestPath, { headers });
+    // 确保返回的数据格式正确
+    if (!data.data || !data.data.length) {
+      console.error(`获取持仓信息失败: ${instId}`);
+      return { data: [] };
+    }
+    return data;
+  } catch (error) {
+    console.error('获取交易品种持仓信息失败:', error.response?.data || error.message);
+    return { data: [] };
+  }
+}
+
 // 获取持仓量
 export async function getOpenInterest(instType, instId, uly, instFamily) {
-   const security = MIMIC ? mimic : firm;
+  const security = MIMIC ? mimic : firm;
 
   const timestamp = new Date().toISOString();
   const method = 'GET';

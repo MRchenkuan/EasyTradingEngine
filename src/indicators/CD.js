@@ -34,7 +34,6 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
         : granularityMinutes === 60
           ? '1小时'
           : '1天';
-  console.log(`检测到数据粒度: ${granularity} (${granularityMinutes}分钟)`);
 
   // 3. 动态计算参数
   const params = {
@@ -44,9 +43,6 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
 
   // 4. 获取计算窗口 (基于流通股本)
   const { windowData, minPrice, maxPrice } = getVolumeWindow(data);
-  console.log(
-    `计算窗口: ${windowData.length} 条数据, 价格范围: [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`
-  );
 
   // 5. 动态生成价格轴
   const priceStep = (maxPrice - minPrice) / params.bins;

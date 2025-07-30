@@ -1,4 +1,4 @@
-import { getInstruments, getOpenInterest, getOrderHistory } from '../api.js';
+import { getInstruments, getOpenInterest, getOrderHistory, getPositions } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import {
   getClosingTransaction,
@@ -33,10 +33,14 @@ export class TradeEngine {
   static _positionCost = new LocalVariable('TradeEngine/positionCost');
   static _max_candle_size = 3000;
   static _instrument_timers = {}; // 存储每个品种的定时器
+  static _position_timers = {}; // 存储每个品种的定时器
+  static _position_refresh_interval = 3000; // 存储每个品种的持仓刷新间隔
+  static _instrument_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔
   static _instrument_info = {}; // 存储品种信息
   static _interest_history = {}; // 存储品种历史数据
   static _chip_distribution = {};
   static _chip_distribution_cache_duration = 1000 * 9;
+  static _position_list = {};
 
   /**
    * 对冲监听器
@@ -764,12 +768,14 @@ export class TradeEngine {
    * 注册品种并定期更新信息
    * @param {string} assetName - 品种名称
    * @param {string} instType - 品种类型 (SPOT/SWAP等)
-   * @param {number} interval - 更新间隔(毫秒)，默认10秒
    */
-  static registerInstrument(assetName, instType, interval = 10000) {
+  static registerInstrument(assetName, instType) {
     // 清除已存在的定时器
     if (this._instrument_timers[assetName]) {
       clearInterval(this._instrument_timers[assetName]);
+    }
+    if (this._position_timers[assetName]) {
+      clearInterval(this._position_timers[assetName]);
     }
     // 创建定时更新任务
     const updateInstrument = async () => {
@@ -795,11 +801,36 @@ export class TradeEngine {
       }
     };
 
+    const updatePositions = async () => {
+      const { data: positions } = await getPositions(assetName);
+      if (positions.length) {
+        this._position_list[assetName] = {
+          ...this._position_list[assetName],
+          ...positions[0],
+          lastUpdateTime: Date.now(),
+        };
+      } else {
+        this._position_list[assetName] = null;
+      }
+    };
+
     // 立即执行一次
     updateInstrument();
+    updatePositions();
 
     // 设置定时器
-    this._instrument_timers[assetName] = setInterval(updateInstrument, interval);
+    this._instrument_timers[assetName] = setInterval(
+      updateInstrument,
+      this._instrument_refresh_interval
+    );
+    this._position_timers[assetName] = setInterval(
+      updatePositions,
+      this._position_refresh_interval
+    );
+  }
+
+  static getPositionList(assetName) {
+    return this._position_list[assetName] || null;
   }
 
   static getHisInterestByTime(assetName, bar_type, ts = Date.now()) {
