@@ -34,7 +34,7 @@ export class TradeEngine {
   static _max_candle_size = 3000;
   static _instrument_timers = {}; // 存储每个品种的定时器
   static _position_timers = {}; // 存储每个品种的定时器
-  static _position_refresh_interval = 3000; // 存储每个品种的持仓刷新间隔
+  static _position_refresh_interval = 5000; // 存储每个品种的持仓刷新间隔
   static _instrument_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔
   static _instrument_info = {}; // 存储品种信息
   static _interest_history = {}; // 存储品种历史数据

@@ -341,7 +341,7 @@ export async function getPositions(instId, instType, posId) {
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种持仓信息失败:', error.response?.data || error.message);
+    console.error('获取交易品种个人持仓信息失败:', error.response?.data || error.message);
     return { data: [] };
   }
 }
@@ -371,12 +371,12 @@ export async function getOpenInterest(instType, instId, uly, instFamily) {
     const { data } = await axios.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.error(`获取交易品种持仓信息失败: ${instId} ${ordId}`);
+      console.error(`获取交易品种市场持仓信息失败: ${instId} ${ordId}`);
       return { data: [] };
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种持仓信息失败:', error.response?.data || error.message);
+    console.error('获取交易品种市场持仓信息失败:', error.response?.data || error.message);
     return { data: [] };
   }
 }
@@ -406,12 +406,12 @@ export async function getInstruments(instType, instId) {
     const { data } = await axios.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.error(`获取交易品种信息信息失败: ${instId} ${ordId}`);
+      console.error(`获取交易品种基础信息信息失败: ${instId} ${ordId}`);
       return { data: [] };
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种信息失败:', error.response?.data || error.message);
+    console.error('获取交易品种基础信息失败:', error.response?.data || error.message);
     return { data: [] };
   }
 }

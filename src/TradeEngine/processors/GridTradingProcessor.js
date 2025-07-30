@@ -380,12 +380,16 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       if (is_buy_first && this._tendency < 0) {
         this._threshold = this._threshold / 2;
-        console.log(`- 当前保证金率：${(mgnRatio *100).toFixed(2)}%； 看多优先，趋势向下，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`);
+        console.log(
+          `- 当前保证金率：${(mgnRatio * 100).toFixed(2)}%； 看多优先，趋势向下，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`
+        );
       }
 
       if (is_sell_first && this._tendency > 0) {
         this._threshold = this._threshold / 2;
-        console.log(`- 当前保证金率：${(mgnRatio *100).toFixed(2)}%；看空优先，趋势向上，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`);
+        console.log(
+          `- 当前保证金率：${(mgnRatio * 100).toFixed(2)}%；看空优先，趋势向上，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`
+        );
       }
 
       // 如果超过两格则回撤判断减半，快速锁定利润
