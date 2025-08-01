@@ -8,9 +8,9 @@ export class AbstractPainter {
     throw new Error('draw() must be implemented by subclass!');
   }
 
-  async flush(file_path, configuration){
+  async flush(file_path, configuration) {
     const render = this.constructor.chartJSNodeCanvas;
     const image = await render.renderToBuffer(configuration);
-    this.engine.writeChartFile(file_path, image);
+    await this.engine.writeChartFile(file_path, image);
   }
 }

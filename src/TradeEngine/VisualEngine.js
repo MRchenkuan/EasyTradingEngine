@@ -796,11 +796,11 @@ export class VisualEngine {
    * @param {*} image
    * @returns
    */
-  static writeChartFile(dir, image) {
+  static async writeChartFile(dir, image) {
     const fullPath = path.join('./chart', dir);
     const dirPath = path.dirname(fullPath);
-    fs.mkdirSync(dirPath, { recursive: true });
-    return fs.writeFileSync(fullPath, image);
+    await fs.promises.mkdir(dirPath, { recursive: true });
+    await fs.promises.writeFile(fullPath, image);
   }
 
   /**

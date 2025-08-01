@@ -287,9 +287,12 @@ export async function getOpenInterestHistory(instId, period, begin, end, limit =
 
   try {
     const { data } = await axios.get(base_url + requestPath, { headers });
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.error(`获取交易品种持仓历史信息失败: ${instId}`);
+      console.warn(`未获取到获取交易品种持仓历史信息: ${instId}`);
       return { data: [] };
     }
     return data;
@@ -316,7 +319,9 @@ export async function getPositions(instId, instType, posId) {
   const queryString = Object.entries(params)
     .map(([key, value]) =>
       key && value ? `${encodeURIComponent(key)}=${encodeURIComponent(value)}` : undefined
-    ).filter(it=>it).join('&');
+    )
+    .filter(it => it)
+    .join('&');
   const requestPath = `/api/v5/account/positions?${queryString}`;
   const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
 
@@ -335,8 +340,11 @@ export async function getPositions(instId, instType, posId) {
   try {
     const { data } = await axios.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
     if (!data.data || !data.data.length) {
-      console.error(`获取持仓信息失败: ${instId}`);
+      console.warn(`未获取到持仓信息: ${instId}`);
       return { data: [] };
     }
     return data;
@@ -370,8 +378,11 @@ export async function getOpenInterest(instType, instId, uly, instFamily) {
   try {
     const { data } = await axios.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
     if (!data.data || !data.data.length) {
-      console.error(`获取交易品种市场持仓信息失败: ${instId} ${ordId}`);
+      console.warn(`未获取到交易品种市场持仓信息: ${instId} ${ordId}`);
       return { data: [] };
     }
     return data;
@@ -404,9 +415,12 @@ export async function getInstruments(instType, instId) {
 
   try {
     const { data } = await axios.get(base_url + requestPath, { headers });
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.error(`获取交易品种基础信息信息失败: ${instId} ${ordId}`);
+      console.warn(`未获取到交易品种基础信息: ${instId} ${ordId}`);
       return { data: [] };
     }
     return data;
@@ -441,9 +455,12 @@ export async function getOrderInfo(instId, ordId) {
 
   try {
     const { data } = await axios.get(base_url + requestPath, { headers });
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.error(`获取订单信息失败: ${instId} ${ordId}`);
+      console.warn(`未获取到订单信息: ${instId} ${ordId}`);
       return { data: [] };
     }
     return data;

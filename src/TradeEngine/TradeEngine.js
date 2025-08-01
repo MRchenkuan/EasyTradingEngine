@@ -786,7 +786,7 @@ export class TradeEngine {
       const inst_open_interest = openInterest.find(it => it.instId === assetName);
 
       if (inst_base) {
-        this._instrument_info[assetName] ??= {
+        this._instrument_info[assetName] = {
           ...inst_base,
           lastUpdateTime: Date.now(),
         };

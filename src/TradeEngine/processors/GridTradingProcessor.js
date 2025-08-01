@@ -59,6 +59,8 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   _mix_mgn_ratio = 4000; // 最小保证金倍数 4000%
 
+  _trade_suppress_multiple = 2; // 交易抑制倍数 倍数越大则成交要求越高： 1 为不抑制 3：3倍抑制， 只能是整数，否则报错
+
   constructor(asset_name, params = {}, engine) {
     super();
     this.engine = engine;
@@ -403,27 +405,52 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      // 满足超过一格
-      if (grid_count_abs >= 1) {
-        // 正常满足条件下单
-        console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
-        );
+      // 交易抑制逻辑 - 仓位管理
+      const trade_suppress_multiple = Math.round(this._trade_suppress_multiple);
+      const need_supress =
+        (is_buy_first && this._tendency > 0) || (is_sell_first && this._tendency < 0);
+      const supressed_grid_count_abs = Math.abs(currentGridCountAbs / trade_suppress_multiple);
+      const supressed_grid_count = supressed_grid_count_abs * gridCount/Math.abs(gridCount)
 
-        await this._placeOrder(gridCount, '- 回调下单');
-        return;
-      }
-
-      //
-      if (price_distance_grid > 1.5) {
-        // 正常满足条件下单
+      if (need_supress) {
+        // 抑制交易
         console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          `当前保证金率偏低：${(mgnRatio * 100).toFixed(2)}%； 抑制交易:${gridCount}格 => ${supressed_grid_count}格，当前抑制倍数:${this._trade_suppress_multiple}\n`
         );
-        if (this._tendency > 0) {
-          await this._placeOrder(1, '- 回调下单:格内');
-        } else {
-          await this._placeOrder(-1, '- 回调下单:格内');
+        if (supressed_grid_count_abs >= 1) {
+          console.log(
+            `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          );
+
+          await this._placeOrder(
+            supressed_grid_count * trade_suppress_multiple,
+            '- 回调下单(抑制)'
+          );
+          return;
+        }
+      } else {
+        // 正常交易
+        if (grid_count_abs >= 1) {
+          // 正常满足条件下单
+          console.log(
+            `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          );
+
+          await this._placeOrder(gridCount, '- 回调下单');
+          return;
+        }
+
+        // 未超过一格但实际距离超过 1.5
+        if (!need_supress && price_distance_grid > 1.5) {
+          // 正常满足条件下单
+          console.log(
+            `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          );
+          if (this._tendency > 0) {
+            await this._placeOrder(1, '- 回调下单:格内');
+          } else {
+            await this._placeOrder(-1, '- 回调下单:格内');
+          }
         }
       }
 
@@ -516,7 +543,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {number} gridCount 跨越的网格数量
    * @param {string} orderDesc 订单类型
    */
-  async _placeOrder(gridCount, orderDesc) {
+  async _placeOrder(gridCount, orderDesc, retry_count = 0) {
     const { ctVal } = this._instrument_info;
     let amount = 0;
     if (this._settlement_type === SettlementType.AMOUNT) {
@@ -561,13 +588,18 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // todo 3.如果失败则重置关键参数,并更新记录状态：交易成功|失败
     if (!result.success) {
-      // todo 3.1 失败则直接记录为失败订单
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
+      // 再次尝试下单
+      if (retry_count < 3) {
+        await this._placeOrder(gridCount, orderDesc, retry_count + 1);
+      } else {
+        await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
+          order_status: OrderStatus.UNSUCESS,
+          retry_count,
+          error: result.msg,
+        });
+      }
       this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
-      await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: OrderStatus.UNSUCESS,
-        error: result.msg,
-      });
       return;
     } else {
       // todo 3.2 成功则先查询
