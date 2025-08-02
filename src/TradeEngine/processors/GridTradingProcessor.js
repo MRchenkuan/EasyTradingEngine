@@ -57,7 +57,9 @@ export class GridTradingProcessor extends AbstractProcessor {
   _threshold = 0.05;
   _snapshot = 'none';
 
-  _mix_mgn_ratio = 4000; // 最小保证金倍数 4000%
+  _min_mgn_ratio_supress = 4000; // 抑制状态最小保证金率 4000%
+
+  _min_mgn_ratio_survival = 2000; // 止损状态最小保证金率 1000%
 
   _trade_suppress_multiple = 2; // 交易抑制倍数 倍数越大则成交要求越高： 1 为不抑制 3：3倍抑制， 只能是整数，否则报错
 
@@ -313,8 +315,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     } = this.engine.getPositionList(this.asset_name) || {};
 
     // 是否开仓优先
-    const is_buy_first = 100 * mgnRatio < this._mix_mgn_ratio && parseFloat(pos) < 0;
-    const is_sell_first = 100 * mgnRatio < this._mix_mgn_ratio && parseFloat(pos) > 0;
+    const is_buy_first = 100 * mgnRatio < this._min_mgn_ratio_supress && parseFloat(pos) < 0;
+    const is_sell_first = 100 * mgnRatio < this._min_mgn_ratio_supress && parseFloat(pos) > 0;
+
+    // 是否止损
+    const is_buy_loss = 100 * mgnRatio < this._min_mgn_ratio_survival && parseFloat(pos) < 0;
+    const is_sell_loss = 100 * mgnRatio < this._min_mgn_ratio_survival && parseFloat(pos) > 0;
+
     try {
       this._stratage_locked = true;
       // 趋势和方向一致时不交易
@@ -382,15 +389,21 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       if (is_buy_first && this._tendency < 0) {
         this._threshold = this._threshold / 2;
+        if (is_buy_loss) {
+          this._threshold = this._threshold / 2;
+        }
         console.log(
-          `- 当前保证金率：${(mgnRatio * 100).toFixed(2)}%； 看多优先，趋势向下，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`
+          `- 当前保证金率不足：${(mgnRatio * 100).toFixed(2)}%； 趋势向下，优先买入，阈值降低：${(100 * this._threshold).toFixed(2)}%\n`
         );
       }
 
       if (is_sell_first && this._tendency > 0) {
         this._threshold = this._threshold / 2;
+        if (is_sell_loss) {
+          this._threshold = this._threshold / 2;
+        }
         console.log(
-          `- 当前保证金率：${(mgnRatio * 100).toFixed(2)}%；看空优先，趋势向上，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`
+          `- 当前保证金率不足：${(mgnRatio * 100).toFixed(2)}%；趋势向上，优先卖出，阈值减半：${(100 * this._threshold).toFixed(2)}%\n`
         );
       }
 
@@ -409,8 +422,14 @@ export class GridTradingProcessor extends AbstractProcessor {
       const trade_suppress_multiple = Math.round(this._trade_suppress_multiple);
       const need_supress =
         (is_buy_first && this._tendency > 0) || (is_sell_first && this._tendency < 0);
-      const supressed_grid_count_abs = Math.abs(currentGridCountAbs / trade_suppress_multiple);
-      const supressed_grid_count = (supressed_grid_count_abs * gridCount) / Math.abs(gridCount);
+      const supressed_grid_count_abs = Math.floor(
+        Math.abs(currentGridCountAbs / trade_suppress_multiple)
+      );
+      const supressed_grid_count = supressed_grid_count_abs * Math.sign(gridCount);
+
+      // 止损逻辑
+      const need_survival =
+        (is_buy_loss && this._tendency > 0) || (is_sell_loss && this._tendency < 0);
 
       if (need_supress) {
         // 抑制交易
@@ -421,11 +440,16 @@ export class GridTradingProcessor extends AbstractProcessor {
           console.log(
             `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
           );
-
-          await this._placeOrder(
-            supressed_grid_count * trade_suppress_multiple,
-            '- 回调下单(抑制)'
-          );
+          if (need_survival) {
+            // 上涨 n 倍 才卖出一份，牺牲利润，有损
+            await this._placeOrder(supressed_grid_count), '- 回调下单(止损)';
+          } else {
+            // 上涨 n 倍卖出 n 分， 牺牲交易机会，无损
+            await this._placeOrder(
+              supressed_grid_count * trade_suppress_multiple,
+              '- 回调下单(抑制)'
+            );
+          }
           return;
         }
       } else {
