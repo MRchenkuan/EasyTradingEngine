@@ -410,7 +410,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       const need_supress =
         (is_buy_first && this._tendency > 0) || (is_sell_first && this._tendency < 0);
       const supressed_grid_count_abs = Math.abs(currentGridCountAbs / trade_suppress_multiple);
-      const supressed_grid_count = supressed_grid_count_abs * gridCount/Math.abs(gridCount)
+      const supressed_grid_count = (supressed_grid_count_abs * gridCount) / Math.abs(gridCount);
 
       if (need_supress) {
         // 抑制交易
@@ -573,33 +573,28 @@ export class GridTradingProcessor extends AbstractProcessor {
     });
     // todo 1.先记录...
     // todo 2.然后执行
-    let result = {};
-    try {
-      this._resetKeyPrices(this._current_price, this._current_price_ts);
-      result = await executeOrders([order]);
-    } catch (error) {
-      console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
-      await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: OrderStatus.FAILED,
-        error: error.message,
-      });
-      return;
-    }
+    // waring 一定要先保存成交点，否则容易重复下单
+    this._resetKeyPrices(this._current_price, this._current_price_ts);
+    const result = await executeOrders([order]);
 
     // todo 3.如果失败则重置关键参数,并更新记录状态：交易成功|失败
     if (!result.success) {
       console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
+      await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
+        order_status: OrderStatus.UNSUCESS,
+        error: result.msg,
+        retry_count,
+      });
       // 再次尝试下单
       if (retry_count < 3) {
         await this._placeOrder(gridCount, orderDesc, retry_count + 1);
       } else {
         await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: OrderStatus.UNSUCESS,
+          order_status: OrderStatus.FAILED,
           retry_count,
           error: result.msg,
         });
       }
-      this._resetKeyPrices(this._last_trade_price, this._last_trade_price_ts);
       return;
     } else {
       // todo 3.2 成功则先查询
@@ -611,6 +606,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         ...order,
         ...originalOrder,
         order_status: OrderStatus.PLACED,
+        retry_count,
       });
 
       console.log(`✅${this.asset_name} 交易成功: ${orderDesc}`);
