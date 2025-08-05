@@ -24,7 +24,7 @@ export class VisualEngine {
   static _asset_names = [];
   static _show_order_his = [];
   static _painting_interval = Env === TradeEnv.MIMIC ? 1000 : 5000; //
-  static _boll_cache = new Map();
+  static _boll_cache = new Map(); // 每一个滑动窗口的布林带
   static _boll_timer = null;
   static font_style = 'Monaco, Menlo, Consolas, monospace';
 
@@ -81,23 +81,31 @@ export class VisualEngine {
 
   static getBOLL(instId) {
     const candles = TradeEngine.getCandleData(instId);
-    const cacheKey = JSON.stringify(candles.at(-1));
+    // const cacheKey = JSON.stringify(candles.at(-1));
+
+    const cacheKey = `${candles.at(-1).ts}:${instId}`;
     if (this._boll_cache.has(cacheKey)) {
       return this._boll_cache.get(cacheKey);
+    }
+
+    // 限制缓存大小
+    if (this._boll_cache.size > 20) {
+      const firstKey = this._boll_cache.keys().next().value;
+      this._boll_cache.delete(firstKey);
     }
 
     const result = calculateBOLL(candles, 20);
     this._boll_cache.set(cacheKey, result);
 
     // 清除旧的定时器
-    if (this._boll_timer) {
-      clearTimeout(this._boll_timer);
-    }
+    // if (this._boll_timer) {
+    //   clearTimeout(this._boll_timer);
+    // }
 
-    // 2秒后清除缓存
-    this._boll_timer = setTimeout(() => {
-      this._boll_cache.delete(cacheKey);
-    }, 5000);
+    // // 2秒后清除缓存
+    // this._boll_timer = setTimeout(() => {
+    //   this._boll_cache.delete(cacheKey);
+    // }, 10000);
 
     return result;
   }

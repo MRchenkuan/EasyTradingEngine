@@ -41,6 +41,10 @@ export class TradeEngine {
   static _chip_distribution = {};
   static _chip_distribution_cache_duration = 1000 * 9;
   static _position_list = {};
+  // 添加缓存相关变量
+  static _interest_cache = {}; // 持仓兴趣缓存
+  static _volume_cache = {}; // 成交量缓存
+  static _chip_cache_duration = 10000; // 缓存有效期 5秒
 
   /**
    * 对冲监听器
@@ -184,7 +188,7 @@ export class TradeEngine {
 
   static _orderHistoryCache = {};
   static _lastCacheTime = {};
-  static CACHE_DURATION = 30000; // 缓存时间10秒
+  static CACHE_DURATION = 60000; // 缓存时间10秒
 
   /**
    * 获取订单历史（带缓存）
@@ -384,6 +388,7 @@ export class TradeEngine {
       );
       existingCandles.splice(insertIndex, 0, candleInfo);
     }
+    this.market_candle[bar_type][assetId] = existingCandles.slice(-this._max_candle_size);
   }
 
   static updateCandleDates(assetId, bar_type, candle_data_array) {
@@ -414,7 +419,9 @@ export class TradeEngine {
     const sortedTimestamps = [...candleMap.keys()].sort((a, b) => a - b);
 
     // 生成有序的K线数据
-    this.market_candle[bar_type][assetId] = sortedTimestamps.map(ts => candleMap.get(ts));
+    this.market_candle[bar_type][assetId] = sortedTimestamps
+      .map(ts => candleMap.get(ts))
+      .slice(-this._max_candle_size);
   }
 
   /**
@@ -533,8 +540,8 @@ export class TradeEngine {
 
       // 维护数组长度
       if (assetData.ts.length > assetData.max_length) {
-        assetData.ts.shift();
-        assetData.prices.shift();
+        assetData.ts = assetData.ts.slice(-assetData.max_length);
+        assetData.prices = assetData.prices.slice(-assetData.max_length);
       }
     }
 
@@ -686,8 +693,12 @@ export class TradeEngine {
     Object.values(this._instrument_timers).forEach(timer => {
       clearInterval(timer);
     });
+    Object.values(this._position_timers).forEach(timer => {
+      clearInterval(timer);
+    });
     // 重置定时器对象
     this._instrument_timers = {};
+    this._position_timers = {};
   }
 
   /**
@@ -834,34 +845,58 @@ export class TradeEngine {
   }
 
   static getHisInterestByTime(assetName, bar_type, ts = Date.now()) {
-    const _interest_history = this._interest_history[assetName]?.[bar_type];
-    // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
-    let last = _interest_history[0];
-    let minDiff = Math.abs(ts - last.ts);
-    for (let i = 1; i < _interest_history.length; i++) {
-      const diff = Math.abs(ts - _interest_history[i].ts);
-      if (diff < minDiff) {
-        minDiff = diff;
-        last = _interest_history[i];
+    const cacheKey = `${assetName}_${bar_type}_${Math.floor(ts / this._chip_cache_duration)}`;
+    // 检查缓存
+    if (!this._interest_cache[cacheKey]) {
+      this._cleanCache(this._interest_cache);
+      const _interest_history = this._interest_history[assetName]?.[bar_type];
+      // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
+      let last = _interest_history[0];
+      let minDiff = Math.abs(ts - last.ts);
+      for (let i = 1; i < _interest_history.length; i++) {
+        const diff = Math.abs(ts - _interest_history[i].ts);
+        if (diff < minDiff) {
+          minDiff = diff;
+          last = _interest_history[i];
+        }
       }
+      this._interest_cache[cacheKey] = last;
     }
-    return last;
+    return this._interest_cache[cacheKey];
   }
 
   static getHisVolumeByTime(assetName, bar_type, ts = Date.now()) {
-    const candle_data = this.market_candle[bar_type]?.[assetName];
+    const cacheKey = `${assetName}_${bar_type}_${Math.floor(ts / this._chip_cache_duration)}`;
 
-    // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
-    let last = candle_data.at(-1);
-    let minDiff = Math.abs(ts - last.ts);
-    for (let i = 1; i < candle_data.length; i++) {
-      const diff = Math.abs(ts - candle_data[i].ts);
-      if (diff < minDiff) {
-        minDiff = diff;
-        last = candle_data[i];
+    // 检查缓存
+    if (!this._volume_cache[cacheKey]) {
+      this._cleanCache(this._volume_cache);
+      const candle_data = this.market_candle[bar_type]?.[assetName];
+      // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
+      let last = candle_data.at(-1);
+      let minDiff = Math.abs(ts - last.ts);
+      for (let i = 1; i < candle_data.length; i++) {
+        const diff = Math.abs(ts - candle_data[i].ts);
+        if (diff < minDiff) {
+          minDiff = diff;
+          last = candle_data[i];
+        }
       }
+      this._volume_cache[cacheKey] = last;
     }
-    return last;
+    return this._volume_cache[cacheKey];
+  }
+
+  // 清理过期缓存
+  static _cleanCache(cache) {
+    const keys = Object.keys(cache);
+
+    // 如果缓存项超过1000个，清理过期的
+    if (keys.length > 15000) {
+      keys.forEach(key => {
+        delete cache[key];
+      });
+    }
   }
 
   //

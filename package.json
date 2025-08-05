@@ -11,6 +11,7 @@
     "check-format": "prettier --check \"src/**/*.js\"",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/main.js",
+    "inspect": "node --inspect src/main.js",
     "trading": "node ./src/manual.js",
     "docker:build": "docker build -t okx-trading .",
     "docker:build-amd": "docker build --platform linux/amd64 -t okx-trading . && npm run docker:save",

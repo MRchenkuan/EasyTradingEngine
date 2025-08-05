@@ -1,4 +1,5 @@
 import { formatTimestamp } from '../tools.js';
+import { TradeEngine } from '../TradeEngine/TradeEngine.js';
 
 /**
  * 多粒度筹码分布计算器（自动适应1m/5m/1H/1D数据）
@@ -8,9 +9,13 @@ import { formatTimestamp } from '../tools.js';
  * @returns {Object} {
  */
 export function calculateChipDistribution(data, f_get_open_interest_by_time, f_get_volume_by_time) {
+  const getOpenInterestByTime = f_get_open_interest_by_time;
+
+  const getVolumeByTime = f_get_volume_by_time;
+
   const now = Date.now();
-  const now_volume = f_get_volume_by_time(now).vol;
-  const circulation = f_get_open_interest_by_time(now).oi;
+  const now_volume = getVolumeByTime(now).vol;
+  const circulation = getOpenInterestByTime(now).oi;
   const now_turnover = now_volume / circulation;
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');
@@ -61,7 +66,7 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
   windowData.forEach((bar, index) => {
     const { open, high, low, close, vol: volume, ts } = bar;
     const priceRange = [low, high];
-    const turnover = f_get_volume_by_time(ts).vol / f_get_open_interest_by_time(ts).oi;
+    const turnover = getVolumeByTime(ts).vol / getOpenInterestByTime(ts).oi;
     max_turnover = Math.max(max_turnover, turnover);
     min_turnover = Math.min(min_turnover, turnover);
 
@@ -94,11 +99,11 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
         max_volume: max_volume,
         open,
         close,
-        volume: f_get_volume_by_time(ts).vol,
+        volume: getVolumeByTime(ts).vol,
         turnover: turnover,
         max_turnover: max_turnover,
         min_turnover: min_turnover,
-        open_interest: f_get_open_interest_by_time(ts).oi,
+        open_interest: getOpenInterestByTime(ts).oi,
         step: priceStep,
         concentration,
       });
@@ -151,11 +156,11 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
       max_volume: max_volume,
       open,
       close,
-      volume: f_get_volume_by_time(ts).vol,
+      volume: getVolumeByTime(ts).vol,
       turnover: turnover,
       max_turnover: max_turnover,
       min_turnover: min_turnover,
-      open_interest: f_get_open_interest_by_time(ts).oi,
+      open_interest: getOpenInterestByTime(ts).oi,
       step: priceStep,
       concentration,
     });
@@ -193,7 +198,6 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
     step: priceStep,
     concentration,
   };
-
   return result;
 }
 

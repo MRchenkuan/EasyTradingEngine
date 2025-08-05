@@ -308,8 +308,7 @@ export function trendReversalThreshold(
   tendency,
   grid_box
 ) {
-
-  if(price_distance_count > 1.75 && price_grid_count < 2) {
+  if (price_distance_count > 1.75 && price_grid_count < 2) {
     threshold = threshold * 0.75;
   }
 
@@ -377,6 +376,16 @@ export function trendReversalThreshold(
   });
 
   const timeFactor = 1 - Math.min(Math.log1p(time_passed_seconds / 3600 / 24), 0.5);
+
+  if (timeFactor <= 0.6) {
+    // 最近 5 个周期总共的涨跌幅，是否超过 atr 的 2 倍
+    // const total_diff_rate = recent_prices.slice(-60).reduce((acc, cur, index, array) => {
+    //   if (index === 0) return 0;
+    //   return acc + (cur - array[index - 1]) / array[index - 1];
+    // }, 0);
+    // const is_total_diff_rate_exceed = Math.abs(total_diff_rate) > 2 * atr_6;
+  }
+
   console.log(` * boll 因子: ${boll_factor} ,${boll_msg}`);
   console.log(` * grid 因子: ${grid_factor} ,${grid_msg}`);
   console.log(` * rsi  因子: ${rsi_factor} ,${rsi_msg}`);

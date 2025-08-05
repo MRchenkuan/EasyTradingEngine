@@ -4,6 +4,7 @@ import { create_order_market, executeOrders, fetchOrders } from '../../trading.j
 import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
 import { OrderStatus, SettlementType } from '../../enum.js';
+import { trade_open } from '../../../config.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -568,6 +569,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {string} orderDesc 订单类型
    */
   async _placeOrder(gridCount, orderDesc, retry_count = 0) {
+    if (!trade_open) return;
     const { ctVal } = this._instrument_info;
     let amount = 0;
     if (this._settlement_type === SettlementType.AMOUNT) {
