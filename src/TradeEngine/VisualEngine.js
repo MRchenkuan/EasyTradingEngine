@@ -97,16 +97,6 @@ export class VisualEngine {
     const result = calculateBOLL(candles, 20);
     this._boll_cache.set(cacheKey, result);
 
-    // 清除旧的定时器
-    // if (this._boll_timer) {
-    //   clearTimeout(this._boll_timer);
-    // }
-
-    // // 2秒后清除缓存
-    // this._boll_timer = setTimeout(() => {
-    //   this._boll_cache.delete(cacheKey);
-    // }, 10000);
-
     return result;
   }
 
