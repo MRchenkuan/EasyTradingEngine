@@ -699,6 +699,7 @@ export class TradeEngine {
     // 重置定时器对象
     this._instrument_timers = {};
     this._position_timers = {};
+    this._status = 0;
   }
 
   /**

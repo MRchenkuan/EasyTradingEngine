@@ -3,8 +3,8 @@ import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 // export const Env = TradeEnv.MIMIC;
 export const Env = TradeEnv.PRODUCTION;
 
-export const trade_open = true;
-// export const trade_open = false;
+// export const trade_open = true;
+export const trade_open = false;
 
 export const KLine = {
   bar_type: BarType.MINUTE_5,
@@ -39,6 +39,8 @@ export const Strategies = [
       _max_price: 4.0,
       _base_amount: 30, // 每笔交易量
       _base_lots: 10, // 每笔交易的份数
+      _position_warning_count: 6, // 持仓警戒线
+      _position_break_count: 12, // 持仓止损线
       _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
     },
   },
@@ -53,6 +55,8 @@ export const Strategies = [
       _max_price: 4200,
       _base_amount: 30,
       _base_lots: 10,
+      _position_warning_count: 6, // 持仓警戒线
+      _position_break_count: 12, // 持仓止损线
       _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
     },
   },
@@ -68,6 +72,8 @@ export const Strategies = [
       _max_price: 220,
       _base_amount: 30,
       _base_lots: 10,
+      _position_warning_count: 6, // 持仓警戒线
+      _position_break_count: 12, // 持仓止损线
       _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
     },
   },
@@ -83,6 +89,8 @@ export const Strategies = [
       _swap_value: 0.01, //合约面值
       _base_amount: 60,
       _base_lots: 10,
+      _position_warning_count: 6, // 持仓警戒线
+      _position_break_count: 12, // 持仓止损线
       _settlement_type: SettlementType.AMOUNT, //交易单位 amount 等额，lots 等数量
     },
   },

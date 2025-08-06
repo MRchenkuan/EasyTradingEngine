@@ -23,7 +23,7 @@ export class VisualEngine {
   static _asset_themes = [];
   static _asset_names = [];
   static _show_order_his = [];
-  static _painting_interval = Env === TradeEnv.MIMIC ? 1000 : 5000; //
+  static _painting_interval = Env === TradeEnv.MIMIC ? 1000 : 10000; //
   static _boll_cache = new Map(); // 每一个滑动窗口的布林带
   static _boll_timer = null;
   static font_style = 'Monaco, Menlo, Consolas, monospace';
@@ -859,5 +859,5 @@ export class VisualEngine {
 // 网格交易绘制模块
 VisualEngine.use(GridTradingSlice);
 VisualEngine.use(MainGraph);
-VisualEngine.use(HedgeTransactionSlice);
-VisualEngine.use(HedgeProfitDistance);
+// VisualEngine.use(HedgeTransactionSlice);
+// VisualEngine.use(HedgeProfitDistance);

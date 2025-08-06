@@ -19,6 +19,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _base_lots = 10; // 每次交易数量
   _base_amount = 10; // 每次交易的金额
   _instrument_info = {}; // 每次交易数量
+  _position_warning_count = 6; // 持仓警告线
+  _position_break_count = 12; // 持仓严重警告线
   _settlement_type = SettlementType.AMOUNT; //交易单位 amount 等额，lots 等数量
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
@@ -315,6 +317,19 @@ export class GridTradingProcessor extends AbstractProcessor {
       notionalUsd,
     } = this.engine.getPositionList(this.asset_name) || {};
 
+    let position_count = 0;
+    const { ctVal } = this._instrument_info;
+    if (this._settlement_type === SettlementType.AMOUNT) {
+      position_count = Math.abs(notionalUsd / this._base_amount);
+    } else if (this._settlement_type === SettlementType.LOTS) {
+      position_count = Math.abs(pos / (this._base_lots / ctVal));
+    }
+
+    // 是否过度持仓
+    const is_position_warning = position_count > this._position_warning_count;
+    // 是否严重过度持仓
+    const is_position_critical = position_count > this._position_break_count;
+
     // 是否开仓优先
     const is_buy_first = 100 * mgnRatio < this._min_mgn_ratio_supress && parseFloat(pos) < 0;
     const is_sell_first = 100 * mgnRatio < this._min_mgn_ratio_supress && parseFloat(pos) > 0;
@@ -388,6 +403,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       console.log(`- 当前阈值：${(100 * this._threshold).toFixed(2)}%\n`);
 
+      // 第一级止损：保证金不足，单向减半
       if (is_buy_first && this._tendency < 0) {
         this._threshold = this._threshold / 2;
         if (is_buy_loss) {
@@ -432,7 +448,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       const need_survival =
         (is_buy_loss && this._tendency > 0) || (is_sell_loss && this._tendency < 0);
 
-      if (need_supress) {
+      if (need_supress || is_position_warning) {
         // 抑制交易
         console.log(
           `当前保证金率偏低：${(mgnRatio * 100).toFixed(2)}%； 抑制交易:${gridCount}格 => ${supressed_grid_count}格，当前抑制倍数:${this._trade_suppress_multiple}\n`
@@ -441,7 +457,7 @@ export class GridTradingProcessor extends AbstractProcessor {
           console.log(
             `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
           );
-          if (need_survival) {
+          if (need_survival || is_position_critical) {
             // 上涨 n 倍 才卖出一份，牺牲利润，有损
             await this._placeOrder(supressed_grid_count), '- 回调下单(止损)';
           } else {
