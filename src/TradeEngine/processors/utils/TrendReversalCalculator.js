@@ -329,8 +329,6 @@ export function trendReversalThreshold(
   const vol_power = vol_avg_fast / vol_avg_slow; // 量能
   const { ceil: grid_ceil_line, floor: grid_floor_line } = grid_box; // 网格线
 
-  // 默认两倍atr作为阈值
-  console.log(`=========指标数据========`);
   console.log(`- 💵价格:${price.toFixed(3)}`);
   // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
   console.log(`- 📏价距格数:${price_distance_count.toFixed(2)}`);

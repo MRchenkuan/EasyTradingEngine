@@ -33,3 +33,12 @@ export const StrategyType = Object.freeze({
   SCALPING_TRADING: 'scalping_trading',
   HEDGE_TRADING: 'hedge_trading',
 });
+
+export const StopLossLevel = Object.freeze({
+  NORMAL: 'normal',
+  SUPPRESS: 'suppress',
+  SURVIVAL: 'survival',
+  SINGLE_SUPPRESS: 'single_suppress',
+  SINGLE_SURVIVAL: 'single_survival',
+  SINGLE_KILL: 'single_kill',
+});
