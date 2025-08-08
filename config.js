@@ -1,7 +1,7 @@
 import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 
-export const Env = TradeEnv.MIMIC;
-// export const Env = TradeEnv.PRODUCTION;
+// export const Env = TradeEnv.MIMIC;
+export const Env = TradeEnv.PRODUCTION;
 
 export const trade_open = true;
 // export const trade_open = false;
@@ -37,7 +37,7 @@ export const Strategies = [
       _grid_width: 0.005,
       _min_price: 2.0,
       _max_price: 4.0,
-      _base_amount: 3000, // 每笔交易量
+      _base_amount: 30, // 每笔交易量
       _base_lots: 10, // 每笔交易的份数
       _position_supress_count: 6, // 持仓警戒线
       _position_survival_count: 12, // 持仓止损线
@@ -53,7 +53,7 @@ export const Strategies = [
       _grid_width: 0.005,
       _min_price: 1500,
       _max_price: 4200,
-      _base_amount: 3000,
+      _base_amount: 30,
       _base_lots: 10,
       _position_supress_count: 6, // 持仓警戒线
       _position_survival_count: 12, // 持仓止损线
@@ -70,7 +70,7 @@ export const Strategies = [
       _grid_width: 0.005,
       _min_price: 120,
       _max_price: 220,
-      _base_amount: 3000,
+      _base_amount: 30,
       _base_lots: 10,
       _position_supress_count: 6, // 持仓警戒线
       _position_survival_count: 12, // 持仓止损线
@@ -87,7 +87,7 @@ export const Strategies = [
       _min_price: 90000,
       _max_price: 130000,
       _swap_value: 0.01, //合约面值
-      _base_amount: 6000,
+      _base_amount: 60,
       _base_lots: 10,
       _position_supress_count: 6, // 持仓警戒线
       _position_survival_count: 12, // 持仓止损线
