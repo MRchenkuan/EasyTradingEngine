@@ -1,6 +1,6 @@
 export const SettlementType = Object.freeze({
-  AMOUNT: 'AMOUNT', // 等额
-  LOTS: 'LOTS', // 等份
+  VALUE: 'VALUE', // 等额
+  QUANTITY: 'QUANTITY', // 等份
 });
 
 export const BarType = Object.freeze({
@@ -27,7 +27,6 @@ export const TradeEnv = Object.freeze({
   PRODUCTION: 'production',
 });
 
-
 export const StrategyType = Object.freeze({
   GRID_TRADING: 'grid_trading',
   SCALPING_TRADING: 'scalping_trading',
@@ -35,10 +34,10 @@ export const StrategyType = Object.freeze({
 });
 
 export const StopLossLevel = Object.freeze({
-  NORMAL: 'normal',
-  SUPPRESS: 'suppress',
-  SURVIVAL: 'survival',
-  SINGLE_SUPPRESS: 'single_suppress',
-  SINGLE_SURVIVAL: 'single_survival',
-  SINGLE_KILL: 'single_kill',
+  NORMAL: 'NORMAL',
+  SUPPRESS: 'SUPPRESS',
+  SURVIVAL: 'SURVIVAL',
+  SINGLE_SUPPRESS: 'SINGLE_SUPPRESS',
+  SINGLE_SURVIVAL: 'SINGLE_SURVIVAL',
+  SINGLE_KILL: 'SINGLE_KILL',
 });

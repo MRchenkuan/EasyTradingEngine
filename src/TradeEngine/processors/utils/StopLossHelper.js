@@ -12,9 +12,9 @@ function calculateStopLossThreshold(baseThreshold, stopLossLevel, tendency, pos)
   let adjustedThreshold = baseThreshold;
 
   // 判断持仓方向与趋势的关系
-  const needPriorityClose = Math.sign(parseFloat(pos)) !== Math.sign(tendency);
+  const noNeedPriorityClose = Math.sign(parseFloat(pos)) !== Math.sign(tendency);
 
-  if (!needPriorityClose) {
+  if (noNeedPriorityClose) {
     return adjustedThreshold;
   }
 
@@ -69,16 +69,18 @@ export function StopLossControl(
       description: '正常交易',
       threshold: adjustedThreshold,
     },
-    [StopLossLevel.SUPPRESS]: { // 抑制模式：拉宽网格，交易分数同样增大
+    [StopLossLevel.SUPPRESS]: {
+      // 抑制模式：拉宽网格，交易分数同样增大
       shouldSuppress: true,
       gridCount: suppressedGridCount,
       tradeCount: suppressedGridCount * tradeMultiple,
       threshold: adjustedThreshold,
       description: '抑制交易(无损)',
     },
-    [StopLossLevel.SURVIVAL]: { // 减仓模式：拉宽网格，交易分数减半
+    [StopLossLevel.SURVIVAL]: {
+      // 减仓模式：拉宽网格，交易分数减半
       shouldSuppress: true,
-      gridCount: suppressedGridCount, 
+      gridCount: suppressedGridCount,
       tradeCount: suppressedGridCount,
       threshold: adjustedThreshold,
       description: '减仓交易(有损)',

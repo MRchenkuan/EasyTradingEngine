@@ -1,6 +1,6 @@
 import axios from 'axios';
-import * as mimic from './config.security.mimic.js';
-import * as firm from './config.security.js';
+import * as mimic from '../config.security.mimic.js';
+import * as firm from '../config.security.js';
 import { calcProfit, generateSignature, hashString } from './tools.js';
 import { Env } from '../config.js';
 import { TradeEnv } from './enum.js';

@@ -1,7 +1,7 @@
 import './utils/logger.js';
 import WebSocket from 'ws';
 import { getPrices, parseCandleData, getLastWholeMinute, getHistoryPrices, getHistoryOpenInterest } from './tools.js';
-import { base_url } from './config.security.js';
+import { base_url } from '../config.security.js';
 import { subscribeKlineChanel } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
 import { VisualEngine } from './TradeEngine/VisualEngine.js';

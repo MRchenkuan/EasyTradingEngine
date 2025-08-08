@@ -17,12 +17,12 @@ export class GridTradingProcessor extends AbstractProcessor {
   _grid_width = 0.025; // 网格宽度
   _upper_drawdown = 0.012; // 最大回撤
   _lower_drawdown = 0.012; // 最大反弹
-  _base_lots = 10; // 每次交易数量
+  _base_quantity = 10; // 每次交易数量
   _base_amount = 10; // 每次交易的金额
   _instrument_info = {}; // 每次交易数量
   _position_supress_count = 6; // 持仓警告线
   _position_survival_count = 12; // 持仓严重警告线
-  _settlement_type = SettlementType.AMOUNT; //交易单位 amount 等额，lots 等数量
+  _settlement_type = SettlementType.VALUE; //交易单位 value 等金额，quantity 等数量
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
   _backoff_1st_time = 30 * 60; // 15 分钟
@@ -303,25 +303,57 @@ export class GridTradingProcessor extends AbstractProcessor {
     };
   }
 
-  /**
-   * 获取止损等级
-   * @param {number} mgnRatio 保证金比例
-   * @param {number} pos 持仓
-   * @param {number} notionalUsd 持仓金额
-   * @returns {StopLossLevel} 止损等级
+  /** 获取当前持仓的份额
+   * @returns {number} 持仓份额
    */
-  _getStopLossLevel(mgnRatio, pos, notionalUsd) {
-    if (parseFloat(pos) === 0) {
-      return StopLossLevel.NORMAL;
-    }
-    const mgnRatioPercent = 100 * mgnRatio;
+  _getPositionLots() {
+    const pos_contracts = this._getPositionContracts();
+    const pos_value = this._getPositionValue();
+
     let position_count = 0;
     const { ctVal } = this._instrument_info;
-    if (this._settlement_type === SettlementType.AMOUNT) {
-      position_count = notionalUsd / this._base_amount;
-    } else if (this._settlement_type === SettlementType.LOTS) {
-      position_count = pos / (this._base_lots / ctVal);
+    if (this._settlement_type === SettlementType.VALUE) {
+      position_count = pos_value / this._base_amount;
+    } else if (this._settlement_type === SettlementType.QUANTITY) {
+      position_count = pos_contracts / (this._base_quantity / ctVal);
     }
+    return position_count;
+  }
+
+  /** 获取当前持仓的合约数量
+   * @returns {number} 持仓合约数量
+   */
+  _getPositionContracts() {
+    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).pos);
+  }
+
+  /** 获取当前持仓的价值
+   * @returns {number} 持仓价值
+   */
+  _getPositionValue() {
+    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).notionalUsd);
+  }
+
+  /** 获取当前维持保证金率
+   * @returns {number} 维持保证金率
+   */
+  _getMaintenanceMarginRate() {
+    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).mgnRatio);
+  }
+
+  /**
+   * 获取止损等级
+   * @returns {StopLossLevel} 止损等级
+   */
+  _getStopLossLevel() {
+    const pos_contracts = this._getPositionContracts();
+    const mmr = this._getMaintenanceMarginRate();
+
+    if (pos_contracts === 0) {
+      return StopLossLevel.NORMAL;
+    }
+    const mgnRatioPercent = 100 * mmr;
+    const position_count = this._getPositionLots();
     // 单个斩仓
     // if (Math.abs(position_count) >  2 * this._position_survival_count) {
     //   return StopLossLevel.SINGLE_KILL;
@@ -354,16 +386,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     if (now - this._last_turtle_ts < this.turtle) return;
     this._last_turtle_ts = now;
 
-    const {
-      posSide, // long short net
-      pos, // 持仓
-      avgPx, // 开仓均价
-      upl, // 未实现盈亏
-      uplRatio, // 未实现盈亏比例
-      mgnRatio, // 保证金比例
-      adl, // 信号强弱
-      notionalUsd,
-    } = this.engine.getPositionList(this.asset_name) || {};
+    const pos_contracts = this._getPositionContracts();
 
     try {
       this._stratage_locked = true;
@@ -431,7 +454,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._snapshot = snapshot;
 
       // 止损控制
-      const stopLossLevel = this._getStopLossLevel(mgnRatio, pos, notionalUsd);
+      const stopLossLevel = this._getStopLossLevel();
       const {
         shouldSuppress,
         gridCount: adjustedGridCount,
@@ -442,7 +465,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._threshold,
         stopLossLevel,
         this._tendency,
-        pos,
+        pos_contracts,
         this._trade_suppress_multiple,
         gridCount
       );
@@ -453,6 +476,14 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       this._threshold = adjustedThreshold;
 
+      if (shouldSuppress) {
+        const pos_lots = this._getPositionLots();
+        const mmr = this._getMaintenanceMarginRate();
+        // 止损模式，抑制交易
+        console.log(
+          `- [${this.asset_name}] 当前过度持仓：${pos_lots.toFixed(0)}手，维持保证金率：${(mmr * 100).toFixed(0)}%； 抑制交易:${gridCount}格 => ${adjustedGridCount}格，当前抑制倍数:${this._trade_suppress_multiple}`
+        );
+      }
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
       const is_return_arrived = Math.abs(correction) > this._threshold;
@@ -464,13 +495,6 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      if (shouldSuppress) {
-        // 止损模式，抑制交易
-        console.log(
-          `- [${this.asset_name}] 当前过度持仓，保证金率偏低：${(mgnRatio * 100).toFixed(2)}%； 抑制交易:${gridCount}格 => ${adjustedGridCount}格，当前抑制倍数:${this._trade_suppress_multiple}`
-        );
-      }
-
       if (Math.abs(adjustedGridCount) >= 1) {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
@@ -480,8 +504,14 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      // 未超过一格但实际距离超过 1.5
-      if (price_distance_grid > 1.5) {
+      const isClosePosition = Math.sign(pos_contracts) === Math.sign(this._tendency);
+
+      // 格内交易的的条件：
+      // 在平仓方向上
+      // 至少超超过了 1.5 格实际距离
+      // 当前处于抑制模式？
+      // if (price_distance_grid > 1.5 && isClosePosition && shouldSuppress) {
+      if (price_distance_grid > 1.5 && isClosePosition) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
@@ -586,12 +616,12 @@ export class GridTradingProcessor extends AbstractProcessor {
   async _placeOrder(gridCount, orderDesc, retry_count = 0) {
     const { ctVal } = this._instrument_info;
     let amount = 0;
-    if (this._settlement_type === SettlementType.AMOUNT) {
+    if (this._settlement_type === SettlementType.VALUE) {
       const swap_price = this._current_price * ctVal;
       const swap_amount = this._base_amount / swap_price;
       amount = (-gridCount * swap_amount).toFixed(2);
-    } else if (this._settlement_type === SettlementType.LOTS) {
-      amount = (-gridCount * this._base_lots) / ctVal;
+    } else if (this._settlement_type === SettlementType.QUANTITY) {
+      amount = (-gridCount * this._base_quantity) / ctVal;
     }
 
     console.log(`💰${orderDesc}：${this._current_price} ${amount} 个`);
