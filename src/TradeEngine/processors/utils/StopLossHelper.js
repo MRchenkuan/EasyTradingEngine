@@ -1,4 +1,4 @@
-import { StopLossLevel } from '../../../enum.js';
+import { StopLossLevel, TradingPriority } from '../../../enum.js';
 
 /**
  * 计算止损阈值调整
@@ -8,13 +8,12 @@ import { StopLossLevel } from '../../../enum.js';
  * @param {number} pos 持仓
  * @returns {number} 调整后的阈值
  */
-function calculateStopLossThreshold(baseThreshold, stopLossLevel, tendency, pos) {
+function calculateStopLossThreshold(baseThreshold, stopLossLevel, currentStrategyType) {
   let adjustedThreshold = baseThreshold;
 
   // 判断持仓方向与趋势的关系
-  const noNeedPriorityClose = Math.sign(parseFloat(pos)) !== Math.sign(tendency);
 
-  if (noNeedPriorityClose) {
+  if (currentStrategyType.OPEN) {
     return adjustedThreshold;
   }
 
@@ -56,50 +55,103 @@ export function StopLossControl(
   trade_suppress_multiple,
   gridCount
 ) {
+  const currentStrategyType =
+    Math.sign(parseFloat(pos)) === Math.sign(tendency)
+      ? TradingPriority.CLOSE
+      : TradingPriority.OPEN;
   const tradeMultiple = Math.round(trade_suppress_multiple);
-  const adjustedThreshold = calculateStopLossThreshold(threshold, stopLossLevel, tendency, pos);
+  const adjustedThreshold = calculateStopLossThreshold(
+    threshold,
+    stopLossLevel,
+    currentStrategyType
+  );
   const gridCountAbs = Math.abs(gridCount);
   const suppressedGridCount = Math.floor(gridCountAbs / tradeMultiple) * Math.sign(gridCount);
 
   const strategies = {
-    [StopLossLevel.NORMAL]: {
-      shouldSuppress: false,
-      gridCount: gridCount,
-      tradeCount: gridCount,
-      description: '正常交易',
-      threshold: adjustedThreshold,
+    [TradingPriority.OPEN]: {
+      [StopLossLevel.NORMAL]: {
+        shouldSuppress: false,
+        gridCount: gridCount,
+        tradeCount: gridCount,
+        description: '正常交易',
+        threshold: adjustedThreshold,
+      },
+      [StopLossLevel.SUPPRESS]: {
+        // 抑制模式：拉宽网格，交易分数同样增大
+        shouldSuppress: true,
+        gridCount: suppressedGridCount,
+        tradeCount: suppressedGridCount * tradeMultiple,
+        threshold: adjustedThreshold,
+        description: '抑制交易(无损)',
+      },
+      [StopLossLevel.SURVIVAL]: {
+        // 减仓模式：拉宽网格，交易分数减半
+        shouldSuppress: true,
+        gridCount: suppressedGridCount,
+        tradeCount: suppressedGridCount,
+        threshold: adjustedThreshold,
+        description: '减仓交易(有损)',
+      },
+      [StopLossLevel.SINGLE_SUPPRESS]: {
+        shouldSuppress: true,
+        gridCount: suppressedGridCount, // 单仓抑制模式：拉宽网格，交易分数同样增大
+        tradeCount: suppressedGridCount * tradeMultiple,
+        threshold: adjustedThreshold,
+        description: '单仓抑制交易（无损）',
+      },
+      [StopLossLevel.SINGLE_SURVIVAL]: {
+        shouldSuppress: true,
+        gridCount: suppressedGridCount, // 单仓减仓模式：拉宽网格，交易分数减半
+        tradeCount: suppressedGridCount,
+        threshold: adjustedThreshold,
+        description: '单仓减仓交易（有损）',
+      },
     },
-    [StopLossLevel.SUPPRESS]: {
-      // 抑制模式：拉宽网格，交易分数同样增大
-      shouldSuppress: true,
-      gridCount: suppressedGridCount,
-      tradeCount: suppressedGridCount * tradeMultiple,
-      threshold: adjustedThreshold,
-      description: '抑制交易(无损)',
-    },
-    [StopLossLevel.SURVIVAL]: {
-      // 减仓模式：拉宽网格，交易分数减半
-      shouldSuppress: true,
-      gridCount: suppressedGridCount,
-      tradeCount: suppressedGridCount,
-      threshold: adjustedThreshold,
-      description: '减仓交易(有损)',
-    },
-    [StopLossLevel.SINGLE_SURVIVAL]: {
-      shouldSuppress: true,
-      gridCount: suppressedGridCount, // 单仓减仓模式：拉宽网格，交易分数减半
-      tradeCount: suppressedGridCount,
-      threshold: adjustedThreshold,
-      description: '单仓减仓交易（有损）',
-    },
-    [StopLossLevel.SINGLE_SUPPRESS]: {
-      shouldSuppress: true,
-      gridCount: suppressedGridCount, // 单仓抑制模式：拉宽网格，交易分数同样增大
-      tradeCount: suppressedGridCount * tradeMultiple,
-      threshold: adjustedThreshold,
-      description: '单仓抑制交易（无损）',
+
+    [TradingPriority.CLOSE]: {
+      [StopLossLevel.NORMAL]: {
+        shouldSuppress: false,
+        gridCount: gridCount,
+        tradeCount: gridCount,
+        description: '正常交易',
+        threshold: adjustedThreshold,
+      },
+      [StopLossLevel.SUPPRESS]: {
+        // 抑制模式：拉宽网格，交易分数同样增大
+        shouldSuppress: true,
+        gridCount: gridCount,
+        tradeCount: gridCount,
+        threshold: adjustedThreshold,
+        description: '抑制交易 - 平仓(无损)',
+      },
+      [StopLossLevel.SURVIVAL]: {
+        // 减仓模式：拉宽网格，交易分数减半
+        shouldSuppress: true,
+        gridCount: gridCount,
+        tradeCount: gridCount,
+        threshold: adjustedThreshold,
+        description: '减仓交易 - 平仓(无损)',
+      },
+      [StopLossLevel.SINGLE_SUPPRESS]: {
+        shouldSuppress: true,
+        gridCount: gridCount,
+        tradeCount: gridCount,
+        threshold: adjustedThreshold,
+        description: '单仓抑制交易 - 平仓(无损)',
+      },
+      [StopLossLevel.SINGLE_SURVIVAL]: {
+        shouldSuppress: true,
+        gridCount: gridCount,
+        tradeCount: gridCount + 1*Math.sign(gridCount),
+        threshold: adjustedThreshold,
+        description: '单仓减仓交易 - 平仓(无损)',
+      },
     },
   };
 
-  return strategies[stopLossLevel] || strategies[StopLossLevel.NORMAL];
+  return (
+    strategies[currentStrategyType][stopLossLevel] ||
+    strategies[currentStrategyType][StopLossLevel.NORMAL]
+  );
 }

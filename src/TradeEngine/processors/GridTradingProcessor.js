@@ -359,24 +359,24 @@ export class GridTradingProcessor extends AbstractProcessor {
     //   return StopLossLevel.SINGLE_KILL;
     // }
 
-    // 整体止损状态
-    if (mgnRatioPercent < this._min_mgn_ratio_survival) {
-      return StopLossLevel.SURVIVAL;
-    }
-
     // 单个止损
     if (Math.abs(position_count) > this._position_survival_count) {
       return StopLossLevel.SINGLE_SURVIVAL;
     }
-    
-    // 整体抑制状态
-    if (mgnRatioPercent < this._min_mgn_ratio_supress) {
-      return StopLossLevel.SUPPRESS;
-    }
 
+    // 整体止损状态
+    if (mgnRatioPercent < this._min_mgn_ratio_survival) {
+      return StopLossLevel.SURVIVAL;
+    }
+    
     // 单个抑制
     if (Math.abs(position_count) > this._position_supress_count) {
       return StopLossLevel.SINGLE_SUPPRESS;
+    }
+
+    // 整体抑制状态
+    if (mgnRatioPercent < this._min_mgn_ratio_supress) {
+      return StopLossLevel.SUPPRESS;
     }
 
     return StopLossLevel.NORMAL;

@@ -41,3 +41,8 @@ export const StopLossLevel = Object.freeze({
   SINGLE_SURVIVAL: 'SINGLE_SURVIVAL',
   SINGLE_KILL: 'SINGLE_KILL',
 });
+
+export const TradingPriority = {
+  OPEN: 'OPEN',
+  CLOSE: 'CLOSE',
+};
