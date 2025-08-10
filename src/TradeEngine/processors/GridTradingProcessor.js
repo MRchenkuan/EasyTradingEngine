@@ -331,7 +331,8 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @returns {number} 持仓价值
    */
   _getPositionValue() {
-    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).notionalUsd);
+    const pos = parseFloat((this.engine.getPositionList(this.asset_name) || {}).pos);
+    return Math.abs(parseFloat((this.engine.getPositionList(this.asset_name) || {}).notionalUsd)) * Math.sign(pos);
   }
 
   /** 获取当前维持保证金率
@@ -502,7 +503,7 @@ export class GridTradingProcessor extends AbstractProcessor {
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
         // 上涨 n 倍 才卖出一份，牺牲利润，有损
-        await this._placeOrder(adjustedTradeCount), `- 回调下单 - ${description} `;
+        await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${description} `);
         return;
       }
 
