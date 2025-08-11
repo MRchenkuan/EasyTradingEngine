@@ -38,7 +38,7 @@ export function StopLossControl(
         // 抑制模式：拉宽网格，交易分数同样增大
         shouldSuppress: true,
         gridCount: suppressedGridCount,
-        tradeCount: suppressedGridCount * tradeMultiple,
+        tradeCount: gridCount,
         threshold: threshold,
         description: '抑制交易(无损)',
       },
@@ -53,7 +53,7 @@ export function StopLossControl(
       [StopLossLevel.SINGLE_SUPPRESS]: {
         shouldSuppress: true,
         gridCount: suppressedGridCount, // 单仓抑制模式：拉宽网格，交易分数同样增大
-        tradeCount: suppressedGridCount * tradeMultiple,
+        tradeCount: gridCount,
         threshold: threshold,
         description: '单仓抑制交易（无损）',
       },
@@ -100,7 +100,8 @@ export function StopLossControl(
       [StopLossLevel.SINGLE_SURVIVAL]: {
         shouldSuppress: true,
         gridCount: gridCount,
-        tradeCount: gridCount + 1 * Math.sign(gridCount),
+        // tradeCount: gridCount + 0.5 * Math.sign(gridCount),
+        tradeCount: gridCount,
         threshold: threshold / 4,
         description: '单仓减仓交易 - 平仓(无损)',
       },
