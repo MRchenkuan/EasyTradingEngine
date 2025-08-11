@@ -364,7 +364,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     // }
 
     // 单个止损
-    if (Math.abs(position_count) >= this._position_survival_count) {
+    if (Math.abs(position_count) > this._position_survival_count) {
       return StopLossLevel.SINGLE_SURVIVAL;
     }
 
@@ -374,7 +374,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 单个抑制
-    if (Math.abs(position_count) >= this._position_supress_count) {
+    if (Math.abs(position_count) > this._position_supress_count) {
       return StopLossLevel.SINGLE_SUPPRESS;
     }
 

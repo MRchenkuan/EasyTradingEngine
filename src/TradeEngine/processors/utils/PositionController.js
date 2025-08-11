@@ -152,10 +152,9 @@ export class PositionController {
   /**
    * 检查是否需要强制平仓
    * @param {object} riskAssessment 风险评估结果
-   * @param {number} currentPosition 当前持仓
    * @returns {object} 强制平仓建议
    */
-  checkForceClose(riskAssessment, currentPosition) {
+  checkForceClose(riskAssessment) {
     if (riskAssessment.shouldEmergencyClose) {
       return {
         shouldForceClose: true,
