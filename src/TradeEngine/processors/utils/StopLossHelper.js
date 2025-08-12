@@ -1,4 +1,4 @@
-import { StopLossLevel, TradingPriority } from '../../../enum.js';
+import { StopLossLevel, PositionAction } from '../../../enum.js';
 
 /**
  * 获取交易策略配置
@@ -18,15 +18,13 @@ export function StopLossControl(
   gridCount
 ) {
   const currentStrategyType =
-    Math.sign(parseFloat(pos)) === Math.sign(tendency)
-      ? TradingPriority.CLOSE
-      : TradingPriority.OPEN;
+    Math.sign(parseFloat(pos)) === Math.sign(tendency) ? PositionAction.CLOSE : PositionAction.OPEN;
   const tradeMultiple = Math.round(trade_suppress_multiple);
   const gridCountAbs = Math.abs(gridCount);
   const suppressedGridCount = Math.floor(gridCountAbs / tradeMultiple) * Math.sign(gridCount);
 
   const strategies = {
-    [TradingPriority.OPEN]: {
+    [PositionAction.OPEN]: {
       [StopLossLevel.NORMAL]: {
         shouldSuppress: false,
         gridCount: gridCount,
@@ -66,7 +64,7 @@ export function StopLossControl(
       },
     },
 
-    [TradingPriority.CLOSE]: {
+    [PositionAction.CLOSE]: {
       [StopLossLevel.NORMAL]: {
         shouldSuppress: false,
         gridCount: gridCount,

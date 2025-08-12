@@ -127,8 +127,8 @@ export const Strategies = [
       _upper_drawdown: 0.0075,      // 上行回撤
       _lower_drawdown: 0.0075,      // 下行回撤
       _base_amount: 60,             // 基础交易金额
-      _position_supress_count: 6,   // 持仓警戒线
-      _position_survival_count: 12, // 持仓止损线
+      _supress_lots: 6,   // 持仓警戒线
+      _survival_lots: 12, // 持仓止损线
     },
   },
 ];
@@ -146,8 +146,8 @@ export const Strategies = [
 - \_upper_drawdown : 上行回撤阈值，价格上涨超过此值时卖出
 - \_lower_drawdown : 下行回撤阈值，价格下跌超过此值时买入
 - \_base_amount : 每次交易的基础金额
-- \_position_supress_count : 持仓警戒线，超过时降低交易频率
-- \_position_survival_count : 持仓止损线，超过时强制平仓
+- \_supress_lots : 持仓警戒线，超过时降低交易频率
+- \_survival_lots : 持仓止损线，超过时强制平仓
   风险控制：
 
 - 两层止损机制：警戒线和生存线

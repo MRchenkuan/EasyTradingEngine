@@ -42,7 +42,7 @@ export const StopLossLevel = Object.freeze({
   SINGLE_KILL: 'SINGLE_KILL',
 });
 
-export const TradingPriority = {
+export const PositionAction = {
   OPEN: 'OPEN',
   CLOSE: 'CLOSE',
 };

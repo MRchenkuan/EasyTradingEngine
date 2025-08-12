@@ -20,8 +20,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _base_quantity = 10; // 每次交易数量
   _base_amount = 10; // 每次交易的金额
   _instrument_info = {}; // 每次交易数量
-  _position_supress_count = 8; // 持仓警告线
-  _position_survival_count = 12; // 持仓严重警告线
+  _supress_lots = 8; // 持仓警告线
+  _survival_lots = 12; // 持仓严重警告线
   _settlement_type = SettlementType.VALUE; //交易单位 value 等金额，quantity 等数量
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格
@@ -359,12 +359,12 @@ export class GridTradingProcessor extends AbstractProcessor {
     const mgnRatioPercent = 100 * mmr;
     const position_count = this._getPositionLots();
     // 单个斩仓
-    // if (Math.abs(position_count) >  2 * this._position_survival_count) {
+    // if (Math.abs(position_count) >  2 * this._survival_lots) {
     //   return StopLossLevel.SINGLE_KILL;
     // }
 
     // 单个止损
-    if (Math.abs(position_count) > this._position_survival_count) {
+    if (Math.abs(position_count) > this._survival_lots) {
       return StopLossLevel.SINGLE_SURVIVAL;
     }
 
@@ -374,7 +374,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     // 单个抑制
-    if (Math.abs(position_count) > this._position_supress_count) {
+    if (Math.abs(position_count) > this._supress_lots) {
       return StopLossLevel.SINGLE_SUPPRESS;
     }
 
