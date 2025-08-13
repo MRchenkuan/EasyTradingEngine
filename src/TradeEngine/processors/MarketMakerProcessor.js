@@ -18,7 +18,7 @@ export class MarketMakerProcessor extends AbstractProcessor {
   type = 'MarketMakerProcessor';
 
   constructor(asset_name, size, distance, engine) {
-    super();
+    super(engine, asset_name);
     this.asset_name = asset_name;
     this.engine = engine;
     this.id = hashString(`${Date.now()}${asset_names.join('')}`);

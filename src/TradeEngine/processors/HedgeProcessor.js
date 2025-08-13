@@ -22,7 +22,7 @@ export class HedgeProcessor extends AbstractProcessor {
    * @param {*} assetNames
    */
   constructor(asset_names, size, gate, engine) {
-    super();
+    super(engine, asset_names);
     this.engine = engine;
     this.id = hashString(`${Date.now()}${asset_names.join('')}`);
     this.asset_names = asset_names;

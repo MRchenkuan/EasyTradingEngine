@@ -784,10 +784,10 @@ export class TradeEngine {
   static registerInstrument(assetName, instType) {
     // 清除已存在的定时器
     if (this._instrument_timers[assetName]) {
-      clearInterval(this._instrument_timers[assetName]);
+      clearTimeout(this._instrument_timers[assetName]);
     }
     if (this._position_timers[assetName]) {
-      clearInterval(this._position_timers[assetName]);
+      clearTimeout(this._position_timers[assetName]);
     }
     // 创建定时更新任务
     const updateInstrument = async () => {
@@ -811,6 +811,12 @@ export class TradeEngine {
           lastUpdateTime: Date.now(),
         };
       }
+
+      // 设置定时器
+      this._instrument_timers[assetName] = setTimeout(
+        updateInstrument,
+        this._instrument_refresh_interval
+      );
     };
 
     const updatePositions = async () => {
@@ -824,21 +830,15 @@ export class TradeEngine {
       } else {
         this._position_list[assetName] = null;
       }
+      this._position_timers[assetName] = setTimeout(
+        updatePositions,
+        this._position_refresh_interval
+      );
     };
 
     // 立即执行一次
     updateInstrument();
     updatePositions();
-
-    // 设置定时器
-    this._instrument_timers[assetName] = setInterval(
-      updateInstrument,
-      this._instrument_refresh_interval
-    );
-    this._position_timers[assetName] = setInterval(
-      updatePositions,
-      this._position_refresh_interval
-    );
   }
 
   static getPositionList(assetName) {

@@ -42,7 +42,26 @@ export const StopLossLevel = Object.freeze({
   SINGLE_KILL: 'SINGLE_KILL',
 });
 
-export const PositionAction = {
+export const PositionAction = Object.freeze({
   OPEN: 'OPEN',
   CLOSE: 'CLOSE',
-};
+});
+
+export const PositionRiskLevel = Object.freeze({
+  NORMAL: 'NORMAL',
+  NOTICE: 'NOTICE',
+  HIGHT: 'HIGHT',
+  EMERGENCY: 'EMERGENCY',
+});
+
+export const PositionCompositeRiskLevel = Object.freeze({
+  // 风险等级
+  NORMAL: 'NORMAL',
+  NOTICE: 'NOTICE',
+  CROSS_HIGH: 'CROSS_HIGH',
+  CROSS_EMERGENCY: 'CROSS_EMERGENCY',
+  ISOLATE_HIGHT: 'ISOLATE_HIGHT',
+  ISOLATE_EMERGENCY: 'ISOLATE_EMERGENCY',
+  DUAL_HIGH: 'DUAL_HIGH',
+  DUAL_EMERGENCY: 'DUAL_EMERGENCY',
+});

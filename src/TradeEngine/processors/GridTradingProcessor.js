@@ -3,9 +3,9 @@ import { LocalVariable } from '../../LocalVariable.js';
 import { create_order_market, executeOrders, fetchOrders } from '../../trading.js';
 import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
-import { OrderStatus, SettlementType, StopLossLevel } from '../../enum.js';
+import { OrderStatus, PositionAction, SettlementType, StopLossLevel } from '../../enum.js';
 import { trade_open } from '../../../config.js';
-import { StopLossControl } from './utils/StopLossHelper.js';
+import { PositionController } from './utils/PositionController.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -20,7 +20,7 @@ export class GridTradingProcessor extends AbstractProcessor {
   _base_quantity = 10; // 每次交易数量
   _base_amount = 10; // 每次交易的金额
   _instrument_info = {}; // 每次交易数量
-  _supress_lots = 8; // 持仓警告线
+  _suppress_lots = 8; // 持仓警告线
   _survival_lots = 12; // 持仓严重警告线
   _settlement_type = SettlementType.VALUE; //交易单位 value 等金额，quantity 等数量
   _min_price = 0.1; // 最低触发价格
@@ -61,16 +61,8 @@ export class GridTradingProcessor extends AbstractProcessor {
   _threshold = 0.05;
   _snapshot = 'none';
 
-  _min_mgn_ratio_supress = 3000; // 抑制状态最小保证金率 4000%
-
-  _min_mgn_ratio_survival = 1500; // 止损状态最小保证金率 1000%
-
-  _min_mgn_ratio_break = 500; // 斩仓状态最小保证金率 1000%
-
-  _trade_suppress_multiple = 2; // 交易抑制倍数 倍数越大则成交要求越高： 1 为不抑制 3：3倍抑制， 只能是整数，否则报错
-
   constructor(asset_name, params = {}, engine) {
-    super();
+    super(engine, asset_name);
     this.engine = engine;
     this.asset_name = asset_name;
     this.id = `GridTradingProcessor_${asset_name}`;
@@ -82,6 +74,8 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 从本地变量恢复状态
     this._loadState();
+
+    this.position_controller = new PositionController(engine, this);
   }
 
   _loadState() {
@@ -345,47 +339,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     return parseFloat((this.engine.getPositionList(this.asset_name) || {}).mgnRatio);
   }
 
-  /**
-   * 获取止损等级
-   * @returns {StopLossLevel} 止损等级
-   */
-  _getStopLossLevel() {
-    const pos_contracts = this._getPositionContracts();
-    const mmr = this._getMaintenanceMarginRate();
-
-    if (pos_contracts === 0) {
-      return StopLossLevel.NORMAL;
-    }
-    const mgnRatioPercent = 100 * mmr;
-    const position_count = this._getPositionLots();
-    // 单个斩仓
-    // if (Math.abs(position_count) >  2 * this._survival_lots) {
-    //   return StopLossLevel.SINGLE_KILL;
-    // }
-
-    // 单个止损
-    if (Math.abs(position_count) > this._survival_lots) {
-      return StopLossLevel.SINGLE_SURVIVAL;
-    }
-
-    // 整体止损状态
-    if (mgnRatioPercent < this._min_mgn_ratio_survival) {
-      return StopLossLevel.SURVIVAL;
-    }
-
-    // 单个抑制
-    if (Math.abs(position_count) > this._supress_lots) {
-      return StopLossLevel.SINGLE_SUPPRESS;
-    }
-
-    // 整体抑制状态
-    if (mgnRatioPercent < this._min_mgn_ratio_supress) {
-      return StopLossLevel.SUPPRESS;
-    }
-
-    return StopLossLevel.NORMAL;
-  }
-
   async _orderStrategy(gridCount) {
     if (this._stratage_locked) return;
     const now = Date.now();
@@ -393,6 +346,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._last_turtle_ts = now;
 
     const pos_contracts = this._getPositionContracts();
+    const position_action =
+      Math.sign(pos_contracts) === Math.sign(this._tendency)
+        ? PositionAction.CLOSE
+        : PositionAction.OPEN;
 
     try {
       this._stratage_locked = true;
@@ -459,25 +416,18 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._threshold = threshold;
       this._snapshot = snapshot;
 
-      // 止损控制
-      const stopLossLevel = this._getStopLossLevel();
       const {
         shouldSuppress,
         gridCount: adjustedGridCount,
         tradeCount: adjustedTradeCount,
-        description,
         threshold: adjustedThreshold,
-      } = StopLossControl(
-        this._threshold,
-        stopLossLevel,
-        this._tendency,
-        pos_contracts,
-        this._trade_suppress_multiple,
-        gridCount
-      );
+        description: tradeDescription,
+        riskLevel: positionRiskLevel,
+        tradeMultiple: tradeSuppressMultiple,
+      } = this.position_controller.getPositionStrategy(this._tendency, this._threshold, gridCount);
 
       console.log(
-        `- [${this.asset_name}] 当前止损等级：${stopLossLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
+        `- [${this.asset_name}] 当前止损等级：${positionRiskLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
       );
 
       this._threshold = adjustedThreshold;
@@ -487,8 +437,12 @@ export class GridTradingProcessor extends AbstractProcessor {
         const mmr = this._getMaintenanceMarginRate();
         // 止损模式，抑制交易
         console.log(
-          `- [${this.asset_name}] 当前过度持仓：${pos_lots.toFixed(0)}手，维持保证金率：${(mmr * 100).toFixed(0)}%； 抑制交易:${gridCount}格 => ${adjustedGridCount}格，当前抑制倍数:${this._trade_suppress_multiple}`
+          `- [${this.asset_name}] 过度持仓：${pos_lots.toFixed(0)} 手，维持保证金率：${(mmr * 100).toFixed(0)}%；`
         );
+        console.log(
+          `- [${this.asset_name}] 抑制交易：${gridCount}格 => ${adjustedGridCount}格，${gridCount}份 => ${adjustedTradeCount}份`
+        );
+        console.log(`- [${this.asset_name}] 抑制倍数：${tradeSuppressMultiple}`);
       }
       // 如果超过两格则回撤判断减半，快速锁定利润
       // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
@@ -505,27 +459,24 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
-        // 上涨 n 倍 才卖出一份，牺牲利润，有损
-        await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${description} `);
+        await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
         return;
       }
-
-      const isClosePosition = Math.sign(pos_contracts) === Math.sign(this._tendency);
 
       // 格内交易的的条件：
       // 在平仓方向上
       // 至少超超过了 1.5 格实际距离
       // 当前处于抑制模式？
       // if (price_distance_grid > 1.5 && isClosePosition && shouldSuppress) {
-      if (price_distance_grid > 1.5 && isClosePosition) {
+      if (price_distance_grid > 1.5 && position_action === PositionAction.CLOSE) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
         if (this._tendency > 0) {
-          await this._placeOrder(1, '- 回调下单:格内');
+          await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);
         } else {
-          await this._placeOrder(-1, '- 回调下单:格内');
+          await this._placeOrder(-1, `- 回调下单:格内 - ${tradeDescription} `);
         }
         return;
       }
@@ -610,8 +561,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     let count = this._grid.filter(price => price >= lowerPrice && price <= upperPrice).length;
 
     if (count <= 1) return 0;
-    const result = current > prev ? count - 1 : -(count - 1);
-    return Math.min(result, this._max_trade_grid_count);
+    return current > prev ? count - 1 : -(count - 1)
   }
 
   /**
