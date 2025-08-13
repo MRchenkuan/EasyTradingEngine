@@ -689,16 +689,6 @@ export class TradeEngine {
 
   static stop() {
     clearTimeout(this._timer.start);
-    // 清除所有定时器
-    Object.values(this._instrument_timers).forEach(timer => {
-      clearInterval(timer);
-    });
-    Object.values(this._position_timers).forEach(timer => {
-      clearInterval(timer);
-    });
-    // 重置定时器对象
-    this._instrument_timers = {};
-    this._position_timers = {};
     this._status = 0;
   }
 
@@ -791,49 +781,59 @@ export class TradeEngine {
     }
     // 创建定时更新任务
     const updateInstrument = async () => {
-      // 从API获取品种信息
-      const { data: base } = await getInstruments(instType, assetName);
-      const { data: openInterest } = await getOpenInterest(instType, assetName);
-      const inst_base = base.find(it => it.instId === assetName);
-      const inst_open_interest = openInterest.find(it => it.instId === assetName);
+      try{
+        // 从API获取品种信息
+        const { data: base } = await getInstruments(instType, assetName);
+        const { data: openInterest } = await getOpenInterest(instType, assetName);
+        const inst_base = base.find(it => it.instId === assetName);
+        const inst_open_interest = openInterest.find(it => it.instId === assetName);
 
-      if (inst_base) {
-        this._instrument_info[assetName] = {
-          ...inst_base,
-          lastUpdateTime: Date.now(),
-        };
+        if (inst_base) {
+          this._instrument_info[assetName] = {
+            ...inst_base,
+            lastUpdateTime: Date.now(),
+          };
+        }
+
+        if (inst_open_interest) {
+          this._instrument_info[assetName] = {
+            ...this._instrument_info[assetName],
+            ...inst_open_interest,
+            lastUpdateTime: Date.now(),
+          };
+        }
+      }catch(e){
+        console.log(e);
+      } finally {
+        // 设置定时器
+        this._instrument_timers[assetName] = setTimeout(
+          updateInstrument,
+          this._instrument_refresh_interval
+        );
       }
-
-      if (inst_open_interest) {
-        this._instrument_info[assetName] = {
-          ...this._instrument_info[assetName],
-          ...inst_open_interest,
-          lastUpdateTime: Date.now(),
-        };
-      }
-
-      // 设置定时器
-      this._instrument_timers[assetName] = setTimeout(
-        updateInstrument,
-        this._instrument_refresh_interval
-      );
     };
 
     const updatePositions = async () => {
-      const { data: positions } = await getPositions(assetName);
-      if (positions.length) {
-        this._position_list[assetName] = {
-          ...this._position_list[assetName],
-          ...positions[0],
-          lastUpdateTime: Date.now(),
-        };
-      } else {
-        this._position_list[assetName] = null;
+      try{
+        const { data: positions } = await getPositions(assetName);
+        if (positions.length) {
+          this._position_list[assetName] = {
+            ...this._position_list[assetName],
+            ...positions[0],
+            lastUpdateTime: Date.now(),
+          };
+        } else {
+          this._position_list[assetName] = null;
+        }
+      } catch(e){
+        console.log(e);
+      } finally {
+        // 设置定时器
+        this._position_timers[assetName] = setTimeout(
+          updatePositions,
+          this._position_refresh_interval
+        );
       }
-      this._position_timers[assetName] = setTimeout(
-        updatePositions,
-        this._position_refresh_interval
-      );
     };
 
     // 立即执行一次
