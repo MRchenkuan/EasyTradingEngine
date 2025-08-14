@@ -394,7 +394,7 @@ export class GridTradingProcessor extends AbstractProcessor {
           : Math.max(this._current_price, this._last_trade_price);
       const diff_rate = price_diff / ref_price;
 
-      const price_distance_grid = diff_rate / this._grid_width;
+      const grid_span = diff_rate / this._grid_width;
       const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
       const grid_box = this.getGridBox(this._current_price);
@@ -406,7 +406,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._recent_prices,
         this._current_price,
         default_threshold,
-        price_distance_grid,
+        grid_span,
         grid_count_abs,
         timeDiff,
         correction,
@@ -424,7 +424,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         description: tradeDescription,
         riskLevel: positionRiskLevel,
         tradeMultiple: tradeSuppressMultiple,
-      } = this.position_controller.getPositionStrategy(this._tendency, this._threshold, gridCount);
+      } = this.position_controller.getPositionStrategy(this._tendency, this._threshold, gridCount, grid_span);
 
       console.log(
         `- [${this.asset_name}] 当前止损等级：${positionRiskLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
@@ -450,14 +450,14 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
         console.log(
-          `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
+          `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
         );
         return;
       }
 
       if (Math.abs(adjustedGridCount) >= 1) {
         console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
         await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
         return;
@@ -467,11 +467,11 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 在平仓方向上
       // 至少超超过了 1.5 格实际距离
       // 当前处于抑制模式？
-      // if (price_distance_grid > 1.5 && isClosePosition && shouldSuppress) {
-      if (price_distance_grid > 1.5 && position_action === PositionAction.CLOSE) {
+      // if (grid_span > 1.5 && isClosePosition && shouldSuppress) {
+      if (grid_span > 1.5 && position_action === PositionAction.CLOSE) {
         // 正常满足条件下单
         console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${price_distance_grid.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
         if (this._tendency > 0) {
           await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);

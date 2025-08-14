@@ -5,7 +5,7 @@ import { calculateMA } from '../../../indicators/MA.js';
 import { calculateRSI } from '../../../indicators/RSI.js';
 
 function situations({
-  price_distance_count,
+  price_span,
   price_grid_count,
   candles,
   price,
@@ -63,35 +63,35 @@ function situations({
   const cell_width = Math.abs(grid_ceil_line - grid_floor_line);
   const over_grid_distance = remain_distance / cell_width;
   if (price_grid_count >= 1) {
-    grid_msg = `只超过${price_distance_count.toFixed(2)}格，越过网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
+    grid_msg = `只超过${price_span.toFixed(2)}格，越过网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
     grid_factor = 1;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
+      grid_msg = `价格${price_span.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔹 阈值不变`;
       grid_factor = 1;
     }
   }
 
   if (price_grid_count >= 2) {
-    grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔹 放宽阈值`;
+    grid_msg = `超过${price_span.toFixed(2)}格，🚧🔹 放宽阈值`;
     grid_factor = 1;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_span.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
   if (price_grid_count >= 3) {
-    grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 允许更大回撤`;
+    grid_msg = `超过${price_span.toFixed(2)}格，🚧🔺 允许更大回撤`;
     grid_factor = 1.25;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_span.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
   if (price_grid_count >= 4) {
-    grid_msg = `超过${price_distance_count.toFixed(2)}格，🚧🔺 许更大回撤`;
+    grid_msg = `超过${price_span.toFixed(2)}格，🚧🔺 许更大回撤`;
     grid_factor = 1.5;
     if (over_grid_distance <= 0.1) {
-      grid_msg = `价格${price_distance_count.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
+      grid_msg = `价格${price_span.toFixed(2)}格，距离网格线${over_grid_distance.toFixed(2)}格，🚧🔻 锁定利润`;
       grid_factor = 0.2;
     }
   }
@@ -288,7 +288,7 @@ function getVolumeStandard(candles, slow_window = 30, fast_window = 3) {
  * @param {Array<number>} recent_prices 最近的价格数组
  * @param {number} price 当前价格
  * @param {number} threshold 初始阈值
- * @param {number} price_distance_count 价格距离上次交易的绝对格数
+ * @param {number} price_span 价格距离上次交易的绝对格数
  * @param {number} price_grid_count 价格距离上次交易的整数格数
  * @param {number} time_passed_seconds 距离上次交易的时间（秒）
  * @param {number} diff_rate 当前回撤比例
@@ -301,14 +301,14 @@ export function trendReversalThreshold(
   recent_prices,
   price,
   threshold,
-  price_distance_count,
+  price_span,
   price_grid_count,
   time_passed_seconds,
   diff_rate,
   tendency,
   grid_box
 ) {
-  if (price_distance_count > 1.75 && price_grid_count < 2) {
+  if (price_span > 1.75 && price_grid_count < 2) {
     threshold = threshold * 0.75;
   }
 
@@ -331,7 +331,7 @@ export function trendReversalThreshold(
 
   console.log(`- 💵价格:${price.toFixed(3)}`);
   // --- 因子计算（新增price_distance_count和price_grid_count的差异化处理）---
-  console.log(`- 📏价距格数:${price_distance_count.toFixed(2)}`);
+  console.log(`- 📏价距格数:${price_span.toFixed(2)}`);
 
   // 2. 网格跨越因子（price_grid_count）：离散格数强化趋势强度
   console.log(`- 🔲价差格数:${price_grid_count}`);
@@ -362,7 +362,7 @@ export function trendReversalThreshold(
     grid: { factor: grid_factor, msg: grid_msg },
     rsi: { factor: rsi_factor, msg: rsi_msg },
   } = situations({
-    price_distance_count,
+    price_span,
     price_grid_count,
     candles,
     price,

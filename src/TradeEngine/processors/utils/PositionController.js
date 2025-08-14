@@ -209,9 +209,10 @@ export class PositionController {
    * @param {number} tendency 趋势方向
    * @param {number} threshold 基础阈值
    * @param {number} gridCount 网格数量
+   * @param {number} grid_span 网格间距 绝对值
    * @returns {object} 交易策略配置
    */
-  getPositionStrategy(tendency, threshold, gridCount) {
+  getPositionStrategy(tendency, threshold, gridCount, grid_span) {
     const actionType = this.getPositionAction(tendency);
     const riskLevel = this.getMixedRiskLevel();
 
@@ -219,6 +220,7 @@ export class PositionController {
     const gridCountAbs = Math.abs(gridCount);
     const gridCountSign = Math.sign(gridCount);
     const suppressedGridCount = Math.floor(gridCountAbs / tradeMultiple) * gridCountSign;
+    const baseCloseTradeCount = Math.round(gridCountSign * grid_span *10)/10;
 
     const {
       NORMAL,
@@ -299,14 +301,14 @@ export class PositionController {
         [NORMAL]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold,
           description: '正常平仓',
         },
         [NOTICE]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: gridCount * 0.75,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold,
           description: '正常平仓',
         },
@@ -314,21 +316,21 @@ export class PositionController {
         [CROSS_HIGH]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.5,
           description: '全仓抑制交易 - 平仓(无损)',
         },
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.5,
           description: '单仓抑制交易 - 平仓(无损)',
         },
         [DUAL_HIGH]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.5,
           description: '双重抑制交易 - 平仓(无损)',
         },
@@ -337,21 +339,21 @@ export class PositionController {
         [CROSS_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.25,
           description: '全仓减仓交易 - 平仓(无损)',
         },
         [ISOLATE_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: (gridCountAbs > 1 ? (1.5 * gridCountAbs) : gridCountAbs) * gridCountSign,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.25,
           description: '单仓减仓交易 - 平仓(有损)',
         },
         [DUAL_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: (gridCountAbs > 1 ? (1.5 * gridCountAbs) : gridCountAbs) * gridCountSign,
+          tradeCount: gridCountAbs > 1.5 ? baseCloseTradeCount * 1.5 : baseCloseTradeCount,
           threshold: threshold * 0.25,
           description: '双重减仓交易 - 平仓(有损)',
         },
