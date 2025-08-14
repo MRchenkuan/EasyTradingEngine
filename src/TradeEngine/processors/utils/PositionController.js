@@ -168,10 +168,10 @@ export class PositionController {
       '02': RiskLevel.CROSS_HIGH, // NORMAL-HIGHT
       '03': RiskLevel.CROSS_EMERGENCY, // NORMAL-EMERGENCY
 
-      20: RiskLevel.HIGHT, // NORMAL-HIGHT
-      21: RiskLevel.HIGHT, // NORMAL-HIGHT
+      20: RiskLevel.ISOLATE_HIGHT, // NORMAL-HIGHT
+      21: RiskLevel.ISOLATE_HIGHT, // NORMAL-HIGHT
       22: RiskLevel.DUAL_HIGH, // HIGHT-HIGHT
-      23: RiskLevel.CROSS_EMERGENCY, // EMERGENCY-EMERGENCY
+      23: RiskLevel.DUAL_HIGH, // EMERGENCY-EMERGENCY
 
       30: RiskLevel.ISOLATE_EMERGENCY, // HIGHT-NORMAL
       31: RiskLevel.ISOLATE_EMERGENCY, // HIGHT-EMERGENCY
@@ -234,8 +234,9 @@ export class PositionController {
     } = PositionCompositeRiskLevel;
     // 按照单仓、全仓的风险等级进行分类
     const strategies = {
+      // 开仓策略
       [PositionAction.OPEN]: {
-        // 开仓策略
+        // 无风险
         [NORMAL]: {
           shouldSuppress: false,
           gridCount: gridCount,
@@ -243,6 +244,7 @@ export class PositionController {
           description: '正常交易',
           threshold: threshold,
         },
+        // 提示性风险
         [NOTICE]: {
           shouldSuppress: false,
           gridCount: gridCount,
@@ -251,14 +253,6 @@ export class PositionController {
           threshold: threshold,
         },
         // 高风险：抑制模式，拉宽网格，交易份数放大
-        [CROSS_HIGH]: {
-          //
-          shouldSuppress: true,
-          gridCount: suppressedGridCount,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '全仓抑制交易(无损)',
-        },
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
           gridCount: suppressedGridCount,
@@ -274,13 +268,6 @@ export class PositionController {
           description: '双重抑制交易（无损）',
         },
         // 超高风险：减仓模式，交易份数减半
-        [CROSS_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: suppressedGridCount,
-          tradeCount: (gridCountAbs / tradeMultiple) * gridCountSign,
-          threshold: threshold,
-          description: '全仓减仓交易(有损)',
-        },
         [ISOLATE_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: suppressedGridCount,
@@ -295,31 +282,41 @@ export class PositionController {
           threshold: threshold,
           description: '双重减仓交易（有损）',
         },
+        // 传导性风险
+        [CROSS_HIGH]: {
+          shouldSuppress: true,
+          gridCount: suppressedGridCount,
+          tradeCount: gridCount,
+          threshold: threshold,
+          description: '全仓抑制交易(无损)',
+        },
+        [CROSS_EMERGENCY]: {
+          shouldSuppress: true,
+          gridCount: suppressedGridCount,
+          tradeCount: (gridCountAbs / tradeMultiple) * gridCountSign,
+          threshold: threshold,
+          description: '全仓减仓交易(有损)',
+        },
       },
+      // 平仓策略
       [PositionAction.CLOSE]: {
-        // 平仓策略
+        // 无风险
         [NORMAL]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: baseCloseTradeCount,
+          tradeCount: gridCount,
           threshold: threshold,
           description: '正常平仓',
         },
+        // 提示性风险
         [NOTICE]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: baseCloseTradeCount,
+          tradeCount: gridCount,
           threshold: threshold,
           description: '正常平仓',
         },
         // 高风险：减仓模式,阈值减半
-        [CROSS_HIGH]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.5,
-          description: '全仓抑制交易 - 平仓(无损)',
-        },
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
           gridCount: gridCount,
@@ -331,31 +328,40 @@ export class PositionController {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.5,
+          threshold: threshold * 0.25,
           description: '双重抑制交易 - 平仓(无损)',
         },
 
         // 超高风险：减仓模式,阈值极度压缩
-        [CROSS_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.25,
-          description: '全仓减仓交易 - 平仓(无损)',
-        },
         [ISOLATE_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.25,
+          threshold: threshold * 5,
           description: '单仓减仓交易 - 平仓(有损)',
         },
         [DUAL_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: gridCountAbs > 1.5 ? baseCloseTradeCount * 1.5 : baseCloseTradeCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.25,
           description: '双重减仓交易 - 平仓(有损)',
+        },
+        
+        // 传导性风险
+        [CROSS_HIGH]: {
+          shouldSuppress: true,
+          gridCount: gridCount,
+          tradeCount: gridCount,
+          threshold: threshold * 0.5,
+          description: '全仓抑制交易 - 平仓(无损)',
+        },
+        [CROSS_EMERGENCY]: {
+          shouldSuppress: true,
+          gridCount: gridCount,
+          tradeCount: baseCloseTradeCount,
+          threshold: threshold * 0.5,
+          description: '全仓减仓交易 - 平仓(无损)',
         },
       },
     }[actionType];
