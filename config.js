@@ -8,7 +8,7 @@ export const trade_open = false;
 
 export const KLine = {
   max_days: 3650,
-  bar_type: BarType.MINUTE_5,
+  bar_type: BarType.MINUTE,
   candle_limit: {
     [TradeEnv.MIMIC]: 1000,
     [TradeEnv.PRODUCTION]: 3000,

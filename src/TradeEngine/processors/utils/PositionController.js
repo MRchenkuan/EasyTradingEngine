@@ -15,7 +15,6 @@ export class PositionController {
   processor = null;
   _suppress_lots = 8;
   _survival_lots = 12;
-  _trade_suppress_multiple = 2;
   _min_mgn_ratio_notice = 4000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_supress = 2000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_survival = 1500; // 止损状态最小保证金率 1000%
@@ -216,10 +215,11 @@ export class PositionController {
     const actionType = this.getPositionAction(tendency);
     const riskLevel = this.getMixedRiskLevel();
 
-    const tradeMultiple = Math.round(this._trade_suppress_multiple);
     const gridCountAbs = Math.abs(gridCount);
     const gridCountSign = Math.sign(gridCount);
-    const suppressedGridCount = Math.floor(gridCountAbs / tradeMultiple) * gridCountSign;
+    const tradeMultiple = 0.5;
+    const suppressedGridCount = Math.floor(gridCountAbs * tradeMultiple) * gridCountSign;
+    const suppressedTradeCount = (gridCountAbs * 0.5) * gridCountSign;
     const baseCloseTradeCount = Math.round(gridCountSign * grid_span *10)/10;
 
     const {
@@ -252,6 +252,7 @@ export class PositionController {
           description: '正常交易',
           threshold: threshold,
         },
+        
         // 高风险：抑制模式，拉宽网格，交易份数放大
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
@@ -267,21 +268,23 @@ export class PositionController {
           threshold: threshold,
           description: '双重抑制交易（无损）',
         },
+
         // 超高风险：减仓模式，交易份数减半
         [ISOLATE_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: suppressedGridCount,
-          tradeCount: (gridCountAbs / tradeMultiple) * gridCountSign,
+          tradeCount: suppressedTradeCount,
           threshold: threshold,
           description: '单仓减仓交易（有损）',
         },
         [DUAL_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: suppressedGridCount,
-          tradeCount: (gridCountAbs / tradeMultiple) * gridCountSign,
+          tradeCount: suppressedTradeCount,
           threshold: threshold,
           description: '双重减仓交易（有损）',
         },
+
         // 传导性风险
         [CROSS_HIGH]: {
           shouldSuppress: true,
@@ -293,9 +296,9 @@ export class PositionController {
         [CROSS_EMERGENCY]: {
           shouldSuppress: true,
           gridCount: suppressedGridCount,
-          tradeCount: (gridCountAbs / tradeMultiple) * gridCountSign,
+          tradeCount: gridCount,
           threshold: threshold,
-          description: '全仓减仓交易(有损)',
+          description: '全仓减仓开仓(无损)',
         },
       },
       // 平仓策略
@@ -312,7 +315,7 @@ export class PositionController {
         [NOTICE]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: gridCount,
+          tradeCount: baseCloseTradeCount,
           threshold: threshold,
           description: '正常平仓',
         },
@@ -322,14 +325,14 @@ export class PositionController {
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.5,
-          description: '单仓抑制交易 - 平仓(无损)',
+          description: '单仓抑制交易 - 平仓(有损)',
         },
         [DUAL_HIGH]: {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.25,
-          description: '双重抑制交易 - 平仓(无损)',
+          description: '双重抑制交易 - 平仓(有损)',
         },
 
         // 超高风险：减仓模式,阈值极度压缩
@@ -337,7 +340,7 @@ export class PositionController {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
-          threshold: threshold * 5,
+          threshold: threshold * 0.5,
           description: '单仓减仓交易 - 平仓(有损)',
         },
         [DUAL_EMERGENCY]: {
@@ -361,7 +364,7 @@ export class PositionController {
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
           threshold: threshold * 0.5,
-          description: '全仓减仓交易 - 平仓(无损)',
+          description: '全仓减仓交易 - 平仓(有损)',
         },
       },
     }[actionType];

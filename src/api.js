@@ -267,7 +267,7 @@ export async function batchCancelOrders(orders) {
 
 export async function getOpenInterestHistory(instId, period, begin, end, limit = 100) {
   const security = MIMIC ? mimic : firm;
-
+  if (period === '1m') period = '5m';
   const timestamp = new Date().toISOString();
   const method = 'GET';
   const requestPath = `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`;
