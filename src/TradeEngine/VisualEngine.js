@@ -1,4 +1,3 @@
-import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import fs from 'fs';
 import { blendColors, createMapFrom, formatTimestamp, hashString, shortDcm } from '../tools.js';
 import { calculateCorrelationMatrix } from '../mathmatic.js';
@@ -10,8 +9,6 @@ import { LocalVariable } from '../LocalVariable.js';
 import { calculateBOLL } from '../indicators/BOLL.js';
 import { GridTradingSlice } from './painters/GridTradingSlice.js';
 import { MainGraph } from './painters/MainGraph.js';
-import { HedgeTransactionSlice } from './painters/HedgeTransactionSlice.js';
-import { HedgeProfitDistance } from './painters/HedgeProfitDistance.js';
 import { Env } from '../../config.js';
 import { TradeEnv } from '../enum.js';
 
@@ -206,6 +203,16 @@ export class VisualEngine {
    * @private
    */
   static _paintSingleOrder(ctx, fx, fy, labels, side, collisionAvoidance, ghost = null) {
+    const fx_offset = {
+      buy: fx - 10,
+      sell: fx + 10,
+    }[side];
+
+    const fx_offset_label = {
+      buy: fx - 20,
+      sell: fx + 20,
+    }[side];
+
     // 绘制圆点
     ctx.beginPath();
     ctx.arc(fx, fy, 1.5, 0, 2 * Math.PI);
@@ -218,20 +225,39 @@ export class VisualEngine {
     // 买单向下(1)，卖单向上(-1)
     const lineLength = 60;
     const lineDirection = side === 'buy' ? 1 : -1;
+    const fy_label = fy + lineDirection * lineLength;
 
     // 绘制垂直虚线
     ctx.beginPath();
     ctx.setLineDash([5, 3]);
-    ctx.lineWidth = 1;
-    ctx.moveTo(fx, fy);
-    ctx.lineTo(fx, fy + lineDirection * lineLength);
+    ctx.lineWidth = 0.5;
     ctx.strokeStyle = ctx.fillStyle;
+    ctx.moveTo(fx_offset, fy);
+    ctx.lineTo(fx_offset, fy_label);
+    ctx.stroke();
+    // 设置横向虚线
+    ctx.beginPath();
+    ctx.moveTo(fx_offset, fy);
+    ctx.lineTo(fx, fy);
+    ctx.stroke();
+    // 设置横向虚线指向文字
+    ctx.beginPath();
+    ctx.moveTo(fx_offset_label, fy_label);
+    ctx.lineTo(fx_offset, fy_label);
     ctx.stroke();
     ctx.setLineDash([]);
 
     if (ghost) {
       ctx.save();
       const { y: ghost_y, label: ghost_label } = ghost;
+      ctx.beginPath();
+      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#8b32a8';
+      ctx.setLineDash([5, 3]);
+      ctx.moveTo(fx, ghost_y);
+      ctx.lineTo(fx_offset, ghost_y);
+      ctx.lineTo(fx_offset, fy);
+      ctx.stroke();
       ctx.beginPath();
       ctx.arc(fx, ghost_y, 1.5, 0, 2 * Math.PI);
       ctx.fillStyle = '#8b32a8';
@@ -240,7 +266,7 @@ export class VisualEngine {
     }
 
     // 绘制文字标签
-    ctx.font = `12px bold ${this.font_style}`;
+    ctx.font = `12px ${this.font_style}`;
     ctx.textAlign = 'center';
     const lines = labels.split('/');
     const lineHeight = 14;
@@ -249,10 +275,12 @@ export class VisualEngine {
     // 添加一些padding，使文本不会太贴近边缘
     const textBoxWidth = maxWidth + 10;
     // sell 方向需要向上偏移文本总高度
-    const labelOffset = side === 'sell' ? -totalHeight : 10;
+    const labelOffset = side === 'sell' ? -totalHeight : 15;
+    const fx_label =
+      side === 'sell' ? fx_offset_label + textBoxWidth * 0.5 : fx_offset_label - textBoxWidth * 0.5;
     const { x: labelX, y: labelY } = collisionAvoidance(
-      fx,
-      fy + lineDirection * (lineLength + 5) + labelOffset,
+      fx_label,
+      fy_label + labelOffset,
       textBoxWidth,
       totalHeight
     );

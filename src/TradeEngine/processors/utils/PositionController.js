@@ -15,7 +15,7 @@ export class PositionController {
   processor = null;
   _suppress_lots = 8;
   _survival_lots = 12;
-  _min_mgn_ratio_notice = 4000; // 抑制状态最小保证金率 4000%
+  _min_mgn_ratio_notice = 5000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_supress = 2000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_survival = 1500; // 止损状态最小保证金率 1000%
   _max_open_grid_count = 8; // 最大开仓网格数量
@@ -219,8 +219,8 @@ export class PositionController {
     const gridCountSign = Math.sign(gridCount);
     const tradeMultiple = 0.5;
     const suppressedGridCount = Math.floor(gridCountAbs * tradeMultiple) * gridCountSign;
-    const suppressedTradeCount = (gridCountAbs * 0.5) * gridCountSign;
-    const baseCloseTradeCount = Math.round(gridCountSign * grid_span *10)/10;
+    const suppressedTradeCount = gridCountAbs * 0.5 * gridCountSign;
+    const baseCloseTradeCount = Math.round(gridCountSign * grid_span * 10) / 10;
 
     const {
       NORMAL,
@@ -252,7 +252,7 @@ export class PositionController {
           description: '正常交易',
           threshold: threshold,
         },
-        
+
         // 高风险：抑制模式，拉宽网格，交易份数放大
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
@@ -350,7 +350,7 @@ export class PositionController {
           threshold: threshold * 0.25,
           description: '双重减仓交易 - 平仓(有损)',
         },
-        
+
         // 传导性风险
         [CROSS_HIGH]: {
           shouldSuppress: true,
@@ -368,12 +368,15 @@ export class PositionController {
         },
       },
     }[actionType];
-    const  _s = (strategies[riskLevel] || strategies[NORMAL]);
+    const _s = strategies[riskLevel] || strategies[NORMAL];
     return {
       ..._s,
       riskLevel,
       tradeMultiple,
-      tradeCount: actionType === PositionAction.OPEN ? Math.min(_s.tradeCount, this._max_open_grid_count) : _s.tradeCount
+      tradeCount:
+        actionType === PositionAction.OPEN
+          ? Math.min(_s.tradeCount, this._max_open_grid_count)
+          : _s.tradeCount,
     };
   }
 
