@@ -225,25 +225,26 @@ export class VisualEngine {
     // 买单向下(1)，卖单向上(-1)
     const lineLength = 60;
     const lineDirection = side === 'buy' ? 1 : -1;
+    const corner_drop = side === 'buy' ? 10 : -10;
     const fy_label = fy + lineDirection * lineLength;
 
     // 绘制垂直虚线
     ctx.beginPath();
     ctx.setLineDash([5, 3]);
-    ctx.lineWidth = 0.5;
+    ctx.lineWidth = 1;
     ctx.strokeStyle = ctx.fillStyle;
-    ctx.moveTo(fx_offset, fy);
-    ctx.lineTo(fx_offset, fy_label);
+    ctx.moveTo(fx_offset, fy + corner_drop);
+    ctx.lineTo(fx_offset, fy_label - corner_drop);
     ctx.stroke();
     // 设置横向虚线
     ctx.beginPath();
-    ctx.moveTo(fx_offset, fy);
+    ctx.moveTo(fx_offset, fy + corner_drop);
     ctx.lineTo(fx, fy);
     ctx.stroke();
     // 设置横向虚线指向文字
     ctx.beginPath();
     ctx.moveTo(fx_offset_label, fy_label);
-    ctx.lineTo(fx_offset, fy_label);
+    ctx.lineTo(fx_offset, fy_label - corner_drop);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -255,8 +256,8 @@ export class VisualEngine {
       ctx.strokeStyle = '#8b32a8';
       ctx.setLineDash([5, 3]);
       ctx.moveTo(fx, ghost_y);
-      ctx.lineTo(fx_offset, ghost_y);
-      ctx.lineTo(fx_offset, fy);
+      ctx.lineTo(fx_offset, ghost_y + corner_drop);
+      ctx.lineTo(fx_offset, fy + corner_drop);
       ctx.stroke();
       ctx.beginPath();
       ctx.arc(fx, ghost_y, 1.5, 0, 2 * Math.PI);
@@ -266,7 +267,7 @@ export class VisualEngine {
     }
 
     // 绘制文字标签
-    ctx.font = `12px ${this.font_style}`;
+    ctx.font = `100 12px ${this.font_style}`;
     ctx.textAlign = 'center';
     const lines = labels.split('/');
     const lineHeight = 14;
