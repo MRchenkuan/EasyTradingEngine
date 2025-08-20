@@ -3,8 +3,8 @@ import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 // export const Env = TradeEnv.MIMIC;
 export const Env = TradeEnv.PRODUCTION;
 
-// export const trade_open = true;
-export const trade_open = false;
+export const trade_open = true;
+// export const trade_open = false;
 
 export const KLine = {
   max_days: 3650,
@@ -13,7 +13,7 @@ export const KLine = {
     [TradeEnv.MIMIC]: 1000,
     [TradeEnv.PRODUCTION]: trade_open ? 3000 : 1000,
   }[Env],
-  open_inerest_limit: (Env === TradeEnv.PRODUCTION) && trade_open ? 3000 : 100,
+  open_inerest_limit: Env === TradeEnv.PRODUCTION && trade_open ? 3000 : 100,
 };
 
 export const MainGraph = {
