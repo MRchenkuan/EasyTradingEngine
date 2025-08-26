@@ -53,8 +53,6 @@ export class GridTradingProcessor extends AbstractProcessor {
   _tendency = 0;
   _direction = 0;
   _enable_none_grid_trading = false; // 是否启用无网格交易,网格内跨线回撤
-  _last_grid_count_overtime_reset_ts = null;
-  _last_reset_grid_count = 0;
   // 外部因子
   factor_is_people_bullish = false;
 
@@ -90,9 +88,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._last_lower_turning_price_ts = this.local_variables.last_lower_turning_price_ts;
     this._last_upper_turning_price = this.local_variables.last_upper_turning_price;
     this._last_upper_turning_price_ts = this.local_variables.last_upper_turning_price_ts;
+    this._last_open_grid_span = this.local_variables.last_open_grid_count;
 
-    // 初始化重置时间
-    this._last_grid_count_overtime_reset_ts = this._last_trade_price_ts;
     // this._current_price = this.local_variables.current_price;
     // this._current_price_ts = this.local_variables.current_price_ts;
     // this._tendency = this.local_variables.tendency || 0;
@@ -100,17 +97,19 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 修改网格数据加载逻辑
     // this._grid_base_price = this.local_variables._grid_base_price;
-    this._last_reset_grid_count = this.local_variables._last_reset_grid_count || 0;
   }
 
   _saveState() {
     this.local_variables.is_position_created = this._is_position_created;
+
     this.local_variables.last_trade_price = this._last_trade_price;
     this.local_variables.last_trade_price_ts = this._last_trade_price_ts;
     this.local_variables.last_lower_turning_price = this._last_lower_turning_price;
     this.local_variables.last_lower_turning_price_ts = this._last_lower_turning_price_ts;
     this.local_variables.last_upper_turning_price = this._last_upper_turning_price;
     this.local_variables.last_upper_turning_price_ts = this._last_upper_turning_price_ts;
+    this.local_variables.last_open_grid_count = this._last_open_grid_span;
+
     this.local_variables.prev_price = this._prev_price;
     this.local_variables.current_price = this._current_price;
     this.local_variables.current_price_ts = this._current_price_ts;
@@ -121,9 +120,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables._min_price = this._min_price;
     this.local_variables._max_price = this._max_price;
     this.local_variables._grid_width = this._grid_width;
-    this.local_variables._last_reset_grid_count = this._last_reset_grid_count;
-    this.local_variables._last_grid_count_overtime_reset_ts =
-      this._last_grid_count_overtime_reset_ts;
     this.local_variables._threshold = this._threshold;
   }
 
@@ -359,24 +355,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      // 检查网格数量变化并处理超时重置
-      const currentGridCountAbs = Math.abs(gridCount);
-
-      // 当网格数量增加且超过上次重置的网格数时重置超时时间
-      if (
-        currentGridCountAbs < 3 &&
-        currentGridCountAbs > 1 &&
-        currentGridCountAbs > this._last_reset_grid_count
-      ) {
-        console.log(
-          `[${this.asset_name}]网格突破新高点：从${this._last_reset_grid_count}增加到${currentGridCountAbs}，重置超时间`
-        );
-        this._last_grid_count_overtime_reset_ts = this._current_price_ts;
-        this._last_reset_grid_count = currentGridCountAbs;
-      }
-
-      const timeDiff =
-        (this._current_price_ts - this._last_grid_count_overtime_reset_ts || 1) / 1000;
+      const timeDiff = (this._current_price_ts - this._last_trade_price_ts || 1) / 1000;
 
       const correction = this._correction();
       const grid_count_abs = Math.abs(gridCount);
@@ -424,7 +403,12 @@ export class GridTradingProcessor extends AbstractProcessor {
         description: tradeDescription,
         riskLevel: positionRiskLevel,
         tradeMultiple: tradeSuppressMultiple,
-      } = this.position_controller.getPositionStrategy(this._tendency, this._threshold, gridCount, grid_span);
+      } = this.position_controller.getPositionStrategy(
+        this._tendency,
+        this._threshold,
+        gridCount,
+        grid_span
+      );
 
       console.log(
         `- [${this.asset_name}] 当前止损等级：${positionRiskLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
@@ -455,10 +439,34 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
+      // 防止连续开仓
+      // 如果之前 是 1 下次开仓必须大于 1
+      // 如果之前大于 1 下次开仓必须大于前次的 0.75
+
+      if (
+        position_action === PositionAction.OPEN &&
+        this._last_open_grid_span > 0 &&
+        grid_span < this._last_open_grid_span + 1 &&
+        grid_span <= 3
+      ) {
+        console.log(
+          `[${this.asset_name}] 上次开仓距离（ ${this._last_open_grid_span.toFixed(2)} 格）过近，当前开仓距离 ${grid_span.toFixed(2)} 格`
+        );
+        return;
+      }
+
       if (Math.abs(adjustedGridCount) >= 1) {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
+
+        // 如果是开仓则保存开仓距离
+        if (position_action === PositionAction.OPEN) {
+          this._last_open_grid_span = grid_span;
+        } else {
+          this._last_open_grid_span = -1;
+        }
+
         await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
         return;
       }
@@ -561,7 +569,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     let count = this._grid.filter(price => price >= lowerPrice && price <= upperPrice).length;
 
     if (count <= 1) return 0;
-    return current > prev ? count - 1 : -(count - 1)
+    return current > prev ? count - 1 : -(count - 1);
   }
 
   /**
@@ -737,7 +745,6 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 重置关键参数
     this._last_trade_price = price;
     this._last_trade_price_ts = ts;
-    this._last_grid_count_overtime_reset_ts = ts;
     // 重置拐点
     this._last_lower_turning_price = price;
     this._last_lower_turning_price_ts = ts;
@@ -750,7 +757,5 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._prev_price = price; // 重置前一价格
     this._prev_price_ts = ts;
     // 交易成功后重置标记，允许下一轮首次突破重置
-    // 重置网格计数
-    this._last_reset_grid_count = 0;
   }
 }

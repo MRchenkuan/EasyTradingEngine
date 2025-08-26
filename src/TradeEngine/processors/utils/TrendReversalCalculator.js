@@ -349,6 +349,8 @@ export function trendReversalThreshold(
 
   // 初始化阈值
   // const initial_threshold = threshold = Math.min(atr_120 * Math.sqrt(5) * 1.5, threshold);
+
+  // 乘以 3 的目的是将周期扩大 5 倍左右（Math.sqrt(5)）然后在乘以 1.5 倍
   const initial_threshold = (threshold = Math.min(atr_120 * 3, threshold));
 
   // 确保阈值在合理范围内

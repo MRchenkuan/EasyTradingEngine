@@ -217,8 +217,8 @@ export class PositionController {
 
     const gridCountAbs = Math.abs(gridCount);
     const gridCountSign = Math.sign(gridCount);
-    const getSuppressedGridCount = (multiple) => Math.floor(gridCountAbs / multiple) * gridCountSign;
-    const suppressedTradeCount = gridCountAbs * 0.5 * gridCountSign;
+    const getSuppressedGridCount = (multiple) => gridCountSign * Math.floor(gridCountAbs / multiple);
+    const getSuppressedTradeCount = (multiple) => gridCountSign * Math.round(10 * gridCountAbs / multiple) / 10;
     const baseCloseTradeCount = Math.round(gridCountSign * grid_span * 10) / 10;
 
     const {
@@ -281,9 +281,9 @@ export class PositionController {
         },
         [DUAL_EMERGENCY]: {
           shouldSuppress: true,
-          gridCount: getSuppressedGridCount(2),
-          tradeMultiple: 2,
-          tradeCount: suppressedTradeCount,
+          gridCount: getSuppressedGridCount(3),
+          tradeCount: getSuppressedTradeCount(2),
+          tradeMultiple: 3,
           threshold: threshold,
           description: '双重减仓交易（有损）',
         },
@@ -329,14 +329,14 @@ export class PositionController {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.5,
+          threshold: threshold,
           description: '单仓抑制交易 - 平仓(有损)',
         },
         [DUAL_HIGH]: {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: baseCloseTradeCount,
-          threshold: threshold * 0.25,
+          threshold: threshold * 0.5,
           description: '双重抑制交易 - 平仓(有损)',
         },
 
