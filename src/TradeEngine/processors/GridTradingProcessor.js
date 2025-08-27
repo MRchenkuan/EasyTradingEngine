@@ -3,9 +3,16 @@ import { LocalVariable } from '../../LocalVariable.js';
 import { create_order_market, executeOrders, fetchOrders } from '../../trading.js';
 import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
-import { OrderStatus, PositionAction, SettlementType, StopLossLevel } from '../../enum.js';
+import {
+  OrderStatus,
+  PositionAction,
+  PositionRiskLevel,
+  SettlementType,
+  StopLossLevel,
+} from '../../enum.js';
 import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
+import { serialOpenOptimize } from './utils/​serial​OpenOptimize.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -428,29 +435,26 @@ export class GridTradingProcessor extends AbstractProcessor {
         );
         console.log(`- [${this.asset_name}] 抑制倍数：${tradeSuppressMultiple}`);
       }
-      // 如果超过两格则回撤判断减半，快速锁定利润
-      // 可能还要叠加动量，比如上涨速度过快时，需要允许更大/更小的回撤
+
+      // 连续开仓优化
+      const {
+        shouldOpen,
+      } = serialOpenOptimize(
+        this.asset_name,
+        this._last_open_grid_span,
+        grid_span,
+        position_action,
+      )
+
+      if ((position_action === PositionAction.OPEN ) && !shouldOpen) {
+        return;
+      }
+
       const is_return_arrived = Math.abs(correction) > this._threshold;
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
         console.log(
           `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
-        );
-        return;
-      }
-
-      // 防止连续开仓
-      // 如果之前 是 1 下次开仓必须大于 1
-      // 如果之前大于 1 下次开仓必须大于前次的 0.75
-
-      if (
-        position_action === PositionAction.OPEN &&
-        this._last_open_grid_span > 0 &&
-        grid_span < this._last_open_grid_span + 1 &&
-        grid_span <= 3
-      ) {
-        console.log(
-          `[${this.asset_name}] 上次开仓距离（ ${this._last_open_grid_span.toFixed(2)} 格）过近，当前开仓距离 ${grid_span.toFixed(2)} 格`
         );
         return;
       }
@@ -481,6 +485,13 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
+        
+        if (position_action === PositionAction.OPEN) {
+          this._last_open_grid_span = grid_span;
+        } else {
+          this._last_open_grid_span = -1;
+        }
+
         if (this._tendency > 0) {
           await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);
         } else {
