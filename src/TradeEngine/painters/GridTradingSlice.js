@@ -421,7 +421,7 @@ export class GridTradingSlice extends AbstractPainter {
             title: {
               display: true,
               text: `${instId} @ ${getFormattedTimeString()}`,
-              align: 'end',
+              align: 'start',
               color: color,
               font: {
                 size: 60,
@@ -571,9 +571,20 @@ export class GridTradingSlice extends AbstractPainter {
               this.drawText(
                 chart,
                 `换手率: ${(turnover * 100).toFixed(4)}% (${parseFloat(period_volume).toFixed(0)} 量/${parseFloat(market_open_interest).toFixed(0)} 持仓)`,
-                this.constructor.graph_position.left,
-                this.constructor.graph_position.top
+                chart.chartArea.right,
+                chart.chartArea.top,
+                color,
               );
+
+              const {notionalUsd, pos, mgnRatio} = TradeEngine.getPositionList(instId)
+              this.drawText(
+                chart,
+                `持仓：${(Math.sign(pos) * notionalUsd).toFixed(2)} USD（${pos} 张） 维持保证金：${(Math.round(mgnRatio*100))}%`,
+                chart.chartArea.right,
+                chart.chartArea.top + 40,
+                color
+              );
+              
               // 绘制网格线
               grid_lines.forEach((grid, index) => {
                 // 绘制网格线，但不能超过图表区域
@@ -591,11 +602,11 @@ export class GridTradingSlice extends AbstractPainter {
     });
   }
 
-  drawText(chart, text, x, y) {
+  drawText(chart, text, x, y, color = '#52be80') {
     chart.ctx.save();
-    chart.ctx.font = '48px "Fira Sans"';
-    chart.ctx.fillStyle = '#52be80';
-    chart.ctx.textAlign = 'left';
+    chart.ctx.font = '36px "Fira Sans"';
+    chart.ctx.fillStyle = color;
+    chart.ctx.textAlign = 'right';
     chart.ctx.textBaseline = 'top';
     chart.ctx.fillText(text, x, y);
     chart.ctx.restore();
