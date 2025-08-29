@@ -12,7 +12,7 @@ import {
 } from '../../enum.js';
 import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
-import { serialOpenOptimize } from './utils/​serial​OpenOptimize.js';
+import { serialOpenOptimize, serialTradeOptimize } from './utils/​serial​OpenOptimize.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -96,6 +96,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._last_upper_turning_price = this.local_variables.last_upper_turning_price;
     this._last_upper_turning_price_ts = this.local_variables.last_upper_turning_price_ts;
     this._last_open_grid_span = this.local_variables.last_open_grid_count;
+    this._last_close_grid_span = this.local_variables.last_close_grid_count;
 
     // this._current_price = this.local_variables.current_price;
     // this._current_price_ts = this.local_variables.current_price_ts;
@@ -116,6 +117,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables.last_upper_turning_price = this._last_upper_turning_price;
     this.local_variables.last_upper_turning_price_ts = this._last_upper_turning_price_ts;
     this.local_variables.last_open_grid_count = this._last_open_grid_span;
+    this.local_variables.last_close_grid_count = this._last_close_grid_span;
 
     this.local_variables.prev_price = this._prev_price;
     this.local_variables.current_price = this._current_price;
@@ -416,7 +418,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         gridCount,
         grid_span
       );
-
+      this._position_risk_level = positionRiskLevel;
       console.log(
         `- [${this.asset_name}] 当前止损等级：${positionRiskLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
       );
@@ -426,7 +428,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       if (shouldSuppress) {
         const pos_lots = this._getPositionLots();
         const mmr = this._getMaintenanceMarginRate();
-        // 止损模式，抑制交易
+        // 止损模式，抑制交易ƒ
         console.log(
           `- [${this.asset_name}] 过度持仓：${pos_lots.toFixed(0)} 手，维持保证金率：${(mmr * 100).toFixed(0)}%；`
         );
@@ -436,17 +438,17 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(`- [${this.asset_name}] 抑制倍数：${tradeSuppressMultiple}`);
       }
 
-      // 连续开仓优化
-      const {
-        shouldOpen,
-      } = serialOpenOptimize(
-        this.asset_name,
-        this._last_open_grid_span,
+      const { shouldTrade } = serialTradeOptimize({
+        asset_name: this.asset_name,
+        last_open_grid_span: this._last_open_grid_span,
+        last_close_grid_span: this._last_close_grid_span,
         grid_span,
         position_action,
-      )
+        time_since_last_trade: now - this._last_trade_price_ts,
+        risk_level: this._position_risk_level,
+      });
 
-      if ((position_action === PositionAction.OPEN ) && !shouldOpen) {
+      if (!shouldTrade) {
         return;
       }
 
@@ -464,13 +466,10 @@ export class GridTradingProcessor extends AbstractProcessor {
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
 
-        // 如果是开仓则保存开仓距离
-        if (position_action === PositionAction.OPEN) {
-          this._last_open_grid_span = grid_span;
-        } else {
-          this._last_open_grid_span = -1;
-        }
+        // 更新连续同类交易的网格距离
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span);
 
+        // 执行下单
         await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
         return;
       }
@@ -485,12 +484,8 @@ export class GridTradingProcessor extends AbstractProcessor {
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
-        
-        if (position_action === PositionAction.OPEN) {
-          this._last_open_grid_span = grid_span;
-        } else {
-          this._last_open_grid_span = -1;
-        }
+
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span);
 
         if (this._tendency > 0) {
           await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);
@@ -744,6 +739,16 @@ export class GridTradingProcessor extends AbstractProcessor {
       };
     } finally {
       this._saveState(); // 保存状态
+    }
+  }
+
+  _refreshLastSerialTradeGridSpan(position_action, grid_span) {
+    if (position_action === PositionAction.OPEN) {
+      this._last_open_grid_span = grid_span;
+      this._last_close_grid_span = -1;
+    } else {
+      this._last_open_grid_span = -1;
+      this._last_close_grid_span = grid_span;
     }
   }
 

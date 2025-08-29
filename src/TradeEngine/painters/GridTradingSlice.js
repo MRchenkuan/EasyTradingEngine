@@ -567,21 +567,18 @@ export class GridTradingSlice extends AbstractPainter {
                     ghost
                   );
                 });
-
+              const processor = TradeEngine.processors.find(it => it.type === 'GridTradingProcessor' && it.asset_name === instId);
+              const {notionalUsd, pos, mgnRatio} = TradeEngine.getPositionList(instId) || {};
               this.drawText(
                 chart,
-                `换手率: ${(turnover * 100).toFixed(4)}% (${parseFloat(period_volume).toFixed(0)} 量/${parseFloat(market_open_interest).toFixed(0)} 持仓)`,
+                [
+                  `${(turnover * 100).toFixed(4)}%：换手率`,
+                  `$ ${(Math.sign(pos) * notionalUsd).toFixed(2)} USD/${pos} 张：持仓`,
+                  `${(Math.round(mgnRatio*100))}%：维持保证金`,
+                  `${processor._position_risk_level}：风险等级`,
+                ],
                 chart.chartArea.right,
                 chart.chartArea.top,
-                color,
-              );
-
-              const {notionalUsd, pos, mgnRatio} = TradeEngine.getPositionList(instId)
-              this.drawText(
-                chart,
-                `持仓：${(Math.sign(pos) * notionalUsd).toFixed(2)} USD（${pos} 张） 维持保证金：${(Math.round(mgnRatio*100))}%`,
-                chart.chartArea.right,
-                chart.chartArea.top + 40,
                 color
               );
               
@@ -608,7 +605,13 @@ export class GridTradingSlice extends AbstractPainter {
     chart.ctx.fillStyle = color;
     chart.ctx.textAlign = 'right';
     chart.ctx.textBaseline = 'top';
-    chart.ctx.fillText(text, x, y);
+    if(Array.isArray(text)){
+      text.forEach((item, index) => {
+        chart.ctx.fillText(item, x, y + index * 40);
+      })
+    } else {
+      chart.ctx.fillText(text, x, y);
+    }
     chart.ctx.restore();
   }
 }
