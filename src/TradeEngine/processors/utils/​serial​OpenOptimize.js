@@ -20,7 +20,6 @@ export function serialOpenOptimize(asset_name, last_open_grid_span, grid_span, p
   };
 }
 
-
 export function serialTradeOptimize(params) {
   const {
     asset_name,
@@ -32,12 +31,15 @@ export function serialTradeOptimize(params) {
     risk_level,
   } = params;
 
-  const {ISOLATE_HIGHT, ISOLATE_EMERGENCY, CROSS_EMERGENCY} = PositionCompositeRiskLevel;
+  const { ISOLATE_HIGHT, ISOLATE_EMERGENCY, CROSS_EMERGENCY } = PositionCompositeRiskLevel;
 
-  if(position_action === PositionAction.CLOSE && [ISOLATE_HIGHT, ISOLATE_EMERGENCY, CROSS_EMERGENCY].includes(risk_level)){
+  if (
+    position_action === PositionAction.CLOSE &&
+    [ISOLATE_HIGHT, ISOLATE_EMERGENCY, CROSS_EMERGENCY].includes(risk_level)
+  ) {
     return {
       shouldTrade: true,
-    }
+    };
   }
 
   const isSerialTrade = {
@@ -68,13 +70,15 @@ export function serialTradeOptimize(params) {
 
   const isDistanceSatisfied = grid_span < 1 + lastTradeGridSpan * 0.75 && grid_span <= 3;
   if (isDistanceSatisfied) {
-    console.log({
-      [PositionAction.OPEN]: `- [${asset_name}] 上次开仓距离（ ${lastTradeGridSpan.toFixed(2)} 格）过近，当前开仓距离 ${grid_span.toFixed(2)} 格`,
-      [PositionAction.CLOSE]: `- [${asset_name}] 上次平仓距离（ ${lastTradeGridSpan.toFixed(2)} 格）过近，当前平仓距离 ${grid_span.toFixed(2)} 格`,
-    }[position_action])
+    console.log(
+      {
+        [PositionAction.OPEN]: `- [${asset_name}] 上次开仓距离（ ${lastTradeGridSpan.toFixed(2)} 格）过近，当前开仓距离 ${grid_span.toFixed(2)} 格`,
+        [PositionAction.CLOSE]: `- [${asset_name}] 上次平仓距离（ ${lastTradeGridSpan.toFixed(2)} 格）过近，当前平仓距离 ${grid_span.toFixed(2)} 格`,
+      }[position_action]
+    );
     return {
       shouldTrade: false,
-    }
+    };
   }
 
   // 兜底
