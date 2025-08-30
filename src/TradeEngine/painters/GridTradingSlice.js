@@ -567,21 +567,33 @@ export class GridTradingSlice extends AbstractPainter {
                     ghost
                   );
                 });
-              const processor = TradeEngine.processors.find(it => it.type === 'GridTradingProcessor' && it.asset_name === instId);
-              const {notionalUsd, pos, mgnRatio} = TradeEngine.getPositionList(instId) || {};
+              const processor = TradeEngine.processors.find(
+                it => it.type === 'GridTradingProcessor' && it.asset_name === instId
+              );
+              const { notionalUsd, pos, mgnRatio, realizedPnl, uplLastPx, upl } =
+                TradeEngine.getPositionList(instId) || {};
               this.drawText(
                 chart,
                 [
                   `${(turnover * 100).toFixed(4)}%：换手率`,
                   `$ ${(Math.sign(pos) * notionalUsd).toFixed(2)} USD/${pos} 张：持仓`,
-                  `${(Math.round(mgnRatio*100))}%：维持保证金`,
+                  `${Math.round(mgnRatio * 100)}%：维持保证金`,
                   `${processor._position_risk_level}：风险等级`,
+                  `$ ${(realizedPnl * 1).toFixed(2)}：已实现收益`,
+                  `$ ${(upl * 1).toFixed(2)}：未实现收益`,
                 ],
                 chart.chartArea.right,
                 chart.chartArea.top,
-                color
+                [
+                  color,
+                  color,
+                  color,
+                  color,
+                  realizedPnl * 1 < 0 ? '#52be80' : '#ec7063',
+                  upl * 1 < 0 ? '#52be80' : '#ec7063',
+                ]
               );
-              
+
               // 绘制网格线
               grid_lines.forEach((grid, index) => {
                 // 绘制网格线，但不能超过图表区域
@@ -605,10 +617,11 @@ export class GridTradingSlice extends AbstractPainter {
     chart.ctx.fillStyle = color;
     chart.ctx.textAlign = 'right';
     chart.ctx.textBaseline = 'top';
-    if(Array.isArray(text)){
+    if (Array.isArray(text)) {
       text.forEach((item, index) => {
+        if (Array.isArray(color)) chart.ctx.fillStyle = color[index];
         chart.ctx.fillText(item, x, y + index * 40);
-      })
+      });
     } else {
       chart.ctx.fillText(text, x, y);
     }
