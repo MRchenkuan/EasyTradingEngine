@@ -10,3 +10,5 @@ README.md
 *.tar
 Dockerfile
 .dockerignore
+!config.security.js
+!config.security.mimic.js

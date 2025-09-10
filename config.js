@@ -4,7 +4,7 @@ import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 export const Env = TradeEnv.PRODUCTION;
 
 export const trade_open = true;
-// export const trade_open = false;
+// export const trade_open = falseFROM node:18-slim AS builder;
 
 export const KLine = {
   max_days: 3650,
