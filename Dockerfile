@@ -1,31 +1,60 @@
-FROM node:18
+# 构建阶段
+FROM node:18-alpine AS builder
 
-# 安装 canvas 所需的系统依赖
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libjpeg-dev \
-    libgif-dev \
-    librsvg2-dev \
-    pkg-config \
-    python3 \
-    fonts-wqy-microhei \  
-    fonts-noto-cjk \     
-    fonts-arphic-ukai \ 
-    fonts-arphic-uming \ 
-    fontconfig \
-    && rm -rf /var/lib/apt/lists/*
+# 安装构建依赖
+RUN apk add --no-cache \
+    build-base \
+    cairo-dev \
+    pango-dev \
+    jpeg-dev \
+    giflib-dev \
+    librsvg-dev \
+    pixman-dev
 
-# 全局安装 PM2
+# 全局安装 pnpm
+RUN npm install -g pnpm
+
+WORKDIR /app
+
+# 复制 pnpm 相关文件
+COPY package.json pnpm-lock.yaml ./
+
+# 使用 pnpm 安装生产依赖
+RUN pnpm install --prod --frozen-lockfile
+
+# 复制源代码
+COPY . .
+
+# 运行阶段
+FROM node:18-alpine AS runtime
+
+# 安装运行时依赖
+RUN apk add --no-cache \
+    cairo \
+    pango \
+    jpeg \
+    giflib \
+    librsvg \
+    pixman
+
+# 安装 PM2
 RUN npm install -g pm2
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+# 从构建阶段复制必要文件
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/config.js ./
+COPY --from=builder /app/transform.js ./
 
-COPY . .
+# 创建非 root 用户
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nextjs -u 1001
 
-# 使用 PM2 启动应用
+USER nextjs
+
+EXPOSE 3000
+
 CMD ["pm2-runtime", "start", "src/main.js", "--name", "okx-trading"]

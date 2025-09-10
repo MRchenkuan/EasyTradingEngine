@@ -477,9 +477,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 格内交易的的条件：
       // 在平仓方向上
       // 至少超超过了 1.5 格实际距离
-      // 当前处于抑制模式？
-      // if (grid_span > 1.5 && isClosePosition && shouldSuppress) {
-      if (grid_span > 1.5 && position_action === PositionAction.CLOSE) {
+      // 不能比前一个格少
+      if (grid_span > 1.5 && grid_span > this._last_close_grid_span && position_action === PositionAction.CLOSE) {
         // 正常满足条件下单
         console.log(
           `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`

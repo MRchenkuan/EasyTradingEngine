@@ -3,6 +3,7 @@ npm-debug.log
 chart
 .git
 .gitignore
+README.md
 .env
 *.md
 *.zip
