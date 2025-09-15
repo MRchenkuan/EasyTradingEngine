@@ -321,7 +321,7 @@ export class PositionController {
         [NOTICE]: {
           shouldSuppress: false,
           gridCount: gridCount,
-          tradeCount: fullTradeCount,
+          tradeCount: gridCount,
           threshold: threshold,
           description: '正常平仓',
         },
@@ -329,15 +329,15 @@ export class PositionController {
         [ISOLATE_HIGHT]: {
           shouldSuppress: true,
           gridCount: gridCount,
-          tradeCount: fullTradeCount,
-          threshold: threshold,
+          tradeCount: gridCount,
+          threshold: threshold * 0.5,
           description: '单仓抑制交易 - 平仓(有损)',
         },
         [DUAL_HIGH]: {
           shouldSuppress: true,
           gridCount: gridCount,
           tradeCount: fullTradeCount,
-          threshold: threshold * 0.5,
+          threshold: threshold,
           description: '双重抑制交易 - 平仓(有损)',
         },
 
