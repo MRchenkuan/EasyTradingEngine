@@ -180,22 +180,44 @@ export class VisualEngine {
   }
 
   /**
-   * 绘制0%参考线
-   * @private
+   * 绘制水平参考线
    */
-  static _drawHorizontalLine(chart, baseValue, dash = [5, 5]) {
-    const ctx = chart.ctx;
-    const yPixel = chart.scales.y.getPixelForValue(baseValue);
+  static drawHorizontalLine(chart, value, options = {}) {
+    const {
+      dash = null,
+      color = '#aaaaaa',
+      width = 1,
+      label,
+      font = `28px "Fira Sans"`,
+      textAlign = 'right',
+      textOffsetX = chart.chartArea.right - 100,
+      textOffsetY = -5,
+    } = options;
 
-    // 绘制 0% 参考线
+    const ctx = chart.ctx;
+    const y = chart.scales.y.getPixelForValue(value);
+
+    ctx.save();
     ctx.beginPath();
     ctx.setLineDash(dash);
-    ctx.strokeStyle = '#aaaaaa';
-    ctx.lineWidth = 1;
-    ctx.moveTo(chart.chartArea.left, yPixel);
-    ctx.lineTo(chart.chartArea.right, yPixel);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.moveTo(chart.chartArea.left, y);
+    ctx.lineTo(chart.chartArea.right, y);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    if (label) {
+      ctx.fillStyle = color;
+      ctx.font = font;
+      ctx.textAlign = textAlign;
+      ctx.fillText(
+        `${label}: ${Number.isFinite(value) ? value.toFixed(2) : value}`,
+        chart.chartArea.left + textOffsetX,
+        y + textOffsetY
+      );
+    }
+    ctx.restore();
   }
 
   /**

@@ -197,7 +197,7 @@ export class HedgeTransactionSlice extends AbstractPainter {
           afterDraw: chart => {
             // 绘制零基准线
             const baseValue = scaled_prices[0].prices[0];
-            this.engine._drawHorizontalLine(chart, baseValue);
+            this.engine.drawHorizontalLine(chart, baseValue);
 
             // 为了避免标签重叠先搞个位置收集器
             const collisionAvoidance = createCollisionAvoidance();

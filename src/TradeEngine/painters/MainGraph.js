@@ -92,7 +92,7 @@ export class MainGraph extends AbstractPainter {
             afterDraw: async chart => {
               const baseValue = scaled_prices[0].prices[0];
 
-              this.engine._drawHorizontalLine(chart, baseValue);
+              this.engine.drawHorizontalLine(chart, baseValue);
               const collisionAvoidance = createCollisionAvoidance();
 
               // 绘制相关性表格
@@ -139,8 +139,7 @@ export class MainGraph extends AbstractPainter {
     }
   }
 
-
-    /**
+  /**
    * 绘制成本线
    * @private
    */

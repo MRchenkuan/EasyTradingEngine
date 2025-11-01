@@ -853,7 +853,7 @@ export class TradeEngine {
       const _interest_history = this._interest_history[assetName]?.[bar_type];
       // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
       let last = _interest_history[0];
-      let minDiff = Math.abs(ts - last.ts);
+      let minDiff = Math.abs(ts - last?.ts||0);
       for (let i = 1; i < _interest_history.length; i++) {
         const diff = Math.abs(ts - _interest_history[i].ts);
         if (diff < minDiff) {

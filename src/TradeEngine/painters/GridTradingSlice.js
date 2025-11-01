@@ -518,7 +518,7 @@ export class GridTradingSlice extends AbstractPainter {
               // 绘制零基准线
               const baseValue = prices[0];
               // 绘制起点基线
-              engine._drawHorizontalLine(chart, baseValue);
+              engine.drawHorizontalLine(chart, baseValue);
 
               // 为了避免标签重叠先搞个位置收集器
               const collisionAvoidance = createCollisionAvoidance();
@@ -570,8 +570,29 @@ export class GridTradingSlice extends AbstractPainter {
               const processor = TradeEngine.processors.find(
                 it => it.type === 'GridTradingProcessor' && it.asset_name === instId
               );
-              const { notionalUsd, pos, mgnRatio, realizedPnl, uplLastPx, upl } =
+              const { notionalUsd, pos, mgnRatio, realizedPnl, uplLastPx, upl, bePx, avgPx } =
                 TradeEngine.getPositionList(instId) || {};
+
+              const posSign = Math.sign(pos);
+
+              const calcColor = (currentPrice, avgPx, posSign) => {
+                const isOver = currentPrice > avgPx ? 1 : -1;
+                const profitSign = isOver * posSign;
+                return profitSign > 0 ? '#ec7063' : '#52be80';
+              };
+              const isAvgPxLarger = parseFloat(avgPx) > parseFloat(bePx);
+              engine.drawHorizontalLine(chart, (parseFloat(avgPx) || 0).toFixed(2), {
+                color: calcColor(current_price, avgPx, posSign),
+                label: '开仓均价',
+                textOffsetY: isAvgPxLarger ? -10 : 28,
+              });
+
+              engine.drawHorizontalLine(chart, (parseFloat(bePx) || 0).toFixed(2), {
+                color: calcColor(current_price, bePx, posSign),
+                label: '盈亏平衡价',
+                textOffsetY: !isAvgPxLarger ? -10 : 28,
+              });
+
               this.drawText(
                 chart,
                 [
@@ -600,7 +621,7 @@ export class GridTradingSlice extends AbstractPainter {
                 const yCoord = yAxias.getPixelForValue(grid);
                 if (yCoord >= chart.chartArea.top && yCoord <= chart.chartArea.bottom) {
                   // 绘制网格线
-                  engine._drawHorizontalLine(chart, grid, [2, 5]);
+                  engine.drawHorizontalLine(chart, grid, { dash: [2, 5] });
                 }
               });
             },

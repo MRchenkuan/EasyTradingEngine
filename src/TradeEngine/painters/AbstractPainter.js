@@ -1,4 +1,8 @@
 export class AbstractPainter {
+  /**
+   * 构造函数
+   * @param {VisualEngine} engine 引擎实例
+   */
   constructor(engine) {
     this.engine = engine; // 注入引擎引用
   }
