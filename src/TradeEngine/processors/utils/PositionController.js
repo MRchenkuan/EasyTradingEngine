@@ -13,11 +13,11 @@ import {
 export class PositionController {
   engine = null;
   processor = null;
-  _suppress_lots = 8;
-  _survival_lots = 12;
-  _min_mgn_ratio_notice = 4000; // 抑制状态最小保证金率 4000%
-  _min_mgn_ratio_supress = 2000; // 抑制状态最小保证金率 4000%
-  _min_mgn_ratio_survival = 1500; // 止损状态最小保证金率 1000%
+  _suppress_lots = 12;
+  _survival_lots = 20;
+  _min_mgn_ratio_notice = 8000; // 抑制状态最小保证金率 4000%
+  _min_mgn_ratio_supress = 4000; // 抑制状态最小保证金率 4000%
+  _min_mgn_ratio_survival = 2000; // 止损状态最小保证金率 1000%
   _max_open_grid_count = 8; // 最大开仓网格数量
 
   constructor(engine, processor) {
@@ -26,17 +26,6 @@ export class PositionController {
     this._suppress_lots = processor._suppress_lots;
     this._survival_lots = processor._survival_lots; // 基础配置
   }
-
-  /**
-   * 初始化管理器
-   * @param {object} engine 交易引擎
-   * @param {string} assetName 资产名称
-   * @param {object} instrumentInfo 合约信息
-   * @param {string} settlementType 结算类型
-   * @param {number} baseAmount 基础金额
-   * @param {number} baseQuantity 基础数量
-   */
-  initialize() {}
 
   // ==================== 持仓数据获取 ====================
 
@@ -159,9 +148,6 @@ export class PositionController {
     const RiskLevel = PositionCompositeRiskLevel;
     // 使用优化后的风险等级映射表,减少重复判断
     const riskLevelMap = {
-      // 使用数字编码优化键值对存储
-      // isolate_risk_level * 10 + cross_risk_level 作为key
-      // NORMAL = 0, HIGHT = 1, EMERGENCY = 2
       '00': RiskLevel.NORMAL, // NORMAL-NORMAL
       '01': RiskLevel.NOTICE, // NORMAL-HIGHT
       '02': RiskLevel.CROSS_HIGH, // NORMAL-HIGHT
@@ -211,16 +197,19 @@ export class PositionController {
    * @param {number} grid_span 网格间距 绝对值
    * @returns {object} 交易策略配置
    */
-  getPositionStrategy(tendency, threshold, gridCount, grid_span) {
+  getPositionStrategy(
+    tendency,
+    threshold,
+    gridCount,
+    grid_span_abs,
+    last_open_grid_span,
+    last_close_grid_span
+  ) {
     const actionType = this.getPositionAction(tendency);
     const riskLevel = this.getMixedRiskLevel();
 
-    const gridCountAbs = Math.abs(gridCount);
-    const gridCountSign = Math.sign(gridCount);
-    const getSuppressedGridCount = multiple => gridCountSign * Math.floor(gridCountAbs / multiple);
-    const getSuppressedTradeCount = multiple =>
-      (gridCountSign * Math.round((10 * gridCountAbs) / multiple)) / 10;
-    const fullTradeCount = Math.round(gridCountSign * grid_span * 10) / 10;
+    const getSuppressedGridCount = multiple => Math.trunc(gridCount / multiple);
+    const fullTradeCount = Math.round(grid_span_abs * 10) / 10;
 
     const {
       NORMAL,
@@ -233,171 +222,124 @@ export class PositionController {
       DUAL_EMERGENCY,
     } = PositionCompositeRiskLevel;
     // 按照单仓、全仓的风险等级进行分类
-    const strategies = {
-      // 开仓策略
+    const baseTemplates = {
       [PositionAction.OPEN]: {
-        // 无风险
-        [NORMAL]: {
-          shouldSuppress: false,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          description: '正常交易',
-          threshold: threshold,
-        },
-        // 提示性风险
-        [NOTICE]: {
-          shouldSuppress: false,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          description: '正常交易',
-          threshold: threshold,
-        },
-
-        // 高风险：抑制模式，拉宽网格，交易份数放大
-        [ISOLATE_HIGHT]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(2),
-          tradeCount: gridCount,
-          threshold: threshold,
-          tradeMultiple: 2,
-          description: '单仓抑制交易(无损)',
-        },
-        [DUAL_HIGH]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(2),
-          tradeMultiple: 2,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '双重抑制交易（无损）',
-        },
-
-        // 超高风险：减仓模式，交易份数放大3倍
-        [ISOLATE_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(3),
-          tradeMultiple: 3,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '单仓减仓交易（无损）',
-        },
-        [DUAL_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(3),
-          tradeCount: getSuppressedTradeCount(2),
-          tradeMultiple: 3,
-          threshold: threshold,
-          description: '双重减仓交易（有损）',
-        },
-
-        // 传导性风险
-        [CROSS_HIGH]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(2),
-          tradeMultiple: 2,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '全仓抑制交易(无损)',
-        },
-        [CROSS_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: getSuppressedGridCount(2),
-          tradeMultiple: 2,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '全仓减仓开仓(无损)',
-        },
+        gridCount,
+        tradeCount: gridCount,
+        threshold,
+        tradeMultiple: 1,
+        thresholdSuppress: 1,
+        description: '正常开仓',
       },
-      // 平仓策略
       [PositionAction.CLOSE]: {
-        // 无风险
-        [NORMAL]: {
-          shouldSuppress: false,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '正常平仓',
-        },
-        // 提示性风险
-        [NOTICE]: {
-          shouldSuppress: false,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          threshold: threshold,
-          description: '正常平仓',
-        },
-        // 高风险：减仓模式,阈值减半
-        [ISOLATE_HIGHT]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          threshold: threshold * 0.5,
-          description: '单仓抑制交易 - 平仓(有损)',
-        },
-        [DUAL_HIGH]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: fullTradeCount,
-          threshold: threshold,
-          description: '双重抑制交易 - 平仓(有损)',
-        },
-
-        // 超高风险：减仓模式,阈值极度压缩
-        [ISOLATE_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: fullTradeCount,
-          threshold: threshold * 0.5,
-          description: '单仓减仓交易 - 平仓(有损)',
-        },
-        [DUAL_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: fullTradeCount,
-          threshold: threshold * 0.25,
-          description: '双重减仓交易 - 平仓(有损)',
-        },
-
-        // 传导性风险
-        [CROSS_HIGH]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: gridCount,
-          threshold: threshold * 0.5,
-          description: '全仓抑制交易 - 平仓(无损)',
-        },
-        [CROSS_EMERGENCY]: {
-          shouldSuppress: true,
-          gridCount: gridCount,
-          tradeCount: fullTradeCount,
-          threshold: threshold * 0.5,
-          description: '全仓减仓交易 - 平仓(有损)',
-        },
+        gridCount,
+        tradeCount: gridCount,
+        threshold,
+        tradeMultiple: 1,
+        thresholdSuppress: 1,
+        description: '正常平仓',
       },
-    }[actionType];
-    const _s = strategies[riskLevel] || strategies[NORMAL];
+    };
+
+    const OPEN_OVERRIDES = {
+      [NORMAL]: {},
+      [NOTICE]: {},
+      // 高风险：抑制模式，拉宽网格，交易份数放大
+      [ISOLATE_HIGHT]: {
+        tradeMultiple: 2,
+        description: '单仓抑制交易',
+      },
+      [DUAL_HIGH]: {
+        tradeMultiple: 2,
+        thresholdSuppress: 1.5,
+        description: '双重抑制交易',
+      },
+
+      // 超高风险：减仓模式，交易份数放大3倍
+      [ISOLATE_EMERGENCY]: {
+        tradeMultiple: 3,
+        thresholdSuppress: 1.5,
+        description: '单仓减仓交易',
+      },
+      [DUAL_EMERGENCY]: {
+        tradeMultiple: 20000, // 停止开仓
+        description: '双重减仓交易', 
+      },
+
+      // 传导性风险
+      [CROSS_HIGH]: {
+        tradeMultiple: 2,
+        thresholdSuppress: 1.5,
+        description: '全仓抑制交易',
+      },
+      [CROSS_EMERGENCY]: {
+        tradeMultiple: 20000, // 停止开仓
+        description: '全仓减仓开仓', 
+      },
+    };
+
+    const CLOSE_OVERRIDES = {
+      [NORMAL]: {},
+      [NOTICE]: {},
+      // 高风险：减仓模式,阈值减半
+      [ISOLATE_HIGHT]: {
+        thresholdSuppress: 0.5,
+        description: '单仓抑制交易',
+      },
+      [DUAL_HIGH]: {
+        tradeCount: fullTradeCount,
+        thresholdSuppress: 0.5,
+        description: '双重抑制交易',
+      },
+
+      // 超高风险：减仓模式,阈值极度压缩
+      [ISOLATE_EMERGENCY]: {
+        tradeCount: fullTradeCount,
+        thresholdSuppress: 0.5,
+        description: '单仓减仓交易',
+      },
+      [DUAL_EMERGENCY]: { //停止开仓，正常平仓
+        tradeCount: fullTradeCount,
+        thresholdSuppress: 0.25,
+        description: '双重减仓交易', 
+      },
+
+      // 传导性风险
+      [CROSS_HIGH]: {
+        thresholdSuppress: 0.5,
+        description: '全仓抑制交易',
+      },
+      [CROSS_EMERGENCY]: { //停止开仓，正常平仓
+        tradeCount: fullTradeCount,
+        thresholdSuppress: 0.5,
+        description: '全仓减仓交易',
+      },
+    };
+
+    const overridesMap = {
+      [PositionAction.OPEN]: OPEN_OVERRIDES,
+      [PositionAction.CLOSE]: CLOSE_OVERRIDES,
+    };
+
+    const base = baseTemplates[actionType];
+    const overrides = overridesMap[actionType][riskLevel] || overridesMap[actionType][NORMAL] || {};
+    const strategy = { ...base, ...overrides };
+
+    const finalTradeCount =
+      actionType === PositionAction.OPEN
+        ? Math.min(strategy.tradeCount, this._max_open_grid_count)
+        : strategy.tradeCount;
+
+    const finalGridCount = getSuppressedGridCount(strategy.tradeMultiple || 1);
+
+    const finalThreshold = strategy.threshold * strategy.thresholdSuppress;
+
     return {
-      ..._s,
+      ...strategy,
       riskLevel,
-      tradeMultiple: _s.tradeMultiple || 1,
-      tradeCount:
-        actionType === PositionAction.OPEN
-          ? Math.min(_s.tradeCount, this._max_open_grid_count)
-          : _s.tradeCount,
+      threshold: finalThreshold,
+      gridCount: finalGridCount,
+      tradeCount: finalTradeCount,
     };
   }
-
-  // ==================== 日志和监控 ====================
-
-  /**
-   * 获取持仓状态报告
-   * @returns {object} 持仓状态报告
-   */
-  getPositionReport() {}
-
-  /**
-   * 记录持仓控制日志
-   * @param {string} action 操作类型
-   * @param {object} details 详细信息
-   */
-  logPositionControl(action, details = {}) {}
 }

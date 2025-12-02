@@ -12,7 +12,7 @@ import {
 } from '../../enum.js';
 import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
-import { serialOpenOptimize, serialTradeOptimize } from './utils/​serial​OpenOptimize.js';
+import { TradeFreqController } from './utils/TradeFreqController.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -375,7 +375,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 持仓方向判断很重要，不能盲目加仓
       // 判断动量，如果涨跌速度过快则不能盲目减少回撤门限
 
-      const price_diff = Math.abs(this._current_price - this._last_trade_price);
+      const price_diff = this._current_price - this._last_trade_price;
       const ref_price =
         this._direction > 0
           ? Math.min(this._current_price, this._last_trade_price)
@@ -383,6 +383,9 @@ export class GridTradingProcessor extends AbstractProcessor {
       const diff_rate = price_diff / ref_price;
 
       const grid_span = diff_rate / this._grid_width;
+
+      const grid_span_abs = Math.abs(grid_span);
+      
       const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
       const grid_box = this.getGridBox(this._current_price);
@@ -394,7 +397,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._recent_prices,
         this._current_price,
         default_threshold,
-        grid_span,
+        grid_span_abs,
         grid_count_abs,
         timeDiff,
         correction,
@@ -405,18 +408,18 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._snapshot = snapshot;
 
       const {
-        shouldSuppress,
         gridCount: adjustedGridCount,
         tradeCount: adjustedTradeCount,
         threshold: adjustedThreshold,
         description: tradeDescription,
         riskLevel: positionRiskLevel,
-        tradeMultiple: tradeSuppressMultiple,
       } = this.position_controller.getPositionStrategy(
         this._tendency,
         this._threshold,
         gridCount,
-        grid_span
+        grid_span_abs,
+        this._last_open_grid_span,
+        this._last_close_grid_span,
       );
       this._position_risk_level = positionRiskLevel;
       console.log(
@@ -425,24 +428,11 @@ export class GridTradingProcessor extends AbstractProcessor {
 
       this._threshold = adjustedThreshold;
 
-      if (shouldSuppress) {
-        const pos_lots = this._getPositionLots();
-        const mmr = this._getMaintenanceMarginRate();
-        // 止损模式，抑制交易ƒ
-        console.log(
-          `- [${this.asset_name}] 过度持仓：${pos_lots.toFixed(0)} 手，维持保证金率：${(mmr * 100).toFixed(0)}%；`
-        );
-        console.log(
-          `- [${this.asset_name}] 抑制交易：${gridCount}格 => ${adjustedGridCount}格，${gridCount}份 => ${adjustedTradeCount}份`
-        );
-        console.log(`- [${this.asset_name}] 抑制倍数：${tradeSuppressMultiple}`);
-      }
-
-      const { shouldTrade } = serialTradeOptimize({
+      const { shouldTrade } = TradeFreqController({
         asset_name: this.asset_name,
         last_open_grid_span: this._last_open_grid_span,
         last_close_grid_span: this._last_close_grid_span,
-        grid_span,
+        grid_span_abs,
         position_action,
         time_since_last_trade: now - this._last_trade_price_ts,
         risk_level: this._position_risk_level,
@@ -456,18 +446,18 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
         console.log(
-          `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
+          `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
         );
         return;
       }
 
       if (Math.abs(adjustedGridCount) >= 1) {
         console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
 
         // 更新连续同类交易的网格距离
-        this._refreshLastSerialTradeGridSpan(position_action, grid_span);
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
 
         // 执行下单
         await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
@@ -478,13 +468,17 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 在平仓方向上
       // 至少超超过了 1.5 格实际距离
       // 不能比前一个格少
-      if (grid_span > 1.5 && grid_span > this._last_close_grid_span && position_action === PositionAction.CLOSE) {
+      if (
+        grid_span_abs > 1.5 &&
+        grid_span_abs > this._last_close_grid_span &&
+        position_action === PositionAction.CLOSE
+      ) {
         // 正常满足条件下单
         console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
+          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
         );
 
-        this._refreshLastSerialTradeGridSpan(position_action, grid_span);
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
 
         if (this._tendency > 0) {
           await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);
@@ -741,13 +735,13 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
   }
 
-  _refreshLastSerialTradeGridSpan(position_action, grid_span) {
+  _refreshLastSerialTradeGridSpan(position_action, grid_span_abs) {
     if (position_action === PositionAction.OPEN) {
-      this._last_open_grid_span = grid_span;
+      this._last_open_grid_span = grid_span_abs;
       this._last_close_grid_span = -1;
     } else {
       this._last_open_grid_span = -1;
-      this._last_close_grid_span = grid_span;
+      this._last_close_grid_span = grid_span_abs;
     }
   }
 
