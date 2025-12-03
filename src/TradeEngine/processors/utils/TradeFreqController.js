@@ -61,7 +61,7 @@ export function TradeFreqController(params) {
     }
     // 2 在高风险下，有限节流
     if([ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level)){
-      if (grid_span_abs < 1 + lastTradeGridSpan * 0.75) {
+      if (grid_span_abs < 1 + lastTradeGridSpan) {
         return {
           shouldTrade: false,
         };
