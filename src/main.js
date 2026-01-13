@@ -142,38 +142,61 @@ try {
   process.exit(1);
 }
 
-const ws_business = new WebSocket(base_url + '/ws/v5/business');
-storeConnection('ws_business', ws_business);
+// 启动 WebSocket 连接
+initBusinessWebSocket();
 
-ws_business.on('open', () => {
-  console.log('ws_business已连接到服务器');
-  assets.map(async it => {
-    await subscribeKlineChanel(ws_business, 'candle' + bar_type, it.id);
+function initBusinessWebSocket() {
+  const ws = new WebSocket(base_url + '/ws/v5/business');
+  storeConnection('ws_business', ws);
+
+  ws.on('open', () => {
+    console.log('ws_business已连接到服务器');
+    assets.map(async it => {
+      await subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
+    });
   });
-});
 
-ws_business.on('message', message => {
-  const { arg = {}, data } = JSON.parse(message.toString());
-  const { channel, instId } = arg;
-  if (channel.indexOf('candle') === 0) {
-    if (data) {
-      const { open, close, ts } = parseCandleData(data[0]);
-      TradeEngine.updateCandleData(instId, bar_type, data[0]);
-      TradeEngine.updatePrice(instId, close, ts, bar_type);
+  ws.on('message', message => {
+    const { arg = {}, data } = JSON.parse(message.toString());
+    const { channel, instId } = arg;
+    if (channel.indexOf('candle') === 0) {
+      if (data) {
+        const { open, close, ts } = parseCandleData(data[0]);
+        TradeEngine.updateCandleData(instId, bar_type, data[0]);
+        TradeEngine.updatePrice(instId, close, ts, bar_type);
+      }
     }
-  }
-});
+  });
 
-ws_business.on('close', async (code, reason) => {
+  ws.on('error', (error) => {
+    console.error('ws_business WebSocket 错误:', error.message);
+    // 触发关闭事件，进入重连逻辑
+    handleWebSocketClose(1011, error.message); // 使用一个自定义的错误码，例如 1011
+  });
+
+  ws.on('close', handleWebSocketClose);
+}
+
+// 全局重连尝试计数器
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10; // 最大重连尝试次数
+
+async function handleWebSocketClose(code, reason) {
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
 
   // 停止引擎
   TradeEngine.stop();
   VisualEngine.stop();
 
+  reconnectAttempts++;
+  if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+    console.error(`达到最大重连尝试次数 (${MAX_RECONNECT_ATTEMPTS})，程序将退出。`);
+    process.exit(1); // 退出程序，可能需要外部进程管理器来重启
+  }
+
   // 等待5秒后重新初始化
   await new Promise(resolve => setTimeout(resolve, 5000));
-  console.log('正在尝试重新连接...');
+  console.log(`正在尝试重新连接... (第 ${reconnectAttempts} 次尝试)`);
 
   try {
     // 重新获取数据
@@ -195,39 +218,19 @@ ws_business.on('close', async (code, reason) => {
       TradeEngine.start();
       VisualEngine.start();
 
-      // 重新建立WebSocket连接
-      const new_ws = new WebSocket(base_url + '/ws/v5/business');
-      storeConnection('ws_business', new_ws);
-
-      // 重新绑定事件处理
-      new_ws.on('open', () => {
-        console.log('ws_business重新连接成功');
-        assets.map(async it => {
-          await subscribeKlineChanel(new_ws, 'candle' + bar_type, it.id);
-        });
-      });
-
-      new_ws.on('message', message => {
-        const { arg = {}, data } = JSON.parse(message.toString());
-        const { channel, instId } = arg;
-        if (channel.indexOf('candle') === 0 && data) {
-          const { open, close, ts } = parseCandleData(data[0]);
-          TradeEngine.updateCandleData(instId, bar_type, data[0]);
-          TradeEngine.updatePrice(instId, close, ts, bar_type);
-        }
-      });
-
-      // 递归绑定close事件
-      new_ws.on('close', ws_business.listeners('close')[0]);
+      // 重置重连尝试计数器
+      reconnectAttempts = 0;
+      // 重新建立连接
+      initBusinessWebSocket();
     } else {
       throw new Error('获取K线数据失败');
     }
   } catch (error) {
     console.error('重连失败:', error.message);
     // 递归重试
-    setTimeout(() => ws_business.emit('close', code, reason), 5000);
+    handleWebSocketClose(code, reason);
   }
-});
+}
 
 // 保存一个ws链接
 function storeConnection(conn_id, ws) {

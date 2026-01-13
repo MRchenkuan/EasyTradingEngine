@@ -43,8 +43,8 @@ export const Strategies = [
       _max_price: 5.0,
       _base_amount: 30, // 每笔交易量
       _base_quantity: 10, // 每笔交易的份数
-      _suppress_lots: 10, // 持仓警戒线
-      _survival_lots: 15, // 持仓止损线
+      _suppress_lots: 15, // 持仓警戒线
+      _survival_lots: 20, // 持仓止损线
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
@@ -59,8 +59,8 @@ export const Strategies = [
       _max_price: 6000,
       _base_amount: 30,
       _base_quantity: 10,
-      _suppress_lots: 10, // 持仓警戒线
-      _survival_lots: 15, // 持仓止损线
+      _suppress_lots: 15, // 持仓警戒线
+      _survival_lots: 20, // 持仓止损线
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
@@ -76,8 +76,8 @@ export const Strategies = [
       _max_price: 350,
       _base_amount: 30,
       _base_quantity: 10,
-      _suppress_lots: 10, // 持仓警戒线
-      _survival_lots: 15, // 持仓止损线
+      _suppress_lots: 15, // 持仓警戒线
+      _survival_lots: 20, // 持仓止损线
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
@@ -94,7 +94,7 @@ export const Strategies = [
       _base_amount: 60,
       _base_quantity: 10,
       _suppress_lots: 7, // 持仓警戒线
-      _survival_lots: 10, // 持仓止损线
+      _survival_lots: 12, // 持仓止损线
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
