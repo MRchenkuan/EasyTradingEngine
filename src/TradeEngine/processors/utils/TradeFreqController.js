@@ -13,7 +13,7 @@ export function TradeFreqController(params) {
 
 
   // 节流重置时间
-  const throttleResetTime = 300 * 60 * 1000;
+  const throttleResetTime = 420 * 60 * 1000;
   // 最大节流距离
   const maxThrottleDistance = 10;
 

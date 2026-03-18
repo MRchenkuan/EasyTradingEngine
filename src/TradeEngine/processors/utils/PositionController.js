@@ -15,9 +15,9 @@ export class PositionController {
   processor = null;
   _suppress_lots = 12;
   _survival_lots = 20;
-  _min_mgn_ratio_notice = 8000; // 抑制状态最小保证金率 4000%
-  _min_mgn_ratio_supress = 4000; // 抑制状态最小保证金率 4000%
-  _min_mgn_ratio_survival = 2000; // 止损状态最小保证金率 1000%
+  _min_mgn_ratio_notice = 10000; // 抑制状态最小保证金率 4000%
+  _min_mgn_ratio_supress = 6000; // 抑制状态最小保证金率 4000%
+  _min_mgn_ratio_survival = 4000; // 止损状态最小保证金率 1000%
   _max_open_grid_count = 8; // 最大开仓网格数量
 
   constructor(engine, processor) {
@@ -108,14 +108,14 @@ export class PositionController {
    * @returns {PositionRiskLevel} 跨仓风险等级
    */
   getCrossRiskLevel() {
-    const pos_contracts = this.getPositionContracts();
+    // const pos_contracts = this.getPositionContracts();
     const mmr = this.getMaintenanceMarginRate();
 
     const mgnRatioPercent = 100 * mmr;
 
-    if (pos_contracts === 0) {
-      return PositionRiskLevel.NORMAL;
-    }
+    // if (pos_contracts === 0) {
+    //   return PositionRiskLevel.NORMAL;
+    // }
 
     // 整体止损状态
     if (mgnRatioPercent < this._min_mgn_ratio_survival) {
@@ -153,10 +153,15 @@ export class PositionController {
       '02': RiskLevel.CROSS_HIGH, // NORMAL-HIGHT
       '03': RiskLevel.CROSS_EMERGENCY, // NORMAL-EMERGENCY
 
+      10: RiskLevel.ISOLATE_HIGHT, // NOTICE-HIGHT
+      11: RiskLevel.ISOLATE_HIGHT, // NOTICE-HIGHT
+      12: RiskLevel.CROSS_HIGH, // NOTICE-HIGHT
+      13: RiskLevel.CROSS_EMERGENCY, // NOTICE-EMERGENCY
+
       20: RiskLevel.ISOLATE_HIGHT, // NORMAL-HIGHT
       21: RiskLevel.ISOLATE_HIGHT, // NORMAL-HIGHT
       22: RiskLevel.DUAL_HIGH, // HIGHT-HIGHT
-      23: RiskLevel.DUAL_HIGH, // EMERGENCY-EMERGENCY
+      23: RiskLevel.CROSS_EMERGENCY, // HIGHT-EMERGENCY
 
       30: RiskLevel.ISOLATE_EMERGENCY, // HIGHT-NORMAL
       31: RiskLevel.ISOLATE_EMERGENCY, // HIGHT-EMERGENCY
@@ -209,7 +214,7 @@ export class PositionController {
     const riskLevel = this.getMixedRiskLevel();
 
     const getSuppressedGridCount = multiple => Math.trunc(gridCount / multiple);
-    const fullTradeCount = Math.round(grid_span_abs * 10) / 10;
+    const fullTradeCount = Math.sign(gridCount) * Math.round(grid_span_abs * 10) / 10;
 
     const {
       NORMAL,
@@ -261,11 +266,6 @@ export class PositionController {
         thresholdSuppress: 1.5,
         description: '单仓减仓交易',
       },
-      [DUAL_EMERGENCY]: {
-        tradeMultiple: 20000, // 停止开仓
-        description: '双重减仓交易', 
-      },
-
       // 传导性风险
       [CROSS_HIGH]: {
         tradeMultiple: 2,
@@ -274,7 +274,11 @@ export class PositionController {
       },
       [CROSS_EMERGENCY]: {
         tradeMultiple: 20000, // 停止开仓
-        description: '全仓减仓开仓', 
+        description: '全仓减仓开仓',
+      },
+      [DUAL_EMERGENCY]: {
+        tradeMultiple: 20000, // 停止开仓
+        description: '双重减仓交易',
       },
     };
 
@@ -298,10 +302,11 @@ export class PositionController {
         thresholdSuppress: 0.5,
         description: '单仓减仓交易',
       },
-      [DUAL_EMERGENCY]: { //停止开仓，正常平仓
+      [DUAL_EMERGENCY]: {
+        //停止开仓，正常平仓
         tradeCount: fullTradeCount,
         thresholdSuppress: 0.25,
-        description: '双重减仓交易', 
+        description: '双重减仓交易',
       },
 
       // 传导性风险
@@ -309,7 +314,8 @@ export class PositionController {
         thresholdSuppress: 0.5,
         description: '全仓抑制交易',
       },
-      [CROSS_EMERGENCY]: { //停止开仓，正常平仓
+      [CROSS_EMERGENCY]: {
+        //停止开仓，正常平仓
         tradeCount: fullTradeCount,
         thresholdSuppress: 0.5,
         description: '全仓减仓交易',
