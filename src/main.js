@@ -280,6 +280,46 @@ process.on('unhandledRejection', (reason, promise) => {
   // 不退出进程，让服务继续运行
 });
 
+// 信号处理，确保在用户按下ctrl+c时能够正确关闭应用
+function handleShutdown() {
+  console.log('\n收到关闭信号，正在关闭服务...');
+
+  // 停止交易引擎
+  TradeEngine.stop();
+
+  // 停止可视化引擎
+  VisualEngine.stop();
+
+  // 关闭WebSocket连接
+  Object.values(ws_connection_pool).forEach(ws => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.close();
+    }
+  });
+
+  // 清除所有定时器
+  Object.values(TradeEngine._timer).forEach(timer => {
+    clearTimeout(timer);
+  });
+
+  Object.values(TradeEngine._instrument_timers).forEach(timer => {
+    clearTimeout(timer);
+  });
+
+  Object.values(TradeEngine._position_timers).forEach(timer => {
+    clearTimeout(timer);
+  });
+
+  console.log('服务已关闭');
+  process.exit(0);
+}
+
+// 处理ctrl+c信号
+process.on('SIGINT', handleShutdown);
+
+// 处理终止信号
+process.on('SIGTERM', handleShutdown);
+
 // 保存一个ws链接
 function storeConnection(conn_id, ws) {
   ws_connection_pool[conn_id] = ws;
