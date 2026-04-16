@@ -771,6 +771,24 @@ export class TradeEngine {
    * @param {string} assetName - 品种名称
    * @param {string} instType - 品种类型 (SPOT/SWAP等)
    */
+  // 带重试的API请求函数
+  static async requestWithRetry(apiCall, maxRetries = 3, delay = 1000) {
+    let retries = 0;
+    while (retries < maxRetries) {
+      try {
+        return await apiCall();
+      } catch (error) {
+        retries++;
+        if (retries >= maxRetries) {
+          console.error(`API请求失败 (${retries}/${maxRetries}):`, error.message);
+          throw error;
+        }
+        console.log(`API请求失败，${delay}ms后重试 (${retries}/${maxRetries})...`);
+        await new Promise(resolve => setTimeout(resolve, delay * retries));
+      }
+    }
+  }
+
   static registerInstrument(assetName, instType) {
     // 清除已存在的定时器
     if (this._instrument_timers[assetName]) {
@@ -782,9 +800,9 @@ export class TradeEngine {
     // 创建定时更新任务
     const updateInstrument = async () => {
       try{
-        // 从API获取品种信息
-        const { data: base } = await getInstruments(instType, assetName);
-        const { data: openInterest } = await getOpenInterest(instType, assetName);
+        // 从API获取品种信息，带重试机制
+        const { data: base } = await this.requestWithRetry(() => getInstruments(instType, assetName));
+        const { data: openInterest } = await this.requestWithRetry(() => getOpenInterest(instType, assetName));
         const inst_base = base.find(it => it.instId === assetName);
         const inst_open_interest = openInterest.find(it => it.instId === assetName);
 
@@ -803,7 +821,7 @@ export class TradeEngine {
           };
         }
       }catch(e){
-        console.log(e);
+        console.log('更新品种信息失败:', e.message);
       } finally {
         // 设置定时器
         this._instrument_timers[assetName] = setTimeout(
@@ -815,7 +833,7 @@ export class TradeEngine {
 
     const updatePositions = async () => {
       try{
-        const { data: positions } = await getPositions(assetName);
+        const { data: positions } = await this.requestWithRetry(() => getPositions(assetName));
         if (positions.length) {
           this._position_list[assetName] = {
             ...this._position_list[assetName],
@@ -826,7 +844,7 @@ export class TradeEngine {
           this._position_list[assetName] = null;
         }
       } catch(e){
-        console.log(e);
+        console.log('更新持仓信息失败:', e.message);
       } finally {
         // 设置定时器
         this._position_timers[assetName] = setTimeout(

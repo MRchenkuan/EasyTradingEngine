@@ -7,8 +7,34 @@ import { TradeEnv } from './enum.js';
 
 const base_url = 'https://www.okx.com';
 const MIMIC = Env === TradeEnv.MIMIC;
+
+// 创建axios实例，配置默认超时和错误处理
+const axiosInstance = axios.create({
+  timeout: 15000, // 设置15秒超时
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// 请求重试拦截器
+axiosInstance.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+    // 如果是网络错误，且没有超过重试次数，进行重试
+    if (
+      (error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT' || error.code === 'ENOTFOUND') &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true;
+      console.log('网络请求失败，正在重试...');
+      return axiosInstance(originalRequest);
+    }
+    return Promise.reject(error);
+  }
+);
 export async function marketCandles(instId, bar, after, before, limit) {
-  const { data } = await axios.get(base_url + '/api/v5/market/candles', {
+  const { data } = await axiosInstance.get(base_url + '/api/v5/market/candles', {
     params: {
       instId,
       bar,
@@ -16,13 +42,12 @@ export async function marketCandles(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 10000, // 设置5秒超时
   });
   return data;
 }
 
 export async function marketCandlesHistory(instId, bar, after, before, limit) {
-  const { data } = await axios.get(base_url + '/api/v5/market/history-candles', {
+  const { data } = await axiosInstance.get(base_url + '/api/v5/market/history-candles', {
     params: {
       instId,
       bar,
@@ -30,7 +55,6 @@ export async function marketCandlesHistory(instId, bar, after, before, limit) {
       before,
       limit,
     },
-    timeout: 10000, // 设置5秒超时
   });
   return data;
 }
@@ -74,7 +98,7 @@ export async function getOrderHistory(params = {}) {
   };
 
   try {
-    const { data } = await axios.get(base_url + fullPath, { headers });
+    const { data } = await axiosInstance.get(base_url + fullPath, { headers });
     return data;
   } catch (error) {
     console.error('获取订单历史失败:', error.response?.data || error.message);
@@ -113,7 +137,7 @@ export async function batchOrders(orders) {
   }
 
   try {
-    const { data } = await axios.post(base_url + requestPath, ordersWithId, { headers });
+    const { data } = await axiosInstance.post(base_url + requestPath, ordersWithId, { headers });
     // 将返回结果与原始订单关联
     const enrichedData =
       data.data?.map(result => {
@@ -259,7 +283,7 @@ export async function batchCancelOrders(orders) {
     headers['x-simulated-trading'] = 1;
   }
 
-  const { data } = await axios.post(base_url + requestPath, orders, {
+  const { data } = await axiosInstance.post(base_url + requestPath, orders, {
     headers,
   });
   return data;
@@ -286,7 +310,7 @@ export async function getOpenInterestHistory(instId, period, begin, end, limit =
   }
 
   try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
+    const { data } = await axiosInstance.get(base_url + requestPath, { headers });
     if (data.code != 0) {
       throw new Error(data.msg);
     }
@@ -338,7 +362,7 @@ export async function getPositions(instId, instType, posId) {
   }
 
   try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
+    const { data } = await axiosInstance.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
     if (data.code != 0) {
       throw new Error(data.msg);
@@ -376,7 +400,7 @@ export async function getOpenInterest(instType, instId, uly, instFamily) {
   }
 
   try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
+    const { data } = await axiosInstance.get(base_url + requestPath, { headers });
     // 确保返回的数据格式正确
     if (data.code != 0) {
       throw new Error(data.msg);
@@ -414,7 +438,7 @@ export async function getInstruments(instType, instId) {
   }
 
   try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
+    const { data } = await axiosInstance.get(base_url + requestPath, { headers });
     if (data.code != 0) {
       throw new Error(data.msg);
     }
@@ -454,7 +478,7 @@ export async function getOrderInfo(instId, ordId) {
   }
 
   try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
+    const { data } = await axiosInstance.get(base_url + requestPath, { headers });
     if (data.code != 0) {
       throw new Error(data.msg);
     }

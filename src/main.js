@@ -88,7 +88,7 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
           from_when: params.from_when,
           bar_type: params.bar_type,
           once_limit: 100,
-          total_limit: open_inerest_limit ||params.candle_limit,
+          total_limit: open_inerest_limit || params.candle_limit,
         });
         TradeEngine.setOpenInterest(id, params.bar_type, data_open_interest);
 
@@ -126,21 +126,51 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
 };
 
 // 修改数据获取逻辑的错误处理
-try {
-  const klines = await getKlinesWithRetry(assetIds, params);
-  if (klines && klines.length > 0) {
-    klines.forEach(it => {
-      const { id, prices, ts, orign_data } = it;
-      TradeEngine.updateCandleDates(id, bar_type, orign_data);
-      TradeEngine.updatePrices(id, prices, ts, bar_type);
-    });
-  } else {
-    throw new Error('获取K线数据失败');
+async function initializeData() {
+  try {
+    const klines = await getKlinesWithRetry(assetIds, params);
+    if (klines && klines.length > 0) {
+      klines.forEach(it => {
+        const { id, prices, ts, orign_data } = it;
+        TradeEngine.updateCandleDates(id, bar_type, orign_data);
+        TradeEngine.updatePrices(id, prices, ts, bar_type);
+      });
+      console.log('数据初始化成功');
+      return true;
+    } else {
+      console.error('获取K线数据失败，将重试');
+      return false;
+    }
+  } catch (error) {
+    console.error('初始化数据失败:', error.message);
+    return false;
   }
-} catch (error) {
-  console.error('初始化数据失败:', error.message);
-  process.exit(1);
 }
+
+// 持续尝试初始化数据
+async function tryInitializeData() {
+  let success = false;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!success && attempts < maxAttempts) {
+    attempts++;
+    console.log(`尝试初始化数据 (${attempts}/${maxAttempts})...`);
+    success = await initializeData();
+    if (!success) {
+      console.log('初始化失败，5秒后重试...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+
+  if (!success) {
+    console.error('达到最大初始化尝试次数，服务将在后台继续尝试');
+    // 不退出服务，而是继续运行，后台会定期尝试
+  }
+}
+
+// 启动数据初始化
+tryInitializeData();
 
 // 启动 WebSocket 连接
 initBusinessWebSocket();
@@ -168,7 +198,7 @@ function initBusinessWebSocket() {
     }
   });
 
-  ws.on('error', (error) => {
+  ws.on('error', error => {
     console.error('ws_business WebSocket 错误:', error.message);
     // 触发关闭事件，进入重连逻辑
     handleWebSocketClose(1011, error.message); // 使用一个自定义的错误码，例如 1011
@@ -179,7 +209,8 @@ function initBusinessWebSocket() {
 
 // 全局重连尝试计数器
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10; // 最大重连尝试次数
+const MAX_RECONNECT_ATTEMPTS = 50; // 增加最大重连尝试次数
+const RECONNECT_DELAY = 5000; // 重连延迟时间
 
 async function handleWebSocketClose(code, reason) {
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
@@ -190,12 +221,14 @@ async function handleWebSocketClose(code, reason) {
 
   reconnectAttempts++;
   if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-    console.error(`达到最大重连尝试次数 (${MAX_RECONNECT_ATTEMPTS})，程序将退出。`);
-    process.exit(1); // 退出程序，可能需要外部进程管理器来重启
+    console.error(`达到最大重连尝试次数 (${MAX_RECONNECT_ATTEMPTS})，将在1分钟后再次尝试。`);
+    // 不退出程序，而是等待一段时间后重新尝试
+    await new Promise(resolve => setTimeout(resolve, 60000));
+    reconnectAttempts = 0;
   }
 
-  // 等待5秒后重新初始化
-  await new Promise(resolve => setTimeout(resolve, 5000));
+  // 等待重连延迟后重新初始化
+  await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY));
   console.log(`正在尝试重新连接... (第 ${reconnectAttempts} 次尝试)`);
 
   try {
@@ -223,14 +256,29 @@ async function handleWebSocketClose(code, reason) {
       // 重新建立连接
       initBusinessWebSocket();
     } else {
-      throw new Error('获取K线数据失败');
+      console.error('获取K线数据失败，将再次尝试');
+      // 继续重试
+      handleWebSocketClose(code, reason);
     }
   } catch (error) {
     console.error('重连失败:', error.message);
-    // 递归重试
+    // 继续重试，不退出
     handleWebSocketClose(code, reason);
   }
 }
+
+// 全局错误处理
+process.on('uncaughtException', error => {
+  console.error('未捕获的异常:', error);
+  console.error('服务将继续运行，尝试自动恢复...');
+  // 不退出进程，让服务继续运行
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('未处理的Promise拒绝:', reason);
+  console.error('服务将继续运行，尝试自动恢复...');
+  // 不退出进程，让服务继续运行
+});
 
 // 保存一个ws链接
 function storeConnection(conn_id, ws) {
