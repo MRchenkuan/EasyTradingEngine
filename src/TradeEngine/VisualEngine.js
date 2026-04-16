@@ -61,9 +61,19 @@ export class VisualEngine {
 
   static start() {
     const status = TradeEngine.checkEngine();
+    console.log(
+      `[VisualEngine] 启动检查 - TradeEngine状态: ${status}, 模块数量: ${this.modules.size}`
+    );
     if (status == 2) {
-      this.modules.forEach(it => {
-        it.draw();
+      console.log(`[VisualEngine] 开始绘制图表...`);
+      this.modules.forEach((module, name) => {
+        console.log(`[VisualEngine] 调用 ${name} 的 draw 方法`);
+        try {
+          module.draw();
+          console.log(`[VisualEngine] ${name} 绘制完成`);
+        } catch (e) {
+          console.error(`[VisualEngine] ${name} 绘制失败:`, e);
+        }
       });
     }
     clearTimeout(this._timer.start);

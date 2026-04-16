@@ -12,6 +12,9 @@ export function calculateReturns(prices) {
 
 // 皮尔逊相关性
 export function pearsonCorrelation(arr1, arr2) {
+  if (!arr1 || !arr2 || arr1.length === 0 || arr2.length === 0) {
+    return 0;
+  }
   const mean1 = mean(arr1);
   const mean2 = mean(arr2);
   const covariance =
