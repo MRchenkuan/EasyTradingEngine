@@ -100,7 +100,7 @@ export class PositionController {
       return PositionRiskLevel.HIGHT;
     }
 
-    return StopLossLevel.NORMAL;
+    return PositionRiskLevel.NORMAL;
   }
 
   /**
@@ -108,14 +108,14 @@ export class PositionController {
    * @returns {PositionRiskLevel} 跨仓风险等级
    */
   getCrossRiskLevel() {
-    // const pos_contracts = this.getPositionContracts();
+    const pos_contracts = this.getPositionContracts();
     const mmr = this.getMaintenanceMarginRate();
 
     const mgnRatioPercent = 100 * mmr;
 
-    // if (pos_contracts === 0) {
-    //   return PositionRiskLevel.NORMAL;
-    // }
+    if (pos_contracts === 0) {
+      return PositionRiskLevel.NORMAL;
+    }
 
     // 整体止损状态
     if (mgnRatioPercent < this._min_mgn_ratio_survival) {
@@ -131,7 +131,7 @@ export class PositionController {
       return PositionRiskLevel.NOTICE;
     }
 
-    return StopLossLevel.NORMAL;
+    return PositionRiskLevel.NORMAL;
   }
 
   /**
@@ -214,7 +214,7 @@ export class PositionController {
     const riskLevel = this.getMixedRiskLevel();
 
     const getSuppressedGridCount = multiple => Math.trunc(gridCount / multiple);
-    const fullTradeCount = Math.sign(gridCount) * Math.round(grid_span_abs * 10) / 10;
+    const fullTradeCount = (Math.sign(gridCount) * Math.round(grid_span_abs * 10)) / 10;
 
     const {
       NORMAL,
