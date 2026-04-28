@@ -250,12 +250,16 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 价格超出范围检查
     // 优化后的价格范围检查
     if (this._current_price < this._min_price) {
-      console.log(`当前价格${this._current_price}低于最低价${this._min_price}，暂停交易`);
+      console.log(
+        `[${this.asset_name}] 当前价格${this._current_price}低于最低价${this._min_price}，暂停交易`
+      );
       this._saveState();
       return;
     }
     if (this._current_price > this._max_price) {
-      console.log(`当前价格${this._current_price}高于最高价${this._max_price}，暂停交易`);
+      console.log(
+        `[${this.asset_name}] 当前价格${this._current_price}高于最高价${this._max_price}，暂停交易`
+      );
       this._saveState();
       return;
     }
@@ -345,7 +349,9 @@ export class GridTradingProcessor extends AbstractProcessor {
   }
 
   async _orderStrategy(gridCount) {
-    if (this._stratage_locked) return;
+    if (this._stratage_locked) {
+      return;
+    }
     const now = Date.now();
     if (now - this._last_turtle_ts < this.turtle) return;
     this._last_turtle_ts = now;
@@ -360,7 +366,6 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._stratage_locked = true;
       // 趋势和方向一致时不交易
       if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
         return;
       }
 
@@ -385,7 +390,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       const grid_span = diff_rate / this._grid_width;
 
       const grid_span_abs = Math.abs(grid_span);
-      
+
       const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
 
       const grid_box = this.getGridBox(this._current_price);
@@ -419,7 +424,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         gridCount,
         grid_span_abs,
         this._last_open_grid_span,
-        this._last_close_grid_span,
+        this._last_close_grid_span
       );
       this._position_risk_level = positionRiskLevel;
       console.log(

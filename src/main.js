@@ -69,17 +69,7 @@ VisualEngine.setMetaInfo({
   show_order_his: MainGraph.order_his_show,
 }).start();
 
-// 添加日志来检查VisualEngine的状态
-setInterval(() => {
-  const status = TradeEngine.checkEngine();
-  const marketData = TradeEngine.getAllMarketData();
-  const modules = VisualEngine.modules;
 
-  console.log(`[调试信息] TradeEngine状态: ${status}`);
-  console.log(`[调试信息] 市场数据长度: ${Object.values(marketData || {}).length}`);
-  console.log(`[调试信息] 资产数量: ${TradeEngine._asset_names.length}`);
-  console.log(`[调试信息] VisualEngine模块: ${Array.from(modules.keys())}`);
-}, 5000);
 
 const assetIds = assets.map(it => it.id);
 

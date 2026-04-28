@@ -650,7 +650,11 @@ export class TradeEngine {
     this.processors.forEach(p => {
       if (this._instrument_info[p.asset_name]) {
         setTimeout(() => {
-          p.tick();
+          try {
+            p.tick();
+          } catch (e) {
+            console.error(`[交易引擎] 处理器 ${p.asset_name} 执行失败:`, e);
+          }
         });
       } else {
         console.warn(`未找到合约产品信息: ${p.asset_name}，暂不执行交易策略`);
@@ -660,11 +664,9 @@ export class TradeEngine {
 
   static start() {
     const status = this.checkEngine();
-    // const restore = this._rewriteConsole('交易引擎启动中...');
 
     try {
       if (status == 2) {
-        // restore(); // 如果完全启动，先恢复console
         this.refreshBeta();
         this.refreshTransactions();
         this.runAllProcessors();
@@ -674,17 +676,16 @@ export class TradeEngine {
       } else if (status === 0) {
         console.log('正在启动交易引擎...');
       } else {
-        restore(); // 出错时恢复console
         throw new Error('启动失败...');
       }
+    } catch (e) {
+      console.error('[start] 执行出错:', e);
     } finally {
-      // restore(); // 确保一定会恢复console
+      clearTimeout(this._timer.start);
+      this._timer.start = setTimeout(() => {
+        this.start();
+      }, 500);
     }
-
-    clearTimeout(this._timer.start);
-    this._timer.start = setTimeout(() => {
-      this.start();
-    }, 500);
   }
 
   static stop() {
