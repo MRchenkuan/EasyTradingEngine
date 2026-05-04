@@ -61,35 +61,10 @@ export class VisualEngine {
 
   static start() {
     const status = TradeEngine.checkEngine();
-    console.log(
-      `[VisualEngine] 启动检查 - TradeEngine状态: ${status}, 模块数量: ${this.modules.size}`
-    );
     if (status == 2) {
-      console.log(`[VisualEngine] 开始绘制图表...`);
-      const modulesArray = Array.from(this.modules.entries());
-      let index = 0;
-      
-      const drawNextModule = () => {
-        if (index >= modulesArray.length) {
-          console.log(`[VisualEngine] 所有模块绘制完成`);
-          return;
-        }
-        
-        const [name, module] = modulesArray[index];
-        index++;
-        
-        console.log(`[VisualEngine] 调用 ${name} 的 draw 方法`);
-        try {
-          module.draw();
-          console.log(`[VisualEngine] ${name} 绘制完成`);
-        } catch (e) {
-          console.error(`[VisualEngine] ${name} 绘制失败:`, e);
-        }
-        
-        setTimeout(drawNextModule, 0);
-      };
-      
-      setTimeout(drawNextModule, 0);
+      this.modules.forEach(it => {
+        it.draw();
+      });
     }
     clearTimeout(this._timer.start);
     this._timer.start = setTimeout(() => {
