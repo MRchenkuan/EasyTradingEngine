@@ -39,7 +39,7 @@ export const Strategies = [
       _upper_drawdown: 0.0075,
       _lower_drawdown: 0.0075,
       _grid_width: 0.005,
-      _min_price: 1.0,
+      _min_price: 0.5,
       _max_price: 5.0,
       _base_amount: 30, // 每笔交易量
       _base_quantity: 10, // 每笔交易的份数
@@ -72,11 +72,11 @@ export const Strategies = [
       _upper_drawdown: 0.0075,
       _lower_drawdown: 0.0075,
       _grid_width: 0.005,
-      _min_price: 80,
+      _min_price: 40,
       _max_price: 350,
       _base_amount: 30,
       _base_quantity: 10,
-      _suppress_lots: 15, // 持仓警戒线
+      _suppress_lots: 15, // 持仓警戒线1
       _survival_lots: 20, // 持仓止损线
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
@@ -88,7 +88,7 @@ export const Strategies = [
       _upper_drawdown: 0.0075,
       _lower_drawdown: 0.0075,
       _grid_width: 0.005,
-      _min_price: 60000,
+      _min_price: 40000,
       _max_price: 150000,
       _swap_value: 0.01, //合约面值
       _base_amount: 60,
