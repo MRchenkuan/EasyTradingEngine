@@ -634,9 +634,6 @@ export class TradeEngine {
           if (isBetaMapReady) {
             this._status = 2;
           }
-          // if(Object.values(this._beta_map).length >= this._asset_names.length){
-
-          // }
         }
       }
       return this._status;

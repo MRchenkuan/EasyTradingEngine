@@ -13,6 +13,7 @@ import {
 import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
 import { TradeFreqController } from './utils/TradeFreqController.js';
+import { terminalDisplay } from '../../utils/TerminalDisplay.js';
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -358,41 +359,23 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     try {
       this._stratage_locked = true;
-      // 趋势和方向一致时不交易
-      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
-        return;
-      }
 
+      // 先计算指标数据用于显示
       const timeDiff = (this._current_price_ts - this._last_trade_price_ts || 1) / 1000;
-
       const correction = this._correction();
       const grid_count_abs = Math.abs(gridCount);
-      // 退避机制 ---- 在一个格子内做文章
-      // 如果大于 5 分钟,则减少回撤门限使其尽快平仓
-      // 减少回撤门限，仅限于平仓
-      // 通过当前持仓方向与价格趋势方向是否一致来判断是否平仓
-      // 持仓方向判断很重要，不能盲目加仓
-      // 判断动量，如果涨跌速度过快则不能盲目减少回撤门限
-
       const price_diff = this._current_price - this._last_trade_price;
       const ref_price =
         this._direction > 0
           ? Math.min(this._current_price, this._last_trade_price)
           : Math.max(this._current_price, this._last_trade_price);
       const diff_rate = price_diff / ref_price;
-
       const grid_span = diff_rate / this._grid_width;
-
       const grid_span_abs = Math.abs(grid_span);
-      
       const default_threshold = this._direction < 0 ? this._upper_drawdown : this._lower_drawdown;
-
       const grid_box = this.getGridBox(this._current_price);
 
-      console.log(`=========指标数据[${this.asset_name}]========`);
-
-      const { threshold, snapshot } = trendReversalThreshold(
+      const { threshold, snapshot, indicators } = trendReversalThreshold(
         this.engine.getCandleData(this.asset_name),
         this._recent_prices,
         this._current_price,
@@ -407,6 +390,15 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._threshold = threshold;
       this._snapshot = snapshot;
 
+      // 立即更新终端显示
+      terminalDisplay.updateAsset(this.asset_name, indicators);
+
+      // 趋势和方向一致时不交易
+      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        return;
+      }
+
       const {
         gridCount: adjustedGridCount,
         tradeCount: adjustedTradeCount,
@@ -419,7 +411,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         gridCount,
         grid_span_abs,
         this._last_open_grid_span,
-        this._last_close_grid_span,
+        this._last_close_grid_span
       );
       this._position_risk_level = positionRiskLevel;
       console.log(

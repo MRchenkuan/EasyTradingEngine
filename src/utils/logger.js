@@ -8,20 +8,32 @@ class Logger {
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     const seconds = String(now.getSeconds()).padStart(2, '0');
-    
+
     return `[${year}-${month}-${day} ${hours}:${minutes}:${seconds}]`;
   }
 
   static log(...args) {
-    originalConsole.log(`${this._getTimestamp()}`, ...args);
+    if (globalThis._terminalOriginalLog) {
+      globalThis._terminalOriginalLog(`${this._getTimestamp()}`, ...args);
+    } else {
+      console.log(`${this._getTimestamp()}`, ...args);
+    }
   }
 
   static error(...args) {
-    originalConsole.error(`${this._getTimestamp()}`, ...args);
+    if (globalThis._terminalOriginalError) {
+      globalThis._terminalOriginalError(`${this._getTimestamp()}`, ...args);
+    } else {
+      console.error(`${this._getTimestamp()}`, ...args);
+    }
   }
 
   static warn(...args) {
-    originalConsole.warn(`${this._getTimestamp()}`, ...args);
+    if (globalThis._terminalOriginalWarn) {
+      globalThis._terminalOriginalWarn(`${this._getTimestamp()}`, ...args);
+    } else {
+      console.warn(`${this._getTimestamp()}`, ...args);
+    }
   }
 }
 
@@ -29,10 +41,17 @@ class Logger {
 export const originalConsole = {
   log: console.log.bind(console),
   error: console.error.bind(console),
-  warn: console.warn.bind(console)
+  warn: console.warn.bind(console),
 };
 
-// 重写console方法
-console.log = (...args) => Logger.log(...args);
-console.error = (...args) => Logger.error(...args);
-console.warn = (...args) => Logger.warn(...args);
+// 设置全局原始console引用（供TerminalDisplay使用）
+if (!globalThis._terminalOriginalLog) {
+  globalThis._terminalOriginalLog = console.log.bind(console);
+  globalThis._terminalOriginalError = console.error.bind(console);
+  globalThis._terminalOriginalWarn = console.warn.bind(console);
+}
+
+// 不要在这里重写console方法，让TerminalDisplay来处理
+// console.log = (...args) => Logger.log(...args);
+// console.error = (...args) => Logger.error(...args);
+// console.warn = (...args) => Logger.warn(...args);

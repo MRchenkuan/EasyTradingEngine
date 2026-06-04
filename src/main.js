@@ -1,3 +1,7 @@
+import { terminalDisplay } from './utils/TerminalDisplay.js';
+// 立即启动终端显示管理器，在任何日志输出之前
+terminalDisplay.start();
+
 import './utils/logger.js';
 import WebSocket from 'ws';
 import {
