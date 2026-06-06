@@ -184,6 +184,9 @@ function initBusinessWebSocket() {
 // 全局重连尝试计数器
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10; // 最大重连尝试次数
+const BACKOFF_BASE = 5000; // 基础重试间隔（毫秒）
+const BACKOFF_MULTIPLIER = 1.5; // 指数退避乘数
+const MAX_BACKOFF = 60000; // 最大重试间隔（毫秒）
 
 async function handleWebSocketClose(code, reason) {
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
@@ -193,14 +196,26 @@ async function handleWebSocketClose(code, reason) {
   VisualEngine.stop();
 
   reconnectAttempts++;
+
+  // 计算重试间隔（指数退避）
+  const backoffTime = Math.min(
+    BACKOFF_BASE * Math.pow(BACKOFF_MULTIPLIER, reconnectAttempts - 1),
+    MAX_BACKOFF
+  );
+
   if (reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
-    console.error(`达到最大重连尝试次数 (${MAX_RECONNECT_ATTEMPTS})，程序将退出。`);
-    process.exit(1); // 退出程序，可能需要外部进程管理器来重启
+    console.warn(`达到最大重连尝试次数 (${MAX_RECONNECT_ATTEMPTS})，进入长期等待模式...`);
+    console.warn(`将每 ${MAX_BACKOFF / 1000} 秒尝试一次重新连接`);
   }
 
-  // 等待5秒后重新初始化
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  console.log(`正在尝试重新连接... (第 ${reconnectAttempts} 次尝试)`);
+  // 等待后重新初始化
+  await new Promise(resolve => setTimeout(resolve, backoffTime));
+
+  const attemptInfo =
+    reconnectAttempts > MAX_RECONNECT_ATTEMPTS
+      ? `(持续重连中，累计 ${reconnectAttempts} 次)`
+      : `(第 ${reconnectAttempts} 次尝试)`;
+  console.log(`正在尝试重新连接... ${attemptInfo}`);
 
   try {
     // 重新获取数据

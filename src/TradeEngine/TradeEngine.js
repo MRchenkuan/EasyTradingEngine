@@ -34,7 +34,7 @@ export class TradeEngine {
   static _max_candle_size = 3000;
   static _instrument_timers = {}; // 存储每个品种的定时器
   static _position_timers = {}; // 存储每个品种的定时器
-  static _position_refresh_interval = 5000; // 存储每个品种的持仓刷新间隔
+  static _position_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔（30秒）
   static _instrument_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔
   static _instrument_info = {}; // 存储品种信息
   static _interest_history = {}; // 存储品种历史数据
@@ -812,18 +812,23 @@ export class TradeEngine {
 
     const updatePositions = async () => {
       try {
-        const { data: positions } = await getPositions(assetName);
-        if (positions.length) {
-          this._position_list[assetName] = {
-            ...this._position_list[assetName],
-            ...positions[0],
-            lastUpdateTime: Date.now(),
-          };
-        } else {
-          this._position_list[assetName] = null;
+        const { data: positions, success } = await getPositions(assetName);
+        // 只有在 API 调用成功时才更新持仓信息
+        if (success === true) {
+          if (positions.length) {
+            this._position_list[assetName] = {
+              ...this._position_list[assetName],
+              ...positions[0],
+              lastUpdateTime: Date.now(),
+            };
+          } else {
+            // API 调用成功但没有数据，表示确实没有持仓
+            this._position_list[assetName] = null;
+          }
         }
       } catch (e) {
-        console.log(e);
+        // API 调用失败，保持原有持仓信息不变
+        console.log(`获取个人持仓信息失败: ${e.message}`);
       } finally {
         // 设置定时器
         this._position_timers[assetName] = setTimeout(

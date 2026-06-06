@@ -345,12 +345,12 @@ export async function getPositions(instId, instType, posId) {
     }
     if (!data.data || !data.data.length) {
       console.warn(`未获取到持仓信息: ${instId}`);
-      return { data: [] };
+      return { data: [], success: true };
     }
-    return data;
+    return { ...data, success: true };
   } catch (error) {
     console.error('获取交易品种个人持仓信息失败:', error.response?.data || error.message);
-    return { data: [] };
+    throw error;
   }
 }
 

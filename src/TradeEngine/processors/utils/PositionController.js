@@ -100,7 +100,7 @@ export class PositionController {
       return PositionRiskLevel.HIGHT;
     }
 
-    return StopLossLevel.NORMAL;
+    return PositionRiskLevel.NORMAL;
   }
 
   /**
@@ -131,7 +131,7 @@ export class PositionController {
       return PositionRiskLevel.NOTICE;
     }
 
-    return StopLossLevel.NORMAL;
+    return PositionRiskLevel.NORMAL;
   }
 
   /**

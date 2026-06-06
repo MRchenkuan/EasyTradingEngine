@@ -390,15 +390,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._threshold = threshold;
       this._snapshot = snapshot;
 
-      // 立即更新终端显示
-      terminalDisplay.updateAsset(this.asset_name, indicators);
-
-      // 趋势和方向一致时不交易
-      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
-        return;
-      }
-
+      // 计算止损等级和阈值调整信息
       const {
         gridCount: adjustedGridCount,
         tradeCount: adjustedTradeCount,
@@ -414,11 +406,19 @@ export class GridTradingProcessor extends AbstractProcessor {
         this._last_close_grid_span
       );
       this._position_risk_level = positionRiskLevel;
-      console.log(
-        `- [${this.asset_name}] 当前止损等级：${positionRiskLevel}，阈值调整：${(100 * this._threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`
-      );
-
       this._threshold = adjustedThreshold;
+      // 立即更新终端显示（包含止损等级和阈值调整信息）
+      terminalDisplay.updateAsset(this.asset_name, {
+        ...indicators,
+        stopLossLevel: positionRiskLevel,
+        thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
+      });
+
+      // 趋势和方向一致时不交易
+      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        return;
+      }
 
       const { shouldTrade } = TradeFreqController({
         asset_name: this.asset_name,
@@ -437,17 +437,10 @@ export class GridTradingProcessor extends AbstractProcessor {
       const is_return_arrived = Math.abs(correction) > this._threshold;
       // 回撤/反弹条件是否满足
       if (!is_return_arrived) {
-        console.log(
-          `- [${this.asset_name}] 回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，🐢继续等待...\n`
-        );
         return;
       }
 
       if (Math.abs(adjustedGridCount) >= 1) {
-        console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
-        );
-
         // 更新连续同类交易的网格距离
         this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
 
@@ -465,11 +458,6 @@ export class GridTradingProcessor extends AbstractProcessor {
         grid_span_abs > this._last_close_grid_span &&
         position_action === PositionAction.CLOSE
       ) {
-        // 正常满足条件下单
-        console.log(
-          `[${this.asset_name}]${this._current_price} 价格穿越了 ${gridCount} 个网格，回撤门限: ${(this._threshold * 100).toFixed(2)}%，当前价差 ${grid_span_abs.toFixed(2)} 格，当前回调幅度: ${(correction * 100).toFixed(2)}%，触发策略`
-        );
-
         this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
 
         if (this._tendency > 0) {
