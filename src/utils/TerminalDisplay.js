@@ -311,7 +311,8 @@ export class TerminalDisplay extends EventEmitter {
 
       const output = [];
 
-      const header = `交易监控面板 | 资产数: ${assets.length} | 当前: ${currentPage + 1}/${totalPages} | 按 ←→ 翻页 | ESC 退出`;
+      const currentTime = new Date().toLocaleTimeString();
+      const header = `交易监控面板 | 资产数: ${assets.length} | 当前: ${currentPage + 1}/${totalPages} | ${currentTime} | 按 ←→ 翻页 | ESC 退出`;
       output.push(this.padLine(header, terminalWidth));
       output.push('─'.repeat(terminalWidth));
 
@@ -331,10 +332,6 @@ export class TerminalDisplay extends EventEmitter {
         output.push(...boxLines);
       }
 
-      output.push(' '.repeat(terminalWidth));
-
-      const lastUpdateLine = '最后更新: ' + new Date().toLocaleTimeString();
-      output.push(this.padLine(lastUpdateLine, terminalWidth));
       output.push(' '.repeat(terminalWidth));
 
       const logHeader = '日志信息:';
