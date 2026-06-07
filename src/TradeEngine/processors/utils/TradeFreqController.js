@@ -21,6 +21,15 @@ export function TradeFreqController(params) {
     [PositionAction.CLOSE]: last_close_grid_span > 0,
   }[position_action];
 
+  const {
+    ISOLATE_HIGHT,
+    ISOLATE_EMERGENCY,
+    DUAL_EMERGENCY,
+    DUAL_HIGH,
+    CROSS_HIGH,
+    CROSS_EMERGENCY,
+  } = PositionCompositeRiskLevel;
+
   const args = {
     isSerialTrade,
     isOverThrottleResetTime: time_since_last_trade > throttleResetTime,
@@ -73,15 +82,6 @@ export function TradeFreqController(params) {
       ...args,
     };
   }
-
-  const {
-    ISOLATE_HIGHT,
-    ISOLATE_EMERGENCY,
-    DUAL_EMERGENCY,
-    DUAL_HIGH,
-    CROSS_HIGH,
-    CROSS_EMERGENCY,
-  } = PositionCompositeRiskLevel;
 
   // 对于平仓，根据风险设定节流距离
   if (position_action === PositionAction.CLOSE) {
