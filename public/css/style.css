@@ -108,6 +108,7 @@ body {
   background: #0d1117;
   border-radius: 4px;
   font-size: 12px;
+  position: relative;
 }
 
 .metric-item.span-2 {
@@ -246,6 +247,69 @@ body {
   text-align: center;
   color: #8b949e;
   padding: 40px;
+}
+
+.metric-trade-allow {
+  color: #3fb950;
+  font-weight: bold;
+}
+
+.metric-value.metric-trade-forbid {
+  color: #f85149;
+  font-weight: bold;
+  cursor: help;
+}
+
+.metric-item:has(.metric-trade-forbid) .trade-forbid-tooltip {
+  display: none;
+}
+
+.metric-item:has(.metric-trade-forbid):hover .trade-forbid-tooltip {
+  display: block;
+}
+
+.trade-forbid-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: #c9d1d9;
+  white-space: nowrap;
+  z-index: 1000;
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.trade-forbid-tooltip .tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 0;
+}
+
+.trade-forbid-tooltip .tooltip-label {
+  color: #8b949e;
+}
+
+.trade-forbid-tooltip .tooltip-value {
+  color: #f85149;
+}
+
+.trade-forbid-tooltip .tooltip-value.pass {
+  color: #3fb950;
+}
+
+.trade-forbid-tooltip .tooltip-title {
+  font-weight: bold;
+  color: #f85149;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #30363d;
 }
 
 .page-info {

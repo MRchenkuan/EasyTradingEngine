@@ -30,19 +30,28 @@ export function TradeFreqController(params) {
     CROSS_EMERGENCY,
   } = PositionCompositeRiskLevel;
 
+  const lastTradeGridSpan = {
+    [PositionAction.OPEN]: last_open_grid_span,
+    [PositionAction.CLOSE]: last_close_grid_span,
+  }[position_action];
+
   const args = {
-    isSerialTrade,
+    isNotSerialTrade: !isSerialTrade,
     isOverThrottleResetTime: time_since_last_trade > throttleResetTime,
     isOverThrottleDistance: grid_span_abs > maxThrottleDistance,
+    isOpen: position_action === PositionAction.OPEN,
+    isClose: position_action === PositionAction.CLOSE,
     isCloseEmergencyRiskWithoutThrottle:
       position_action === PositionAction.CLOSE &&
       [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level),
+
     isCloseHighRiskWithThrottle:
       position_action === PositionAction.CLOSE &&
       [ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level),
     isCloseLowRiskWithThrottle:
       position_action === PositionAction.CLOSE && grid_span_abs < 1 + lastTradeGridSpan * 1.25,
-    isOpenEmergencyRiskWithoutThrottle:
+
+    isOpenEmergencyRiskThrottle:
       position_action === PositionAction.OPEN &&
       [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level) &&
       grid_span_abs < 1 + lastTradeGridSpan * 2,
@@ -61,11 +70,6 @@ export function TradeFreqController(params) {
       ...args,
     };
   }
-
-  const lastTradeGridSpan = {
-    [PositionAction.OPEN]: last_open_grid_span,
-    [PositionAction.CLOSE]: last_close_grid_span,
-  }[position_action];
 
   // 开仓/平仓距离超过最大节流时间不节流
   if (time_since_last_trade > throttleResetTime) {

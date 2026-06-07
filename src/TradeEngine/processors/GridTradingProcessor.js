@@ -411,20 +411,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       );
       this._position_risk_level = positionRiskLevel;
       this._threshold = adjustedThreshold;
-      // 立即更新监控显示（包含止损等级和阈值调整信息）
-      monitorServer.updateAsset(this.asset_name, {
-        ...indicators,
-        stopLossLevel: positionRiskLevel,
-        thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
-        chartData: this._getChartData(),
-      });
 
-      // 趋势和方向一致时不交易
-      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
-        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
-        return;
-      }
-
+      // 计算交易频率控制
       const { shouldTrade, ...frq_rest } = TradeFreqController({
         asset_name: this.asset_name,
         last_open_grid_span: this._last_open_grid_span,
@@ -434,6 +422,22 @@ export class GridTradingProcessor extends AbstractProcessor {
         time_since_last_trade: now - this._last_trade_price_ts,
         risk_level: this._position_risk_level,
       });
+
+      // 立即更新监控显示（包含止损等级、阈值调整信息和交易状态）
+      monitorServer.updateAsset(this.asset_name, {
+        ...indicators,
+        stopLossLevel: positionRiskLevel,
+        thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
+        chartData: this._getChartData(),
+        shouldTrade: shouldTrade,
+        frq_rest: shouldTrade ? null : frq_rest,
+      });
+
+      // 趋势和方向一致时不交易
+      if (this._tendency == 0 || this._direction / this._tendency >= 0) {
+        // console.log(`[${this.asset_name}]价格趋势与方向一致，不进行交易`);
+        return;
+      }
 
       if (!shouldTrade) {
         return;

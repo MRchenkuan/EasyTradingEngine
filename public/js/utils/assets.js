@@ -6,6 +6,51 @@ window.TradingApp.Assets = {
     return lastCandles.map(c => c.ts).join(',');
   },
 
+  _buildTradeForbidTooltip: function (frq_rest) {
+    if (!frq_rest) return '';
+
+    const items = [];
+
+    // 通用条件
+    items.push({ label: '非连续交易', value: !frq_rest.isNotSerialTrade });
+    items.push({ label: '超重置时间', value: !frq_rest.isOverThrottleResetTime });
+    items.push({ label: '超节流距离', value: !frq_rest.isOverThrottleDistance });
+
+    if (frq_rest.isOpen) {
+      // 开仓相关
+      items.push({ label: '开仓-紧急风险-高度节流', value: !frq_rest.isOpenEmergencyRiskThrottle });
+      items.push({ label: '开仓-高风险-中度节流', value: !frq_rest.isOpenHighRiskWithThrottle });
+      items.push({ label: '开仓-低风险-低度节流', value: !frq_rest.isOpenLowRiskWithThrottle });
+    }
+
+    if (frq_rest.isClose) {
+      // 平仓相关
+      items.push({
+        label: '平仓避险',
+        value: frq_rest.isCloseEmergencyRiskWithoutThrottle,
+      });
+      items.push({ label: '平仓-高风险-低度节流', value: !frq_rest.isCloseHighRiskWithThrottle });
+      items.push({ label: '平仓-低风险-中度节流', value: !frq_rest.isCloseLowRiskWithThrottle });
+    }
+
+    let html = '<div class="trade-forbid-tooltip">';
+    html += '<div class="tooltip-title">禁止交易原因</div>';
+
+    items.forEach(item => {
+      if (item.value !== undefined) {
+        const statusClass = item.value ? 'tooltip-value' : 'tooltip-value pass';
+        const statusText = item.value ? '❌' : '✓';
+        html += `<div class="tooltip-row">`;
+        html += `<span class="tooltip-label">${item.label}</span>`;
+        html += `<span class="${statusClass}">${statusText}</span>`;
+        html += `</div>`;
+      }
+    });
+
+    html += '</div>';
+    return html;
+  },
+
   renderAssetCard: function (assetName, assetData) {
     if (!assetData) {
       return `<div class="asset-card" data-asset="${assetName}"><div class="asset-title">${assetName}</div><div class="no-data">暂无数据</div></div>`;
@@ -22,10 +67,12 @@ window.TradingApp.Assets = {
 
     metrics.forEach(metric => {
       const spanClass = metric.span === 2 ? 'metric-item span-2' : 'metric-item';
+      const valueClass = metric.className ? `metric-value ${metric.className}` : 'metric-value';
+      const tooltipHtml = metric.tooltip || '';
       html += `
         <div class="${spanClass}">
           <span class="metric-label">${metric.label}</span>
-          <span class="metric-value">${metric.value}</span>
+          <span class="${valueClass}">${metric.value}</span>${tooltipHtml}
         </div>
       `;
     });
@@ -99,6 +146,14 @@ window.TradingApp.Assets = {
       {
         label: '🛡止损等级',
         value: indicators.stopLossLevel !== undefined ? indicators.stopLossLevel : '-',
+        className: 'metric-stop-loss',
+      },
+      {
+        label: '🔔交易状态',
+        value:
+          indicators.shouldTrade !== undefined ? (indicators.shouldTrade ? '允许' : '禁止') : '-',
+        className: indicators.shouldTrade ? 'metric-trade-allow' : 'metric-trade-forbid',
+        tooltip: indicators.shouldTrade ? null : this._buildTradeForbidTooltip(indicators.frq_rest),
       },
     ];
   },
