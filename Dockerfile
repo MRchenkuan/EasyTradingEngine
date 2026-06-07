@@ -56,6 +56,7 @@ COPY --from=builder /app/config.js ./
 COPY --from=builder /app/config.security.js ./
 COPY --from=builder /app/config.security.mimic.js ./
 COPY --from=builder /app/transform.js ./
+COPY --from=builder /app/public ./public
 
 # 创建必要的目录并设置权限
 RUN mkdir -p /app/records /app/chart/grid && \
@@ -64,6 +65,6 @@ RUN mkdir -p /app/records /app/chart/grid && \
 # 更新字体缓存
 RUN fc-cache -fv
 
-EXPOSE 3000
+EXPOSE 8080
 
 CMD ["pm2-runtime", "start", "src/main.js", "--name", "okx-trading"]

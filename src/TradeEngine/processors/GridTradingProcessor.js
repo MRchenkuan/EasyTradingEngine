@@ -13,7 +13,11 @@ import {
 import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
 import { TradeFreqController } from './utils/TradeFreqController.js';
-import { terminalDisplay } from '../../utils/TerminalDisplay.js';
+import { monitorServer } from '../../server.js';
+import { getGridTradeOrders } from '../../recordTools.js';
+import { formatTimestamp } from '../../tools.js';
+import { VisualEngine } from '../VisualEngine.js';
+
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
   engine = null;
@@ -407,11 +411,12 @@ export class GridTradingProcessor extends AbstractProcessor {
       );
       this._position_risk_level = positionRiskLevel;
       this._threshold = adjustedThreshold;
-      // 立即更新终端显示（包含止损等级和阈值调整信息）
-      terminalDisplay.updateAsset(this.asset_name, {
+      // 立即更新监控显示（包含止损等级和阈值调整信息）
+      monitorServer.updateAsset(this.asset_name, {
         ...indicators,
         stopLossLevel: positionRiskLevel,
         thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
+        chartData: this._getChartData(),
       });
 
       // 趋势和方向一致时不交易
@@ -746,5 +751,92 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._prev_price = price; // 重置前一价格
     this._prev_price_ts = ts;
     // 交易成功后重置标记，允许下一轮首次突破重置
+  }
+
+  /**
+   * 获取图表数据
+   * @returns {Object} 图表数据
+   */
+  _getChartData() {
+    const MAX_CANDLE = 200; // 限制K线数量
+    const candle_data = (this.engine.getCandleData(this.asset_name) || [])
+      .map(it => ({
+        open: parseFloat(it.open),
+        close: parseFloat(it.close),
+        low: parseFloat(it.low),
+        high: parseFloat(it.high),
+        vol: parseFloat(it.vol),
+        ts: parseInt(it.ts),
+      }))
+      .slice(-MAX_CANDLE);
+
+    const { ts } = this.engine.getMarketData(this.asset_name) || {};
+    const labels = ts?.map(it => formatTimestamp(it, this.engine._bar_type)).slice(-MAX_CANDLE);
+
+    let bollData = null;
+    try {
+      const boll = VisualEngine.getBOLL(this.asset_name);
+      if (boll) {
+        bollData = {
+          upper: boll.upperArray.slice(-MAX_CANDLE),
+          middle: boll.middleArray.slice(-MAX_CANDLE),
+          lower: boll.lowerArray.slice(-MAX_CANDLE),
+        };
+      }
+    } catch (e) {
+      console.warn(`获取布林带数据失败: ${e.message}`);
+    }
+
+    const {
+      distribution: chip_distribution,
+      max_volume,
+      step: chip_step,
+    } = this.engine.getChipDistribution(this.asset_name);
+
+    const chipData = chip_distribution?.map(it => ({
+      price: it.price,
+      volume: it.volume,
+    }));
+
+    const orders = getGridTradeOrders(this.asset_name)
+      .filter(order => order.order_status === 'confirmed')
+      .slice(-20) // 只取最近20个订单
+      .map(order => ({
+        ts: order.ts,
+        avgPx: parseFloat(order.avgPx),
+        accFillSz: parseFloat(order.accFillSz),
+        side: order.side,
+        grid_count: order.grid_count,
+        order_status: order.order_status,
+      }));
+
+    const position = this.engine.getPositionList(this.asset_name);
+
+    return {
+      candleData: candle_data,
+      labels: labels,
+      boll: bollData,
+      chipDistribution: chipData,
+      chipMaxVolume: max_volume,
+      chipStep: chip_step,
+      orders: orders,
+      position: position,
+      gridParams: {
+        grid_base_price: this._grid_base_price,
+        grid_base_price_ts: this._grid_base_price_ts,
+        last_lower_turning_price: this._last_lower_turning_price,
+        last_lower_turning_price_ts: this._last_lower_turning_price_ts,
+        last_upper_turning_price: this._last_upper_turning_price,
+        last_upper_turning_price_ts: this._last_upper_turning_price_ts,
+        current_price: this._current_price,
+        current_price_ts: this._current_price_ts,
+        last_trade_price: this._last_trade_price,
+        last_trade_price_ts: this._last_trade_price_ts,
+        tendency: this._tendency,
+        direction: this._direction,
+        threshold: this._threshold,
+        grid_width: this._grid_width,
+      },
+    };
   }
 }
