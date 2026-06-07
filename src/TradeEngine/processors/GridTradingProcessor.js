@@ -155,7 +155,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
   _correction() {
     // 计算回撤范围
-    if (this._direction > 0 && this._last_lower_turning_price) {
+    if (this._tendency < 0 && this._last_lower_turning_price) {
       // 趋势向上，计算反弹范围
       // 防止除以0或者拐点价格无效
       if (this._last_lower_turning_price <= 0) {
@@ -166,7 +166,7 @@ export class GridTradingProcessor extends AbstractProcessor {
       );
     }
 
-    if (this._direction < 0 && this._last_upper_turning_price) {
+    if (this._tendency > 0 && this._last_upper_turning_price) {
       // 趋势向下，计算回撤范围
       // 防止除以0或者拐点价格无效
       if (this._last_upper_turning_price <= 0) {
@@ -425,7 +425,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         return;
       }
 
-      const { shouldTrade } = TradeFreqController({
+      const { shouldTrade, ...frq_rest } = TradeFreqController({
         asset_name: this.asset_name,
         last_open_grid_span: this._last_open_grid_span,
         last_close_grid_span: this._last_close_grid_span,

@@ -11,7 +11,6 @@ export function TradeFreqController(params) {
     risk_level,
   } = params;
 
-
   // 节流重置时间
   const throttleResetTime = 420 * 60 * 1000;
   // 最大节流距离
@@ -22,10 +21,35 @@ export function TradeFreqController(params) {
     [PositionAction.CLOSE]: last_close_grid_span > 0,
   }[position_action];
 
+  const args = {
+    isSerialTrade,
+    isOverThrottleResetTime: time_since_last_trade > throttleResetTime,
+    isOverThrottleDistance: grid_span_abs > maxThrottleDistance,
+    isCloseEmergencyRiskWithoutThrottle:
+      position_action === PositionAction.CLOSE &&
+      [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level),
+    isCloseHighRiskWithThrottle:
+      position_action === PositionAction.CLOSE &&
+      [ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level),
+    isCloseLowRiskWithThrottle:
+      position_action === PositionAction.CLOSE && grid_span_abs < 1 + lastTradeGridSpan * 1.25,
+    isOpenEmergencyRiskWithoutThrottle:
+      position_action === PositionAction.OPEN &&
+      [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level) &&
+      grid_span_abs < 1 + lastTradeGridSpan * 2,
+    isOpenHighRiskWithThrottle:
+      position_action === PositionAction.OPEN &&
+      [ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level) &&
+      grid_span_abs < 1 + lastTradeGridSpan * 1.5,
+    isOpenLowRiskWithThrottle:
+      position_action === PositionAction.OPEN && grid_span_abs < 1 + lastTradeGridSpan * 1.25,
+  };
+
   // 非连续交易不节流
   if (!isSerialTrade) {
     return {
       shouldTrade: true,
+      ...args,
     };
   }
 
@@ -38,32 +62,42 @@ export function TradeFreqController(params) {
   if (time_since_last_trade > throttleResetTime) {
     return {
       shouldTrade: true,
+      ...args,
     };
   }
 
   // 开仓/平仓距离超过最大节流距离不节流
-  if(grid_span_abs> maxThrottleDistance){
+  if (grid_span_abs > maxThrottleDistance) {
     return {
       shouldTrade: true,
+      ...args,
     };
   }
 
-
-  const { ISOLATE_HIGHT, ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH, CROSS_HIGH, CROSS_EMERGENCY } = PositionCompositeRiskLevel;
+  const {
+    ISOLATE_HIGHT,
+    ISOLATE_EMERGENCY,
+    DUAL_EMERGENCY,
+    DUAL_HIGH,
+    CROSS_HIGH,
+    CROSS_EMERGENCY,
+  } = PositionCompositeRiskLevel;
 
   // 对于平仓，根据风险设定节流距离
-  if(position_action === PositionAction.CLOSE){
+  if (position_action === PositionAction.CLOSE) {
     // 1 在紧急状况下，不节流
-    if([ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level)){
+    if ([ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level)) {
       return {
         shouldTrade: true,
+        ...args,
       };
     }
     // 2 在高风险下，有限节流
-    if([ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level)){
+    if ([ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level)) {
       if (grid_span_abs < 1 + lastTradeGridSpan) {
         return {
           shouldTrade: false,
+          ...args,
         };
       }
     }
@@ -71,25 +105,28 @@ export function TradeFreqController(params) {
     if (grid_span_abs < 1 + lastTradeGridSpan * 1.25) {
       return {
         shouldTrade: false,
+        ...args,
       };
     }
   }
 
   // 对于开仓，根据风险设定节流距离
-  if(position_action === PositionAction.OPEN){
+  if (position_action === PositionAction.OPEN) {
     // 1 在紧急状况下，高度节流
-    if([ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level)){
+    if ([ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH].includes(risk_level)) {
       if (grid_span_abs < 1 + lastTradeGridSpan * 2) {
         return {
           shouldTrade: false,
+          ...args,
         };
       }
     }
     // 2 在高风险下，强化节流
-    if([ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level)){
+    if ([ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY].includes(risk_level)) {
       if (grid_span_abs < 1 + lastTradeGridSpan * 1.5) {
         return {
           shouldTrade: false,
+          ...args,
         };
       }
     }
@@ -97,6 +134,7 @@ export function TradeFreqController(params) {
     if (grid_span_abs < 1 + lastTradeGridSpan * 1.25) {
       return {
         shouldTrade: false,
+        ...args,
       };
     }
   }
@@ -104,5 +142,6 @@ export function TradeFreqController(params) {
   // 兜底
   return {
     shouldTrade: true,
+    ...args,
   };
 }

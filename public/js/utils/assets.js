@@ -139,9 +139,12 @@ window.TradingApp.Assets = {
         indicators.final_threshold !== undefined ? indicators.final_threshold * 100 : initial;
       const current = indicators.diff_rate !== undefined ? Math.abs(indicators.diff_rate * 100) : 0;
 
-      // 计算百分比（以初始阈值为100%）
-      const finalPercent = initial > 0 ? (final / initial) * 100 : 0;
-      const currentPercent = final > 0 ? Math.min((current / final) * 100, 100) : 0;
+      // 计算百分比
+      // 初始 = 100%（固定）
+      // 最终 = 如果 final >= initial 则100%，否则 (final/initial)*100%
+      // 当前 = (current/final)*100%，最大100%
+      const finalPercent = final >= initial ? 100 : (final / initial) * 100;
+      const currentPercent = Math.min((current / final) * 100, 100);
 
       html += '<div class="threshold-bar">';
       html += '<div class="threshold-bar-track">';
@@ -149,8 +152,8 @@ window.TradingApp.Assets = {
       html += `<div class="threshold-bar-fill threshold-bar-current" style="width: ${currentPercent}%;" data-key="current-fill"></div>`;
       html += '</div>';
       html += '<div class="threshold-bar-labels">';
-      html += `<span>初始回撤 ${initial.toFixed(2)}%</span>`;
-      html += `<span>最终回撤 ${final.toFixed(2)}%</span>`;
+      html += `<span>初始阈值 ${initial.toFixed(2)}%</span>`;
+      html += `<span>最终阈值 ${final.toFixed(2)}%</span>`;
       html += `<span>当前回撤 ${current.toFixed(2)}%</span>`;
       html += '</div>';
       html += '</div>';
@@ -192,9 +195,12 @@ window.TradingApp.Assets = {
         indicators.final_threshold !== undefined ? indicators.final_threshold * 100 : initial;
       const current = indicators.diff_rate !== undefined ? Math.abs(indicators.diff_rate * 100) : 0;
 
-      // 计算百分比（以初始阈值为100%）
-      const finalPercent = initial > 0 ? (final / initial) * 100 : 0;
-      const currentPercent = final > 0 ? Math.min((current / final) * 100, 100) : 0;
+      // 计算百分比
+      // 初始 = 100%（固定）
+      // 最终 = 如果 final >= initial 则100%，否则 (final/initial)*100%
+      // 当前 = (current/final)*100%，最大100%
+      const finalPercent = final >= initial ? 100 : (final / initial) * 100;
+      const currentPercent = Math.min((current / final) * 100, 100);
 
       // 更新进度条宽度
       const finalFill = card.querySelector('[data-key="final-fill"]');
@@ -207,8 +213,8 @@ window.TradingApp.Assets = {
       const labels = card.querySelector('.threshold-bar-labels');
       if (labels) {
         const spans = labels.querySelectorAll('span');
-        if (spans[0]) spans[0].textContent = `初始回撤 ${initial.toFixed(2)}%`;
-        if (spans[1]) spans[1].textContent = `最终回撤 ${final.toFixed(2)}%`;
+        if (spans[0]) spans[0].textContent = `初始阈值 ${initial.toFixed(2)}%`;
+        if (spans[1]) spans[1].textContent = `最终阈值 ${final.toFixed(2)}%`;
         if (spans[2]) spans[2].textContent = `当前回撤 ${current.toFixed(2)}%`;
       }
     }
