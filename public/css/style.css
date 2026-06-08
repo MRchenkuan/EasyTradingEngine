@@ -86,12 +86,23 @@ body {
 }
 
 .asset-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 16px;
   font-weight: bold;
-  color: #f0883e;
   margin-bottom: 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid #30363d;
+}
+
+.asset-name {
+  color: #f0883e;
+}
+
+.asset-price {
+  color: #58a6ff;
+  font-size: 18px;
 }
 
 .metrics-grid {

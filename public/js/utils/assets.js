@@ -53,13 +53,18 @@ window.TradingApp.Assets = {
 
   renderAssetCard: function (assetName, assetData) {
     if (!assetData) {
-      return `<div class="asset-card" data-asset="${assetName}"><div class="asset-title">${assetName}</div><div class="no-data">暂无数据</div></div>`;
+      return `<div class="asset-card" data-asset="${assetName}"><div class="asset-title"><span class="asset-name">${assetName}</span><span class="asset-price">-</span></div><div class="no-data">暂无数据</div></div>`;
     }
 
     const indicators = assetData.indicators || assetData;
+    const price = indicators.price !== undefined ? parseFloat(indicators.price.toFixed(3)) : '-';
+
     let html = `
       <div class="asset-card" data-asset="${assetName}">
-        <div class="asset-title">${assetName}</div>
+        <div class="asset-title">
+          <span class="asset-name">${assetName}</span>
+          <span class="asset-price" data-price="${price}">${price}</span>
+        </div>
         <div class="metrics-grid">
     `;
 
@@ -100,8 +105,9 @@ window.TradingApp.Assets = {
 
     return [
       {
-        label: '💰价格',
-        value: indicators.price !== undefined ? parseFloat(indicators.price.toFixed(3)) : '-',
+        label: '📈ATR(6/22/120)',
+        value: `${atr6}/${atr22}/${atr120}`,
+        span: 2,
       },
       {
         label: '📏价距格数',
@@ -120,17 +126,13 @@ window.TradingApp.Assets = {
             : '-',
       },
       {
-        label: '📈ATR(6/22/120)',
-        value: `${atr6}/${atr22}/${atr120}`,
-        span: 2,
-      },
-      {
         label: '🔶布林带宽',
         value:
           indicators.boll_bandwidth !== undefined
             ? (indicators.boll_bandwidth * 100).toFixed(2) + '%'
             : '-',
       },
+
       {
         label: '🔋量能因子',
         value:
@@ -224,6 +226,16 @@ window.TradingApp.Assets = {
 
     const indicators = assetData.indicators || assetData;
     const metrics = this.buildMetrics(indicators);
+
+    // 更新标题中的价格
+    if (indicators.price !== undefined) {
+      const priceEl = card.querySelector('.asset-price');
+      if (priceEl) {
+        const price = parseFloat(indicators.price.toFixed(3));
+        priceEl.textContent = price;
+        priceEl.dataset.price = price;
+      }
+    }
 
     const metricItems = card.querySelectorAll('.metric-item');
     metricItems.forEach(item => {

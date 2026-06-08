@@ -9,6 +9,7 @@ records/
 .tar
 okx-trading.tar.zip
 okx-trading.tar
+.env
 
 # 忽略所有记录文件
 /records/*

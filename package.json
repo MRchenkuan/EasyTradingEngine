@@ -62,6 +62,7 @@
     "canvas": "^3.1.0",
     "chartjs-node-canvas": "^5.0.0",
     "crypto": "^1.0.1",
+    "dotenv": "^16.6.1",
     "events": "^3.3.0",
     "express": "^4.21.2",
     "mathjs": "^14.2.1",

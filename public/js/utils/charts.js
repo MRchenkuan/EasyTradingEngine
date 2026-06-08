@@ -57,7 +57,7 @@ window.TradingApp.Charts = {
     const priceMin = Math.min(...prices);
     const priceMax = Math.max(...prices);
     const priceRange = priceMax - priceMin;
-    const padding = priceRange * 0.1;
+    const padding = priceRange * 0.15;
     const yMin = priceMin - padding;
     const yMax = priceMax + padding;
 
@@ -152,7 +152,8 @@ window.TradingApp.Charts = {
             type: 'line',
             label: '买入',
             data: buyPointsData,
-            borderColor: 'transparent',
+            borderColor: '#ffffff',
+            borderWidth: 1,
             backgroundColor: '#ec7063',
             pointRadius: 3,
             pointHoverRadius: 5,
@@ -163,7 +164,8 @@ window.TradingApp.Charts = {
             type: 'line',
             label: '卖出',
             data: sellPointsData,
-            borderColor: 'transparent',
+            borderColor: '#ffffff',
+            borderWidth: 1,
             backgroundColor: '#52be80',
             pointRadius: 3,
             pointHoverRadius: 5,
@@ -374,7 +376,7 @@ window.TradingApp.Charts = {
               if (price !== null) {
                 const x = xScale.getPixelForValue(index);
                 const y = yScale.getPixelForValue(price);
-                const labelY = y + 81; // 文字位置
+                const labelY = y + 60; // 文字位置
 
                 // 绘制虚线连接点位和标签
                 ctx.beginPath();
@@ -405,7 +407,7 @@ window.TradingApp.Charts = {
               if (price !== null) {
                 const x = xScale.getPixelForValue(index);
                 const y = yScale.getPixelForValue(price);
-                const labelY = y - 63; // 文字位置
+                const labelY = y - 60; // 文字位置
 
                 // 绘制虚线连接点位和标签
                 ctx.beginPath();

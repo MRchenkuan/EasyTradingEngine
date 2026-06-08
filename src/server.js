@@ -2,8 +2,13 @@ import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+import { config } from 'dotenv';
+
+config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const TOKEN_SALT = process.env.TOKEN_SALT;
 
 export class MonitorServer {
   constructor(port = 8080) {
@@ -19,6 +24,31 @@ export class MonitorServer {
       warn: console.warn.bind(console),
     };
     this.isStarted = false;
+    this.currentToken = this._generateToken();
+    this._scheduleDailyTokenUpdate();
+  }
+
+  _generateToken() {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const input = `${dateStr}-${TOKEN_SALT}`;
+    const hash = crypto.createHash('md5').update(input).digest('hex');
+    return hash.substring(0, 8);
+  }
+
+  _scheduleDailyTokenUpdate() {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    const timeUntilTomorrow = tomorrow - now;
+
+    setTimeout(() => {
+      this.currentToken = this._generateToken();
+      this.originalConsole.log(`访问Token已更新: ${this.currentToken}`);
+      this.originalConsole.log(`新的访问地址: http://localhost:${this.port}/${this.currentToken}`);
+      this._scheduleDailyTokenUpdate();
+    }, timeUntilTomorrow);
   }
 
   start() {
@@ -31,17 +61,42 @@ export class MonitorServer {
   }
 
   setupExpress() {
-    this.app.use(express.static(path.join(__dirname, '../public')));
+    // API token 验证中间件
+    const validateToken = (req, res, next) => {
+      const token = req.query.token || req.headers['x-auth-token'];
+      if (token !== this.currentToken) {
+        return res.status(403).json({ success: false, message: '禁止访问' });
+      }
+      next();
+    };
 
-    this.app.get('/', (req, res) => {
+    this.app.get('/', (_req, res) => {
+      res.status(403).send('禁止访问');
+    });
+
+    this.app.get('/:token', (req, res, next) => {
+      const token = req.params.token;
+
+      const excludedPaths = ['api', 'js', 'css', 'images', 'assets'];
+      if (excludedPaths.includes(token)) {
+        return next();
+      }
+
+      if (token !== this.currentToken) {
+        return res.status(403).send('禁止访问');
+      }
+
       res.sendFile(path.join(__dirname, '../public/index.html'));
     });
 
-    this.app.get('/api/assets', (req, res) => {
+    this.app.use(express.static(path.join(__dirname, '../public')));
+
+    // API 路由需要 token 验证
+    this.app.get('/api/assets', validateToken, (_req, res) => {
       res.json({ success: true, data: Object.keys(this.assetData) });
     });
 
-    this.app.get('/api/assets/:name', (req, res) => {
+    this.app.get('/api/assets/:name', validateToken, (req, res) => {
       const name = req.params.name;
       if (this.assetData[name]) {
         res.json({ success: true, data: this.assetData[name] });
@@ -50,17 +105,38 @@ export class MonitorServer {
       }
     });
 
-    this.app.get('/api/logs', (req, res) => {
+    this.app.get('/api/logs', validateToken, (_req, res) => {
       res.json({ success: true, data: this.logs.slice(-50) });
     });
   }
 
   setupWebSocket() {
     this.server = this.app.listen(this.port, () => {
-      this.originalConsole.log(`监控服务器已启动，访问 http://localhost:${this.port}`);
+      const expiryDate = new Date();
+      expiryDate.setHours(23, 59, 59, 999);
+
+      this.originalConsole.log(
+        `监控服务器已启动，访问 http://localhost:${this.port}/${this.currentToken}`
+      );
+      this.originalConsole.log(
+        `今日访问Token: ${this.currentToken} (有效期至: ${expiryDate.toLocaleString()})`
+      );
     });
 
-    this.wss = new WebSocketServer({ server: this.server });
+    this.wss = new WebSocketServer({
+      server: this.server,
+      verifyClient: (info, callback) => {
+        // 从 URL 参数中获取 token
+        const url = new URL(info.req.url, `http://${info.req.headers.host}`);
+        const token = url.searchParams.get('token');
+
+        if (token !== this.currentToken) {
+          this.originalConsole.log('WebSocket 连接被拒绝: token 无效');
+          return callback(false, 403, '禁止访问');
+        }
+        callback(true);
+      },
+    });
 
     this.wss.on('connection', ws => {
       this.originalConsole.log('新的 WebSocket 连接');
