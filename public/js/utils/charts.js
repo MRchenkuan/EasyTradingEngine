@@ -83,11 +83,40 @@ window.TradingApp.Charts = {
     const orderInfoMap = {}; // 存储买卖点详细信息用于tooltip
 
     if (orders && orders.length > 0) {
+      // 调试：查看 K 线数据的时间戳范围
+
+      
       orders.forEach(order => {
         const orderTs = parseInt(order.ts);
         if (isNaN(orderTs)) return;
         const orderTsMinute = Math.round(orderTs / 60000) * 60000;
-        const orderIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 60000);
+        
+        // 尝试多种匹配方式
+        let orderIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 60000);
+        
+        // 如果精确匹配失败，尝试找最近的K线
+        if (orderIndex === -1) {
+          // 扩大搜索范围到5分钟
+          const wideIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 5 * 60000);
+          if (wideIndex >= 0) {
+            console.log(`Order: ${order.side} ts: ${order.ts} -> found in 5min range at index ${wideIndex}`);
+            orderIndex = wideIndex;
+          } else {
+            // 查找最接近的K线
+            let closestIndex = -1;
+            let minDiff = Infinity;
+            candleData.forEach((d, i) => {
+              const diff = Math.abs(d.ts - orderTsMinute);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = i;
+              }
+            });
+            console.log(`Order: ${order.side} ts: ${order.ts} -> closest candle at index ${closestIndex}, diff: ${minDiff}ms`);
+            orderIndex = closestIndex;
+          }
+        }
+        
         if (orderIndex >= 0) {
           const info = {
             price: order.avgPx,
@@ -104,6 +133,9 @@ window.TradingApp.Charts = {
           }
         }
       });
+      
+      console.log('Buy points:', buyPointsData.filter(p => p !== null).length);
+      console.log('Sell points:', sellPointsData.filter(p => p !== null).length);
     }
 
     this.charts[assetName] = new Chart(ctx, {
