@@ -804,7 +804,15 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     const orders = getGridTradeOrders(this.asset_name)
       .filter(order => order.order_status === 'confirmed')
-      .slice(-20) // 只取最近20个订单
+      .filter(order => {
+        // 只保留在K线时间范围内的订单
+        const orderTs = parseInt(order.ts);
+        const candleTsMin = candle_data[0]?.ts;
+        const candleTsMax = candle_data[candle_data.length - 1]?.ts;
+        return (
+          candleTsMin && candleTsMax && orderTs >= candleTsMin && orderTs <= candleTsMax + 60000
+        );
+      })
       .map(order => ({
         ts: order.ts,
         avgPx: parseFloat(order.avgPx),
@@ -840,6 +848,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         direction: this._direction,
         threshold: this._threshold,
         grid_width: this._grid_width,
+        grid: this._grid,
       },
     };
   }

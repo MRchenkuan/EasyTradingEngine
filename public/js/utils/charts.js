@@ -76,6 +76,7 @@ window.TradingApp.Charts = {
     const bollMiddle = chartData.boll?.middle || [];
     const bollLower = chartData.boll?.lower || [];
     const orders = chartData.orders || [];
+    const gridLines = chartData.gridParams?.grid || [];
 
     // 构建买卖点数据 - 使用与K线相同长度的数组，null表示无买卖点
     const buyPointsData = new Array(candleData.length).fill(null);
@@ -83,40 +84,38 @@ window.TradingApp.Charts = {
     const orderInfoMap = {}; // 存储买卖点详细信息用于tooltip
 
     if (orders && orders.length > 0) {
-      // 调试：查看 K 线数据的时间戳范围
-
-      
       orders.forEach(order => {
         const orderTs = parseInt(order.ts);
         if (isNaN(orderTs)) return;
         const orderTsMinute = Math.round(orderTs / 60000) * 60000;
-        
-        // 尝试多种匹配方式
+
+        // 订单时间不在K线范围内，跳过
+        if (
+          orderTsMinute < candleData[0].ts ||
+          orderTsMinute > candleData[candleData.length - 1].ts + 60000
+        )
+          return;
+
+        // 尝试精确匹配（1分钟内）
         let orderIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 60000);
-        
-        // 如果精确匹配失败，尝试找最近的K线
+
+        // 如果精确匹配失败，找最接近的K线（仅在范围内）
         if (orderIndex === -1) {
-          // 扩大搜索范围到5分钟
-          const wideIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 5 * 60000);
-          if (wideIndex >= 0) {
-            console.log(`Order: ${order.side} ts: ${order.ts} -> found in 5min range at index ${wideIndex}`);
-            orderIndex = wideIndex;
-          } else {
-            // 查找最接近的K线
-            let closestIndex = -1;
-            let minDiff = Infinity;
-            candleData.forEach((d, i) => {
-              const diff = Math.abs(d.ts - orderTsMinute);
-              if (diff < minDiff) {
-                minDiff = diff;
-                closestIndex = i;
-              }
-            });
-            console.log(`Order: ${order.side} ts: ${order.ts} -> closest candle at index ${closestIndex}, diff: ${minDiff}ms`);
+          let closestIndex = -1;
+          let minDiff = Infinity;
+          candleData.forEach((d, i) => {
+            const diff = Math.abs(d.ts - orderTsMinute);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestIndex = i;
+            }
+          });
+          // 只接受5分钟内的匹配
+          if (minDiff <= 5 * 60000) {
             orderIndex = closestIndex;
           }
         }
-        
+
         if (orderIndex >= 0) {
           const info = {
             price: order.avgPx,
@@ -133,9 +132,6 @@ window.TradingApp.Charts = {
           }
         }
       });
-      
-      console.log('Buy points:', buyPointsData.filter(p => p !== null).length);
-      console.log('Sell points:', sellPointsData.filter(p => p !== null).length);
     }
 
     this.charts[assetName] = new Chart(ctx, {
@@ -339,7 +335,7 @@ window.TradingApp.Charts = {
             min: yMin,
             max: yMax,
             beginAtZero: false,
-            grid: { color: 'rgba(48, 54, 61, 0.5)' },
+            grid: { display: false },
             ticks: {
               font: { size: 9 },
               maxTicksLimit: 6,
@@ -382,6 +378,25 @@ window.TradingApp.Charts = {
               ctx.fillStyle = color;
               ctx.fillRect(xCenter - halfWidth, bodyTop, barWidthPx, bodyBottom - bodyTop);
             });
+
+            // 绘制网格水平线
+            if (gridLines.length > 0) {
+              const chartArea = chart.chartArea;
+              gridLines.forEach(gridPrice => {
+                const y = yScale.getPixelForValue(gridPrice);
+                // 只绘制在图表可见区域内的网格线
+                if (y >= chartArea.top && y <= chartArea.bottom) {
+                  ctx.beginPath();
+                  ctx.setLineDash([4, 4]);
+                  ctx.strokeStyle = 'rgba(100, 149, 237, 0.3)';
+                  ctx.lineWidth = 0.5;
+                  ctx.moveTo(chartArea.left, y);
+                  ctx.lineTo(chartArea.right, y);
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+                }
+              });
+            }
 
             // 绘制买卖点文字标识 B/S（带圆角方框和虚线）
             ctx.font = 'bold 10px Arial';
