@@ -1,51 +1,88 @@
 window.TradingApp = window.TradingApp || {};
 window.TradingApp.Assets = {
+  // 格式化价距格数：██=1格，最多显示5格
+  _formatGridCount: function (count) {
+    if (count === 0) return '0';
+    const abs = Math.abs(count);
+    const sign = count < 0 ? '-' : '';
+    const maxDisplay = 5;
+    const display = Math.min(abs, maxDisplay);
+    const blocks = '█'.repeat(display * 2);
+    const overflow = abs > maxDisplay ? `+${abs - maxDisplay}` : '';
+    return `${sign}${blocks}${overflow} ${count}`;
+  },
+
+  // 格式化价差格数：██=1格，███░=1.5格，有小数则显示半格
+  _formatPriceSpan: function (span) {
+    const abs = Math.abs(span);
+    const full = Math.floor(abs);
+    const hasDecimal = abs - full > 0;
+    const maxDisplay = 5;
+    const displayFull = Math.min(full, maxDisplay);
+    let bar = '█'.repeat(displayFull * 2);
+    if (hasDecimal && displayFull < maxDisplay) {
+      bar += '█░';
+    }
+    const overflow = full > maxDisplay ? '+' : '';
+    return `${bar}${overflow} ${span.toFixed(2)}`;
+  },
+
   getChartDataHash: function (chartData) {
     if (!chartData || !chartData.candleData) return '';
     const lastCandles = chartData.candleData.slice(-5);
     return lastCandles.map(c => c.ts).join(',');
   },
 
-  _buildTradeForbidTooltip: function (frq_rest) {
+  _buildTradeConditionTooltip: function (frq_rest) {
     if (!frq_rest) return '';
 
-    const items = [];
-
-    // 通用条件
-    items.push({ label: '非连续交易', value: !frq_rest.isNotSerialTrade });
-    items.push({ label: '超重置时间', value: !frq_rest.isOverThrottleResetTime });
-    items.push({ label: '超节流距离', value: !frq_rest.isOverThrottleDistance });
-
-    if (frq_rest.isOpen) {
-      // 开仓相关
-      items.push({ label: '开仓-紧急风险-高度节流', value: !frq_rest.isOpenEmergencyRiskThrottle });
-      items.push({ label: '开仓-高风险-中度节流', value: !frq_rest.isOpenHighRiskWithThrottle });
-      items.push({ label: '开仓-低风险-低度节流', value: !frq_rest.isOpenLowRiskWithThrottle });
-    }
-
-    if (frq_rest.isClose) {
-      // 平仓相关
-      items.push({
-        label: '平仓避险',
-        value: frq_rest.isCloseEmergencyRiskWithoutThrottle,
-      });
-      items.push({ label: '平仓-高风险-低度节流', value: !frq_rest.isCloseHighRiskWithThrottle });
-      items.push({ label: '平仓-低风险-中度节流', value: !frq_rest.isCloseLowRiskWithThrottle });
-    }
+    const renderRow = (label, value) => {
+      if (value === undefined) return '';
+      const pass = value;
+      const statusClass = pass ? 'tooltip-value pass' : 'tooltip-value fail';
+      const statusText = pass ? '✓' : '✗';
+      return `<div class="tooltip-row"><span class="tooltip-label">${label}</span><span class="${statusClass}">${statusText}</span></div>`;
+    };
 
     let html = '<div class="trade-forbid-tooltip">';
-    html += '<div class="tooltip-title">禁止交易原因</div>';
+    html += '<div class="tooltip-title">交易条件</div>';
 
-    items.forEach(item => {
-      if (item.value !== undefined) {
-        const statusClass = item.value ? 'tooltip-value' : 'tooltip-value pass';
-        const statusText = item.value ? '❌' : '✓';
-        html += `<div class="tooltip-row">`;
-        html += `<span class="tooltip-label">${item.label}</span>`;
-        html += `<span class="${statusClass}">${statusText}</span>`;
-        html += `</div>`;
+    // 第一层：通用放行条件（OR 逻辑）
+    const anyBypass =
+      frq_rest.passNotSerialTrade ||
+      frq_rest.passOverThrottleResetTime ||
+      frq_rest.passOverThrottleDistance;
+    html += '<div class="tooltip-section">';
+    html += `<div class="tooltip-section-title">放行条件 <span class="tooltip-hint">${anyBypass ? '(已满足)' : '(任一满足即放行)'}</span></div>`;
+    html += renderRow('非连续交易', frq_rest.passNotSerialTrade);
+    html += renderRow('超重置时间', frq_rest.passOverThrottleResetTime);
+    html += renderRow('超节流距离', frq_rest.passOverThrottleDistance);
+    html += '</div>';
+
+    // 第二层：节流条件（仅当通用条件全不满足时才展示）
+    if (!anyBypass) {
+      html += '<div class="tooltip-divider"></div>';
+
+      if (frq_rest.passOpenLowRiskSpan !== undefined) {
+        html += '<div class="tooltip-section">';
+        html +=
+          '<div class="tooltip-section-title">开仓节流 <span class="tooltip-hint">(按风险等级递进)</span></div>';
+        html += renderRow('紧急风险 · 距离≥2倍', frq_rest.passOpenEmergencySpan);
+        html += renderRow('高风险 · 距离≥1.5倍', frq_rest.passOpenHighRiskSpan);
+        html += renderRow('低风险 · 距离≥1.25倍', frq_rest.passOpenLowRiskSpan);
+        html += '</div>';
       }
-    });
+
+      if (frq_rest.passCloseLowRiskSpan !== undefined) {
+        html += '<div class="tooltip-section">';
+        html +=
+          '<div class="tooltip-section-title">平仓节流 <span class="tooltip-hint">(紧急避险优先)</span></div>';
+        html += renderRow('紧急避险放行', frq_rest.passCloseEmergencyNoThrottle);
+        html += renderRow('高风险 · 距离≥1.5倍', frq_rest.passCloseHighRiskSpan);
+        html += renderRow('低风险 · 距离≥1.25倍', frq_rest.passCloseLowRiskSpan);
+        html += '</div>';
+      }
+    }
 
     html += '</div>';
     return html;
@@ -74,8 +111,9 @@ window.TradingApp.Assets = {
       const spanClass = metric.span === 2 ? 'metric-item span-2' : 'metric-item';
       const valueClass = metric.className ? `metric-value ${metric.className}` : 'metric-value';
       const tooltipHtml = metric.tooltip || '';
+      const itemClass = metric.tooltip ? `${spanClass} has-trade-tooltip` : spanClass;
       html += `
-        <div class="${spanClass}">
+        <div class="${itemClass}">
           <span class="metric-label">${metric.label}</span>
           <span class="${valueClass}">${metric.value}</span>${tooltipHtml}
         </div>
@@ -112,11 +150,14 @@ window.TradingApp.Assets = {
       {
         label: '📏价距格数',
         value:
-          indicators.price_grid_count !== undefined ? Math.round(indicators.price_grid_count) : '-',
+          indicators.price_grid_count !== undefined
+            ? this._formatGridCount(Math.round(indicators.price_grid_count))
+            : '-',
       },
       {
         label: '📊价差格数',
-        value: indicators.price_span !== undefined ? indicators.price_span.toFixed(2) : '-',
+        value:
+          indicators.price_span !== undefined ? this._formatPriceSpan(indicators.price_span) : '-',
       },
       {
         label: '⚡瞬时波动',
@@ -148,14 +189,22 @@ window.TradingApp.Assets = {
       {
         label: '🛡止损等级',
         value: indicators.stopLossLevel !== undefined ? indicators.stopLossLevel : '-',
-        className: 'metric-stop-loss',
+        className:
+          indicators.stopLossLevel !== undefined
+            ? `metric-stop-loss metric-stop-loss-${indicators.stopLossLevel.toLowerCase()}`
+            : 'metric-stop-loss',
       },
       {
         label: '🔔交易状态',
         value:
           indicators.shouldTrade !== undefined ? (indicators.shouldTrade ? '允许' : '禁止') : '-',
-        className: indicators.shouldTrade ? 'metric-trade-allow' : 'metric-trade-forbid',
-        tooltip: indicators.shouldTrade ? null : this._buildTradeForbidTooltip(indicators.frq_rest),
+        className:
+          indicators.shouldTrade !== undefined
+            ? indicators.shouldTrade
+              ? 'metric-trade-allow'
+              : 'metric-trade-forbid'
+            : '',
+        tooltip: indicators.frq_rest ? this._buildTradeConditionTooltip(indicators.frq_rest) : null,
       },
     ];
   },
@@ -199,9 +248,9 @@ window.TradingApp.Assets = {
       // 计算百分比
       // 初始 = 100%（固定）
       // 最终 = 如果 final >= initial 则100%，否则 (final/initial)*100%
-      // 当前 = (current/final)*100%，最大100%
+      // 当前 = (current/initial)*100%，最大100%
       const finalPercent = final >= initial ? 100 : (final / initial) * 100;
-      const currentPercent = Math.min((current / final) * 100, 100);
+      const currentPercent = Math.min((current / initial) * 100, 100);
 
       html += '<div class="threshold-bar">';
       html += '<div class="threshold-bar-track">';
@@ -244,8 +293,23 @@ window.TradingApp.Assets = {
       if (labelEl && valueEl) {
         const label = labelEl.textContent;
         const metric = metrics.find(m => m.label === label);
-        if (metric && valueEl.textContent !== metric.value) {
-          valueEl.textContent = metric.value;
+        if (metric) {
+          if (valueEl.textContent !== metric.value) {
+            valueEl.textContent = metric.value;
+          }
+          // 更新className
+          valueEl.className = metric.className
+            ? `metric-value ${metric.className}`
+            : 'metric-value';
+          // 更新tooltip
+          const oldTooltip = item.querySelector('.trade-forbid-tooltip');
+          if (oldTooltip) oldTooltip.remove();
+          if (metric.tooltip) {
+            item.classList.add('has-trade-tooltip');
+            valueEl.insertAdjacentHTML('afterend', metric.tooltip);
+          } else {
+            item.classList.remove('has-trade-tooltip');
+          }
         }
       }
     });
@@ -265,9 +329,9 @@ window.TradingApp.Assets = {
       // 计算百分比
       // 初始 = 100%（固定）
       // 最终 = 如果 final >= initial 则100%，否则 (final/initial)*100%
-      // 当前 = (current/final)*100%，最大100%
+      // 当前 = (current/initial)*100%，最大100%
       const finalPercent = final >= initial ? 100 : (final / initial) * 100;
-      const currentPercent = Math.min((current / final) * 100, 100);
+      const currentPercent = Math.min((current / initial) * 100, 100);
 
       // 更新进度条宽度
       const finalFill = card.querySelector('[data-key="final-fill"]');

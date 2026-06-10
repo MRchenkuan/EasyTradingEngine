@@ -154,6 +154,9 @@ function initBusinessWebSocket() {
 
   ws.on('open', () => {
     console.log('ws_business已连接到服务器');
+    console.log(
+      `监控服务器已启动，访问 http://${monitorServer.localIP}:${monitorServer.port}/${monitorServer.currentToken}`
+    );
     assets.map(async it => {
       await subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
     });

@@ -430,7 +430,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
         chartData: this._getChartData(),
         shouldTrade: shouldTrade,
-        frq_rest: shouldTrade ? null : frq_rest,
+        frq_rest: frq_rest,
       });
 
       // 趋势和方向一致时不交易

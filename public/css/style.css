@@ -17,7 +17,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: 10px 16px;
   background: #161b22;
   border-radius: 8px;
   margin-bottom: 20px;
@@ -25,19 +25,22 @@ body {
 }
 
 .header-left {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: bold;
   color: #58a6ff;
+  white-space: nowrap;
 }
 
 .header-center {
   display: flex;
-  gap: 20px;
+  align-items: center;
+  gap: 16px;
 }
 
 .header-right {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  gap: 8px;
 }
 
 .status-indicator {
@@ -216,6 +219,37 @@ body {
   font-weight: bold;
 }
 
+/* 止损等级颜色 */
+.metric-stop-loss-normal {
+  color: #3fb950;
+}
+
+.metric-stop-loss-notice {
+  color: #d29922;
+}
+
+.metric-stop-loss-hight,
+.metric-stop-loss-cross_high,
+.metric-stop-loss-isolate_hight {
+  color: #f0883e;
+}
+
+.metric-stop-loss-emergency,
+.metric-stop-loss-cross_emergency,
+.metric-stop-loss-isolate_emergency {
+  color: #f85149;
+}
+
+.metric-stop-loss-dual_high {
+  color: #f47067;
+  font-weight: bold;
+}
+
+.metric-stop-loss-dual_emergency {
+  color: #ff0000;
+  font-weight: bold;
+}
+
 .logs-section {
   background: #161b22;
   border: 1px solid #30363d;
@@ -263,6 +297,7 @@ body {
 .metric-trade-allow {
   color: #3fb950;
   font-weight: bold;
+  cursor: help;
 }
 
 .metric-value.metric-trade-forbid {
@@ -271,11 +306,11 @@ body {
   cursor: help;
 }
 
-.metric-item:has(.metric-trade-forbid) .trade-forbid-tooltip {
+.has-trade-tooltip .trade-forbid-tooltip {
   display: none;
 }
 
-.metric-item:has(.metric-trade-forbid):hover .trade-forbid-tooltip {
+.has-trade-tooltip:hover .trade-forbid-tooltip {
   display: block;
 }
 
@@ -317,10 +352,36 @@ body {
 
 .trade-forbid-tooltip .tooltip-title {
   font-weight: bold;
-  color: #f85149;
+  color: #8b949e;
   margin-bottom: 6px;
   padding-bottom: 6px;
   border-bottom: 1px solid #30363d;
+}
+
+.trade-forbid-tooltip .tooltip-section {
+  margin-bottom: 4px;
+}
+
+.trade-forbid-tooltip .tooltip-section-title {
+  color: #c9d1d9;
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.trade-forbid-tooltip .tooltip-hint {
+  color: #6e7681;
+  font-weight: 400;
+  font-size: 10px;
+}
+
+.trade-forbid-tooltip .tooltip-divider {
+  border-top: 1px solid #30363d;
+  margin: 6px 0;
+}
+
+.trade-forbid-tooltip .tooltip-value.fail {
+  color: #f85149;
 }
 
 .page-info {
@@ -344,4 +405,85 @@ body {
 .chart-canvas {
   width: 100% !important;
   height: 100% !important;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  body {
+    padding: 4px;
+  }
+
+  .header {
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .header-left {
+    font-size: 14px;
+  }
+
+  .header-center {
+    gap: 10px;
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .assets-container {
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 8px;
+    overflow-x: hidden;
+  }
+
+  .asset-card {
+    min-width: 100%;
+    max-width: 100%;
+    padding: 10px;
+    border-radius: 6px;
+  }
+
+  .asset-title {
+    font-size: 14px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+  }
+
+  .asset-price {
+    font-size: 16px;
+  }
+
+  .metrics-grid {
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .metric-item {
+    padding: 4px 6px;
+    font-size: 11px;
+  }
+
+  .signal-item {
+    font-size: 11px;
+  }
+
+  .chart-container {
+    height: 220px;
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .logs-section {
+    margin-top: 8px;
+    padding: 10px;
+    border-radius: 6px;
+  }
+
+  .page-info,
+  .current-time {
+    font-size: 12px;
+  }
 }

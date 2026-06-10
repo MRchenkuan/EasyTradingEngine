@@ -3,12 +3,25 @@ import { WebSocketServer, WebSocket } from 'ws';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import os from 'os';
 import { config } from 'dotenv';
 
 config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TOKEN_SALT = process.env.TOKEN_SALT;
+
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return 'localhost';
+}
 
 export class MonitorServer {
   constructor(port = 8080) {
@@ -25,6 +38,7 @@ export class MonitorServer {
     };
     this.isStarted = false;
     this.currentToken = this._generateToken();
+    this.localIP = getLocalIP();
     this._scheduleDailyTokenUpdate();
   }
 
@@ -56,8 +70,8 @@ export class MonitorServer {
     this.isStarted = true;
 
     this.setupExpress();
-    this.setupWebSocket();
     this.redirectConsole();
+    this.setupWebSocket();
   }
 
   setupExpress() {
@@ -112,14 +126,8 @@ export class MonitorServer {
 
   setupWebSocket() {
     this.server = this.app.listen(this.port, () => {
-      const expiryDate = new Date();
-      expiryDate.setHours(23, 59, 59, 999);
-
-      this.originalConsole.log(
-        `监控服务器已启动，访问 http://localhost:${this.port}/${this.currentToken}`
-      );
-      this.originalConsole.log(
-        `今日访问Token: ${this.currentToken} (有效期至: ${expiryDate.toLocaleString()})`
+      console.log(
+        `监控服务器已启动，访问 http://${this.localIP}:${this.port}/${this.currentToken}`
       );
     });
 
@@ -131,7 +139,6 @@ export class MonitorServer {
         const token = url.searchParams.get('token');
 
         if (token !== this.currentToken) {
-          this.originalConsole.log('WebSocket 连接被拒绝: token 无效');
           return callback(false, 403, '禁止访问');
         }
         callback(true);
@@ -139,7 +146,9 @@ export class MonitorServer {
     });
 
     this.wss.on('connection', ws => {
-      this.originalConsole.log('新的 WebSocket 连接');
+      this.originalConsole.log(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 WebSocket 连接`
+      );
       this.clients.add(ws);
 
       // 发送当前资产列表
@@ -150,7 +159,9 @@ export class MonitorServer {
       });
 
       ws.on('close', () => {
-        this.originalConsole.log('WebSocket 连接已关闭');
+        this.originalConsole.log(
+          `[${new Date().toLocaleString('zh-CN', { hour12: false })}] WebSocket 连接已关闭`
+        );
         this.clients.delete(ws);
       });
 
@@ -171,7 +182,10 @@ export class MonitorServer {
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'info');
-      this.originalConsole.log(...args);
+      this.originalConsole.log(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
+        ...args
+      );
     };
 
     console.error = (...args) => {
@@ -179,7 +193,10 @@ export class MonitorServer {
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'error');
-      this.originalConsole.error(...args);
+      this.originalConsole.error(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
+        ...args
+      );
     };
 
     console.warn = (...args) => {
@@ -187,7 +204,10 @@ export class MonitorServer {
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'warn');
-      this.originalConsole.warn(...args);
+      this.originalConsole.warn(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
+        ...args
+      );
     };
   }
 

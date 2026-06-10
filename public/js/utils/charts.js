@@ -483,5 +483,44 @@ window.TradingApp.Charts = {
         },
       ],
     });
+
+    // 移动端触摸交互：按住显示tooltip，松开隐藏
+    const canvasEl = canvas;
+    const tooltipEl = () => document.getElementById('chartjs-tooltip');
+
+    canvasEl.addEventListener(
+      'touchstart',
+      function (e) {
+        const touch = e.touches[0];
+        const rect = canvasEl.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        chart._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+      },
+      { passive: true }
+    );
+
+    canvasEl.addEventListener(
+      'touchmove',
+      function (e) {
+        const touch = e.touches[0];
+        const rect = canvasEl.getBoundingClientRect();
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        chart._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+      },
+      { passive: true }
+    );
+
+    canvasEl.addEventListener(
+      'touchend',
+      function () {
+        // 松开时隐藏tooltip
+        const el = tooltipEl();
+        if (el) el.style.opacity = '0';
+        chart._eventHandler({ type: 'mouseout', x: 0, y: 0, native: null });
+      },
+      { passive: true }
+    );
   },
 };
