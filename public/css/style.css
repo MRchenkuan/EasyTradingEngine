@@ -11,6 +11,9 @@ body {
   padding: 6px;
   min-height: 100vh;
   overflow-x: hidden;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: none;
 }
 
 .header {

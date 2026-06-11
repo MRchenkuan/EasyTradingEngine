@@ -99,6 +99,18 @@ function onTickUpdate(payload) {
   }
 }
 
+// 禁止移动端页面级缩放，避免干扰图表双指缩放
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('gesturechange', e => e.preventDefault());
+document.addEventListener('gestureend', e => e.preventDefault());
+document.addEventListener(
+  'touchmove',
+  e => {
+    if (e.touches.length > 1) e.preventDefault();
+  },
+  { passive: false }
+);
+
 TradingApp.Time.startTimeUpdater();
 TradingApp.WebSocket.connect(
   onIndicatorsUpdate,
