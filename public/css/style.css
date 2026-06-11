@@ -306,6 +306,23 @@ body {
   cursor: help;
 }
 
+.metric-value.metric-long {
+  color: #ec7063;
+}
+
+.metric-value.metric-short {
+  color: #52be80;
+}
+
+.metric-value.metric-danger {
+  color: #f85149;
+  font-weight: bold;
+}
+
+.metric-value.metric-warning {
+  color: #d29922;
+}
+
 .has-trade-tooltip .trade-forbid-tooltip {
   display: none;
 }

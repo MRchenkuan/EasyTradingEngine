@@ -202,6 +202,35 @@ window.TradingApp.Assets = {
             : '',
         tooltip: indicators.frq_rest ? this._buildTradeConditionTooltip(indicators.frq_rest) : null,
       },
+      {
+        label: '📦持仓',
+        value:
+          indicators.position && indicators.position.notionalUsd !== undefined
+            ? (indicators.position.notionalUsd > 0 ? '+' : '') +
+              parseFloat(indicators.position.notionalUsd).toFixed(2)
+            : '-',
+        className:
+          indicators.position && indicators.position.pos > 0
+            ? 'metric-long'
+            : indicators.position && indicators.position.pos < 0
+              ? 'metric-short'
+              : '',
+      },
+      {
+        label: '🛡维持保证金',
+        value:
+          indicators.position && indicators.position.mgnRatio !== undefined
+            ? Math.round(indicators.position.mgnRatio * 100) + '%'
+            : '-',
+        className:
+          indicators.position && indicators.position.mgnRatio !== undefined
+            ? indicators.position.mgnRatio < 50
+              ? 'metric-danger'
+              : indicators.position.mgnRatio < 200
+                ? 'metric-warning'
+                : ''
+            : '',
+      },
     ];
   },
 

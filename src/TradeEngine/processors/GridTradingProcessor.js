@@ -431,6 +431,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         chartData: this._getChartData(),
         shouldTrade: shouldTrade,
         frq_rest: frq_rest,
+        position: this.engine.getPositionList(this.asset_name),
       });
 
       // 趋势和方向一致时不交易
@@ -849,6 +850,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         threshold: this._threshold,
         grid_width: this._grid_width,
         grid: this._grid,
+        base_amount: this._base_amount,
       },
     };
   }

@@ -398,8 +398,9 @@ window.TradingApp.Charts = {
               });
             }
 
-            // 绘制开仓均价和盈亏平衡价水平线
+            // 绘制开仓均价、盈亏平衡价和完全平仓价水平线
             const position = chartData.position;
+            const gridParams = chartData.gridParams;
             if (position && position.avgPx && position.bePx) {
               const chartArea = chart.chartArea;
               const currentPrice = bodyData.length > 0 ? bodyData[bodyData.length - 1].c : 0;
@@ -415,9 +416,9 @@ window.TradingApp.Charts = {
                 const y = yScale.getPixelForValue(price);
                 if (y >= chartArea.top && y <= chartArea.bottom) {
                   ctx.beginPath();
-                  ctx.setLineDash([6, 3]);
+                  ctx.setLineDash([4, 3]);
                   ctx.strokeStyle = color;
-                  ctx.lineWidth = 1;
+                  ctx.lineWidth = 0.5;
                   ctx.moveTo(chartArea.left, y);
                   ctx.lineTo(chartArea.right, y);
                   ctx.stroke();
@@ -452,6 +453,40 @@ window.TradingApp.Charts = {
                 '盈亏平衡',
                 isAvgPxLarger ? 10 : -10
               );
+
+              // 绘制完全平仓线
+              const pos = parseFloat(position.notionalUsd);
+              const gridWidth = parseFloat(gridParams?.grid_width) || 0;
+              const baseAmount = parseFloat(gridParams?.base_amount) || 30;
+              if (pos !== 0 && gridWidth > 0 && baseAmount > 0) {
+                const gridSpan = Math.abs(pos) / baseAmount;
+                const totalSpan = gridSpan * gridWidth;
+                const closePrice = avgPx * (1 + posSign * totalSpan);
+                const chartArea = chart.chartArea;
+                const closeY = yScale.getPixelForValue(closePrice);
+
+                if (closeY >= chartArea.top && closeY <= chartArea.bottom) {
+                  drawPriceLine(
+                    closePrice,
+                    calcColor(currentPrice, closePrice, posSign),
+                    '完全平仓',
+                    posSign > 0 ? -10 : 10
+                  );
+                } else {
+                  // 超出图表区域，绘制在边缘
+                  const edgeY = closeY < chartArea.top ? chartArea.top + 4 : chartArea.bottom - 4;
+                  const edgeColor = calcColor(currentPrice, closePrice, posSign);
+                  ctx.font = '10px Arial';
+                  ctx.textAlign = 'right';
+                  ctx.textBaseline = closeY < chartArea.top ? 'top' : 'bottom';
+                  ctx.fillStyle = edgeColor;
+                  ctx.fillText(
+                    `完全平仓 ${self.formatPrice(closePrice)} ${closeY < chartArea.top ? '↑' : '↓'}`,
+                    chartArea.right - 4,
+                    edgeY
+                  );
+                }
+              }
             }
 
             // 绘制买卖点文字标识 B/S（带圆角方框和虚线）
