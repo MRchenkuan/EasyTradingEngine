@@ -2,6 +2,11 @@ window.TradingApp = window.TradingApp || {};
 window.TradingApp.Charts = {
   charts: {},
   chartDataCache: {}, // 缓存图表数据用于实时更新
+  viewports: {}, // 每个资产的视口偏移量（从右侧算起的偏移量，0=最新数据）
+  DEFAULT_VISIBLE_COUNT: 200, // 默认可见K线数量
+  isDragging: false,
+  dragStartX: 0,
+  dragStartOffset: 0,
 
   // 格式化价格，整数位+小数位最多4位，超过则只保留整数位
   formatPrice: function (price) {
@@ -11,33 +16,76 @@ window.TradingApp.Charts = {
     return parseFloat(price.toFixed(decimals));
   },
 
+  // 获取当前可见的数据范围
+  getVisibleRange: function (assetName) {
+    const cachedData = this.chartDataCache[assetName];
+    if (!cachedData) return { start: 0, end: 0 };
+    const totalCount = cachedData.allBodyData.length;
+    const offset = this.viewports[assetName] || 0;
+    const end = totalCount - offset;
+    const start = Math.max(0, end - this.DEFAULT_VISIBLE_COUNT);
+    return { start, end };
+  },
+
   // 更新最后一根K线的收盘价
   updateLastCandleClose: function (assetName, currentPrice) {
     const chart = this.charts[assetName];
     const cachedData = this.chartDataCache[assetName];
     if (!chart || !cachedData) return;
 
-    const lastIndex = cachedData.bodyData.length - 1;
+    const lastIndex = cachedData.allBodyData.length - 1;
     if (lastIndex < 0) return;
 
     // 更新缓存数据
-    cachedData.bodyData[lastIndex].c = currentPrice;
+    cachedData.allBodyData[lastIndex].c = currentPrice;
+
+    // 如果视口在最新位置，更新图表
+    const offset = this.viewports[assetName] || 0;
+    if (offset === 0) {
+      this.refreshViewport(assetName);
+    }
+  },
+
+  // 刷新视口显示
+  refreshViewport: function (assetName) {
+    const chart = this.charts[assetName];
+    const cachedData = this.chartDataCache[assetName];
+    if (!chart || !cachedData) return;
+
+    const { start, end } = this.getVisibleRange(assetName);
+    const visibleBodyData = cachedData.allBodyData.slice(start, end);
+    const visibleLabels = cachedData.allLabels.slice(start, end);
+    const visibleCandleData = cachedData.allCandleData.slice(start, end);
+    const visibleBollUpper = cachedData.allBollUpper.slice(start, end);
+    const visibleBollMiddle = cachedData.allBollMiddle.slice(start, end);
+    const visibleBollLower = cachedData.allBollLower.slice(start, end);
+    const visibleBuyPoints = cachedData.allBuyPoints.slice(start, end);
+    const visibleSellPoints = cachedData.allSellPoints.slice(start, end);
+
+    // 计算可见区域的Y轴范围
+    const prices = visibleCandleData.flatMap(d => [d.high, d.low]);
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    const priceRange = priceMax - priceMin;
+    const padding = priceRange * 0.15;
 
     // 更新图表数据
-    const dataset = chart.data.datasets.find(ds => ds.label === 'K线数据');
-    if (dataset) {
-      dataset.data[lastIndex].c = currentPrice;
-      // 更新高低价范围
-      const prices = cachedData.bodyData.flatMap(d => [d.h, d.l]);
-      const priceMin = Math.min(...prices);
-      const priceMax = Math.max(...prices);
-      const priceRange = priceMax - priceMin;
-      const padding = priceRange * 0.1;
-      chart.options.scales.y.min = priceMin - padding;
-      chart.options.scales.y.max = priceMax + padding;
-    }
+    chart.data.labels = visibleLabels;
+    chart.data.datasets[0].data = visibleCandleData.map(d => d.close);
+    chart.data.datasets[1].data = visibleBollUpper;
+    chart.data.datasets[2].data = visibleBollMiddle;
+    chart.data.datasets[3].data = visibleBollLower;
+    chart.data.datasets[4].data = visibleBuyPoints;
+    chart.data.datasets[5].data = visibleSellPoints;
+    chart.options.scales.y.min = priceMin - padding;
+    chart.options.scales.y.max = priceMax + padding;
 
-    chart.update('none'); // 不使用动画更新
+    // 更新缓存中的可见数据引用
+    cachedData.bodyData = visibleBodyData;
+    cachedData.labels = visibleLabels;
+    cachedData.candleData = visibleCandleData;
+
+    chart.update('none');
   },
 
   renderChart: function (assetName, chartData) {
@@ -53,18 +101,11 @@ window.TradingApp.Charts = {
     }
 
     const ctx = canvas.getContext('2d');
-    const candleData = chartData.candleData;
-    const labels = chartData.labels;
+    const allCandleData = chartData.candleData;
+    const allLabels = chartData.labels;
 
-    const prices = candleData.flatMap(d => [d.high, d.low]);
-    const priceMin = Math.min(...prices);
-    const priceMax = Math.max(...prices);
-    const priceRange = priceMax - priceMin;
-    const padding = priceRange * 0.15;
-    const yMin = priceMin - padding;
-    const yMax = priceMax + padding;
-
-    const bodyData = candleData.map((d, i) => ({
+    // 缓存所有数据
+    const allBodyData = allCandleData.map((d, i) => ({
       x: i,
       o: d.open,
       c: d.close,
@@ -72,18 +113,15 @@ window.TradingApp.Charts = {
       l: d.low,
     }));
 
-    // 缓存数据用于实时更新
-    this.chartDataCache[assetName] = { bodyData, labels };
-
-    const bollUpper = chartData.boll?.upper || [];
-    const bollMiddle = chartData.boll?.middle || [];
-    const bollLower = chartData.boll?.lower || [];
+    const allBollUpper = chartData.boll?.upper || [];
+    const allBollMiddle = chartData.boll?.middle || [];
+    const allBollLower = chartData.boll?.lower || [];
     const orders = chartData.orders || [];
     const gridLines = chartData.gridParams?.grid || [];
 
     // 构建买卖点数据 - 使用与K线相同长度的数组，null表示无买卖点
-    const buyPointsData = new Array(candleData.length).fill(null);
-    const sellPointsData = new Array(candleData.length).fill(null);
+    const allBuyPoints = new Array(allCandleData.length).fill(null);
+    const allSellPoints = new Array(allCandleData.length).fill(null);
     const orderInfoMap = {}; // 存储买卖点详细信息用于tooltip
 
     if (orders && orders.length > 0) {
@@ -94,19 +132,19 @@ window.TradingApp.Charts = {
 
         // 订单时间不在K线范围内，跳过
         if (
-          orderTsMinute < candleData[0].ts ||
-          orderTsMinute > candleData[candleData.length - 1].ts + 60000
+          orderTsMinute < allCandleData[0].ts ||
+          orderTsMinute > allCandleData[allCandleData.length - 1].ts + 60000
         )
           return;
 
         // 尝试精确匹配（1分钟内）
-        let orderIndex = candleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 60000);
+        let orderIndex = allCandleData.findIndex(d => Math.abs(d.ts - orderTsMinute) <= 60000);
 
         // 如果精确匹配失败，找最接近的K线（仅在范围内）
         if (orderIndex === -1) {
           let closestIndex = -1;
           let minDiff = Infinity;
-          candleData.forEach((d, i) => {
+          allCandleData.forEach((d, i) => {
             const diff = Math.abs(d.ts - orderTsMinute);
             if (diff < minDiff) {
               minDiff = diff;
@@ -129,13 +167,56 @@ window.TradingApp.Charts = {
           orderInfoMap[orderIndex].push({ side: order.side, ...info });
 
           if (order.side === 'buy') {
-            buyPointsData[orderIndex] = order.avgPx;
+            allBuyPoints[orderIndex] = order.avgPx;
           } else if (order.side === 'sell') {
-            sellPointsData[orderIndex] = order.avgPx;
+            allSellPoints[orderIndex] = order.avgPx;
           }
         }
       });
     }
+
+    // 缓存所有数据
+    this.chartDataCache[assetName] = {
+      allBodyData,
+      allLabels,
+      allCandleData,
+      allBollUpper,
+      allBollMiddle,
+      allBollLower,
+      allBuyPoints,
+      allSellPoints,
+      orderInfoMap,
+      bodyData: [],
+      labels: [],
+      candleData: [],
+    };
+
+    // 初始化视口偏移（0=最新数据）
+    this.viewports[assetName] = 0;
+
+    // 获取初始可见数据
+    const { start, end } = this.getVisibleRange(assetName);
+    const candleData = allCandleData.slice(start, end);
+    const labels = allLabels.slice(start, end);
+    const bodyData = allBodyData.slice(start, end);
+    const bollUpper = allBollUpper.slice(start, end);
+    const bollMiddle = allBollMiddle.slice(start, end);
+    const bollLower = allBollLower.slice(start, end);
+    const buyPointsData = allBuyPoints.slice(start, end);
+    const sellPointsData = allSellPoints.slice(start, end);
+
+    // 更新缓存中的可见数据引用
+    this.chartDataCache[assetName].bodyData = bodyData;
+    this.chartDataCache[assetName].labels = labels;
+    this.chartDataCache[assetName].candleData = candleData;
+
+    const prices = candleData.flatMap(d => [d.high, d.low]);
+    const priceMin = Math.min(...prices);
+    const priceMax = Math.max(...prices);
+    const priceRange = priceMax - priceMin;
+    const padding = priceRange * 0.15;
+    const yMin = priceMin - padding;
+    const yMax = priceMax + padding;
 
     this.charts[assetName] = new Chart(ctx, {
       type: 'bar',
@@ -244,32 +325,37 @@ window.TradingApp.Charts = {
                 return;
               }
 
-              const index = dataPoint.dataIndex;
-              const candle = candleData[index];
+              const visibleIndex = dataPoint.dataIndex;
+              const cached = self.chartDataCache[assetName];
+              const candle = cached.candleData[visibleIndex];
               if (!candle) {
                 tooltipEl.style.opacity = '0';
                 return;
               }
 
+              const label = cached.labels[visibleIndex] || '';
+
               // 构建tooltip内容
               let innerHtml = '<thead>';
-              innerHtml += `<tr><th style="text-align:left; padding:4px 0; font-size:12px; color:#a5d6ff;">${labels[index] || ''}</th></tr>`;
+              innerHtml += `<tr><th style="text-align:left; padding:4px 0; font-size:12px; color:#a5d6ff;">${label}</th></tr>`;
               innerHtml += '</thead><tbody>';
 
               // K线价格信息
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">开: <span style="color:#c9d1d9;">${self.formatPrice(candle.open)}</span> 高: <span style="color:#ec7063;">${self.formatPrice(candle.high)}</span></td></tr>`;
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">低: <span style="color:#52be80;">${self.formatPrice(candle.low)}</span> 收: <span style="color:${candle.close >= candle.open ? '#ec7063' : '#52be80'};">${self.formatPrice(candle.close)}</span></td></tr>`;
 
-              // 买卖点信息
-              const orders = orderInfoMap[index];
+              // 计算全局索引查找买卖点
+              const { start: viewStart } = self.getVisibleRange(assetName);
+              const globalIndex = viewStart + visibleIndex;
+              const orders = cached.orderInfoMap[globalIndex];
               if (orders && orders.length > 0) {
                 innerHtml += `<tr><td style="padding:6px 0 2px 0; border-top:1px solid #30363d;"></td></tr>`;
                 orders.forEach(order => {
                   const isBuy = order.side === 'buy';
                   const color = isBuy ? '#ec7063' : '#52be80';
-                  const label = isBuy ? '买入' : '卖出';
+                  const orderLabel = isBuy ? '买入' : '卖出';
                   innerHtml += `<tr><td style="padding:3px 0; font-size:11px;">`;
-                  innerHtml += `<span style="color:${color}; font-weight:bold;">${label}</span>`;
+                  innerHtml += `<span style="color:${color}; font-weight:bold;">${orderLabel}</span>`;
                   innerHtml += ` <span style="color:#c9d1d9;">${self.formatPrice(order.price)}</span>`;
                   innerHtml += ` <span style="color:#8b949e;">×${order.amount}</span>`;
                   innerHtml += ` <span style="color:#8b949e;">(${order.gridCount > 0 ? '+' : ''}${order.gridCount}格)</span>`;
@@ -321,7 +407,8 @@ window.TradingApp.Charts = {
               maxRotation: 0,
               font: { size: 9 },
               callback: function (_val, index) {
-                const label = labels[index];
+                const cached = self.chartDataCache[assetName];
+                const label = cached ? cached.labels[index] : '';
                 if (!label) return '';
                 const parts = label.split(' ');
                 if (parts.length >= 2) {
@@ -350,6 +437,19 @@ window.TradingApp.Charts = {
             const ctx = chart.ctx;
             const xScale = chart.scales.x;
             const yScale = chart.scales.y;
+            const cached = self.chartDataCache[assetName];
+            if (!cached) return;
+
+            const visibleBodyData = cached.bodyData;
+            const visibleLabels = cached.labels;
+            const visibleBuyPoints = cached.allBuyPoints.slice(
+              self.getVisibleRange(assetName).start,
+              self.getVisibleRange(assetName).end
+            );
+            const visibleSellPoints = cached.allSellPoints.slice(
+              self.getVisibleRange(assetName).start,
+              self.getVisibleRange(assetName).end
+            );
 
             // 在图表内部绘制 y 轴刻度
             const chartArea = chart.chartArea;
@@ -367,7 +467,7 @@ window.TradingApp.Charts = {
               });
             }
 
-            bodyData.forEach((data, index) => {
+            visibleBodyData.forEach((data, index) => {
               const xCenter = xScale.getPixelForValue(index);
               const wickTop = yScale.getPixelForValue(data.h);
               const wickBottom = yScale.getPixelForValue(data.l);
@@ -377,7 +477,7 @@ window.TradingApp.Charts = {
               const isUp = data.c >= data.o;
               const color = isUp ? '#ec7063' : '#52be80';
 
-              const barWidthPx = (xScale.width / labels.length) * 0.8;
+              const barWidthPx = (xScale.width / visibleLabels.length) * 0.8;
               const halfWidth = barWidthPx / 2;
 
               ctx.beginPath();
@@ -415,7 +515,8 @@ window.TradingApp.Charts = {
             const gridParams = chartData.gridParams;
             if (position && position.avgPx && position.bePx) {
               const chartArea = chart.chartArea;
-              const currentPrice = bodyData.length > 0 ? bodyData[bodyData.length - 1].c : 0;
+              const currentPrice =
+                visibleBodyData.length > 0 ? visibleBodyData[visibleBodyData.length - 1].c : 0;
               const posSign = Math.sign(position.pos);
 
               const calcColor = (currentPrice, avgPx, posSign) => {
@@ -522,7 +623,7 @@ window.TradingApp.Charts = {
             };
 
             // 买入点 - 显示 B（在下方）
-            buyPointsData.forEach((price, index) => {
+            visibleBuyPoints.forEach((price, index) => {
               if (price !== null) {
                 const x = xScale.getPixelForValue(index);
                 const y = yScale.getPixelForValue(price);
@@ -553,7 +654,7 @@ window.TradingApp.Charts = {
             });
 
             // 卖出点 - 显示 S（在上方）
-            sellPointsData.forEach((price, index) => {
+            visibleSellPoints.forEach((price, index) => {
               if (price !== null) {
                 const x = xScale.getPixelForValue(index);
                 const y = yScale.getPixelForValue(price);
@@ -587,18 +688,67 @@ window.TradingApp.Charts = {
       ],
     });
 
-    // 移动端触摸交互：按住显示tooltip，松开隐藏
+    // 拖动平移交互
+    const chartInstance = this.charts[assetName];
     const canvasEl = canvas;
-    const tooltipEl = () => document.getElementById('chartjs-tooltip');
+
+    // 计算每根K线占用的像素宽度
+    const getBarPixelWidth = () => {
+      const xScale = chartInstance.scales.x;
+      const visibleCount = chartInstance.data.labels.length;
+      return visibleCount > 0 ? xScale.width / visibleCount : 10;
+    };
+
+    // 鼠标拖动
+    canvasEl.addEventListener('mousedown', function (e) {
+      self.isDragging = true;
+      self.dragStartX = e.clientX;
+      self.dragStartOffset = self.viewports[assetName] || 0;
+      canvasEl.style.cursor = 'grabbing';
+    });
+
+    window.addEventListener('mousemove', function (e) {
+      if (!self.isDragging) return;
+      const dx = e.clientX - self.dragStartX;
+      const barWidth = getBarPixelWidth();
+      if (barWidth <= 0) return;
+      const barShift = Math.round(dx / barWidth);
+      const cached = self.chartDataCache[assetName];
+      if (!cached) return;
+      const totalCount = cached.allBodyData.length;
+      // 向左拖动 = 查看更早的数据 = offset增大
+      let newOffset = self.dragStartOffset + barShift;
+      newOffset = Math.max(0, Math.min(totalCount - 20, newOffset)); // 至少保留20根K线
+      if (newOffset !== self.viewports[assetName]) {
+        self.viewports[assetName] = newOffset;
+        self.refreshViewport(assetName);
+      }
+    });
+
+    window.addEventListener('mouseup', function () {
+      if (self.isDragging) {
+        self.isDragging = false;
+        canvasEl.style.cursor = 'grab';
+      }
+    });
+
+    // 触摸拖动（移动端）
+    let touchStartX = 0;
+    let touchStartOffset = 0;
 
     canvasEl.addEventListener(
       'touchstart',
       function (e) {
+        if (e.touches.length === 1) {
+          touchStartX = e.touches[0].clientX;
+          touchStartOffset = self.viewports[assetName] || 0;
+        }
+        // 同时保留原有的tooltip交互
         const touch = e.touches[0];
         const rect = canvasEl.getBoundingClientRect();
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
-        chart._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
       },
       { passive: true }
     );
@@ -606,11 +756,27 @@ window.TradingApp.Charts = {
     canvasEl.addEventListener(
       'touchmove',
       function (e) {
+        if (e.touches.length === 1) {
+          const dx = e.touches[0].clientX - touchStartX;
+          const barWidth = getBarPixelWidth();
+          if (barWidth <= 0) return;
+          const barShift = Math.round(dx / barWidth);
+          const cached = self.chartDataCache[assetName];
+          if (!cached) return;
+          const totalCount = cached.allBodyData.length;
+          let newOffset = touchStartOffset + barShift;
+          newOffset = Math.max(0, Math.min(totalCount - 20, newOffset));
+          if (newOffset !== self.viewports[assetName]) {
+            self.viewports[assetName] = newOffset;
+            self.refreshViewport(assetName);
+          }
+        }
+        // 同时保留原有的tooltip交互
         const touch = e.touches[0];
         const rect = canvasEl.getBoundingClientRect();
         const x = touch.clientX - rect.left;
         const y = touch.clientY - rect.top;
-        chart._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
       },
       { passive: true }
     );
@@ -619,11 +785,14 @@ window.TradingApp.Charts = {
       'touchend',
       function () {
         // 松开时隐藏tooltip
-        const el = tooltipEl();
+        const el = document.getElementById('chartjs-tooltip');
         if (el) el.style.opacity = '0';
-        chart._eventHandler({ type: 'mouseout', x: 0, y: 0, native: null });
+        chartInstance._eventHandler({ type: 'mouseout', x: 0, y: 0, native: null });
       },
       { passive: true }
     );
+
+    // 设置初始光标
+    canvasEl.style.cursor = 'grab';
   },
 };

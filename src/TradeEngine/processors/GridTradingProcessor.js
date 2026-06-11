@@ -763,7 +763,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @returns {Object} 图表数据
    */
   _getChartData() {
-    const MAX_CANDLE = 200; // 限制K线数量
+    const MAX_CANDLE = 500; // 限制K线数量
     const candle_data = (this.engine.getCandleData(this.asset_name) || [])
       .map(it => ({
         open: parseFloat(it.open),
