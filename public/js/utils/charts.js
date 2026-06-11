@@ -398,6 +398,62 @@ window.TradingApp.Charts = {
               });
             }
 
+            // 绘制开仓均价和盈亏平衡价水平线
+            const position = chartData.position;
+            if (position && position.avgPx && position.bePx) {
+              const chartArea = chart.chartArea;
+              const currentPrice = bodyData.length > 0 ? bodyData[bodyData.length - 1].c : 0;
+              const posSign = Math.sign(position.pos);
+
+              const calcColor = (currentPrice, avgPx, posSign) => {
+                const isOver = currentPrice > avgPx ? 1 : -1;
+                const profitSign = isOver * posSign;
+                return profitSign > 0 ? '#ec7063' : '#52be80';
+              };
+
+              const drawPriceLine = (price, color, label, textOffsetY) => {
+                const y = yScale.getPixelForValue(price);
+                if (y >= chartArea.top && y <= chartArea.bottom) {
+                  ctx.beginPath();
+                  ctx.setLineDash([6, 3]);
+                  ctx.strokeStyle = color;
+                  ctx.lineWidth = 1;
+                  ctx.moveTo(chartArea.left, y);
+                  ctx.lineTo(chartArea.right, y);
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+
+                  // 绘制标签
+                  ctx.font = '10px Arial';
+                  ctx.textAlign = 'right';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillStyle = color;
+                  ctx.fillText(
+                    `${label} ${self.formatPrice(price)}`,
+                    chartArea.right - 4,
+                    y + textOffsetY
+                  );
+                }
+              };
+
+              const avgPx = parseFloat(position.avgPx);
+              const bePx = parseFloat(position.bePx);
+              const isAvgPxLarger = avgPx > bePx;
+
+              drawPriceLine(
+                avgPx,
+                calcColor(currentPrice, avgPx, posSign),
+                '开仓均价',
+                isAvgPxLarger ? -10 : 10
+              );
+              drawPriceLine(
+                bePx,
+                calcColor(currentPrice, bePx, posSign),
+                '盈亏平衡',
+                isAvgPxLarger ? 10 : -10
+              );
+            }
+
             // 绘制买卖点文字标识 B/S（带圆角方框和虚线）
             ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';

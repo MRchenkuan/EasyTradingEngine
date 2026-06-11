@@ -1,30 +1,26 @@
 window.TradingApp = window.TradingApp || {};
 window.TradingApp.Assets = {
-  // 格式化价距格数：██=1格，最多显示5格
+  // 格式化价距格数：█=1格，░=小数，最多显示10格
   _formatGridCount: function (count) {
     if (count === 0) return '0';
     const abs = Math.abs(count);
     const sign = count < 0 ? '-' : '';
-    const maxDisplay = 5;
-    const display = Math.min(abs, maxDisplay);
-    const blocks = '█'.repeat(display * 2);
-    const overflow = abs > maxDisplay ? `+${abs - maxDisplay}` : '';
-    return `${sign}${blocks}${overflow} ${count}`;
+    const maxDisplay = 10;
+    const full = Math.min(Math.floor(abs), maxDisplay);
+    const hasDecimal = abs - Math.floor(abs) > 0 && full < maxDisplay;
+    const overflow = Math.floor(abs) > maxDisplay ? `+${Math.floor(abs) - maxDisplay}` : '';
+    return `${sign}${'█'.repeat(full)}${hasDecimal ? '░' : ''}${overflow} ${count}`;
   },
 
-  // 格式化价差格数：██=1格，███░=1.5格，有小数则显示半格
+  // 格式化价差格数：█=1格，░=小数，最多显示10格
   _formatPriceSpan: function (span) {
     const abs = Math.abs(span);
     const full = Math.floor(abs);
     const hasDecimal = abs - full > 0;
-    const maxDisplay = 5;
+    const maxDisplay = 10;
     const displayFull = Math.min(full, maxDisplay);
-    let bar = '█'.repeat(displayFull * 2);
-    if (hasDecimal && displayFull < maxDisplay) {
-      bar += '█░';
-    }
     const overflow = full > maxDisplay ? '+' : '';
-    return `${bar}${overflow} ${span.toFixed(2)}`;
+    return `${'█'.repeat(displayFull)}${hasDecimal && displayFull < maxDisplay ? '░' : ''}${overflow} ${span.toFixed(2)}`;
   },
 
   getChartDataHash: function (chartData) {
