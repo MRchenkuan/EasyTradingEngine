@@ -3,9 +3,12 @@ window.TradingApp.Charts = {
   charts: {},
   chartDataCache: {}, // 缓存图表数据用于实时更新
 
-  // 格式化价格，最多保留3位小数
+  // 格式化价格，整数位+小数位最多4位，超过则只保留整数位
   formatPrice: function (price) {
-    return parseFloat(price.toFixed(3));
+    const intDigits = Math.floor(Math.abs(price)).toString().length;
+    if (intDigits >= 4) return Math.round(price);
+    const decimals = 4 - intDigits;
+    return parseFloat(price.toFixed(decimals));
   },
 
   // 更新最后一根K线的收盘价
@@ -331,18 +334,11 @@ window.TradingApp.Charts = {
           y: {
             type: 'linear',
             position: 'left',
-            display: true,
+            display: false,
             min: yMin,
             max: yMax,
             beginAtZero: false,
             grid: { display: false },
-            ticks: {
-              font: { size: 9 },
-              maxTicksLimit: 6,
-              callback: function (value) {
-                return self.formatPrice(value);
-              },
-            },
           },
         },
         animation: { duration: 0 },
@@ -354,6 +350,22 @@ window.TradingApp.Charts = {
             const ctx = chart.ctx;
             const xScale = chart.scales.x;
             const yScale = chart.scales.y;
+
+            // 在图表内部绘制 y 轴刻度
+            const chartArea = chart.chartArea;
+            const yTicks = yScale.getTicks();
+            if (yTicks && yTicks.length > 0) {
+              ctx.font = '9px Arial';
+              ctx.textAlign = 'left';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = 'rgba(139, 148, 158, 0.6)';
+              yTicks.forEach(tick => {
+                const y = yScale.getPixelForValue(tick.value);
+                if (y >= chartArea.top && y <= chartArea.bottom) {
+                  ctx.fillText(self.formatPrice(tick.value), chartArea.left + 4, y);
+                }
+              });
+            }
 
             bodyData.forEach((data, index) => {
               const xCenter = xScale.getPixelForValue(index);
@@ -468,14 +480,14 @@ window.TradingApp.Charts = {
                 if (closeY >= chartArea.top && closeY <= chartArea.bottom) {
                   drawPriceLine(
                     closePrice,
-                    calcColor(currentPrice, closePrice, posSign),
+                    calcColor(currentPrice, closePrice, -posSign),
                     '完全平仓',
                     posSign > 0 ? -10 : 10
                   );
                 } else {
                   // 超出图表区域，绘制在边缘
                   const edgeY = closeY < chartArea.top ? chartArea.top + 4 : chartArea.bottom - 4;
-                  const edgeColor = calcColor(currentPrice, closePrice, posSign);
+                  const edgeColor = calcColor(currentPrice, closePrice, -posSign);
                   ctx.font = '10px Arial';
                   ctx.textAlign = 'right';
                   ctx.textBaseline = closeY < chartArea.top ? 'top' : 'bottom';
