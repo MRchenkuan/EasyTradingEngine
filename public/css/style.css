@@ -15,32 +15,34 @@ body {
 
 .header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 4px 10px;
   background: #161b22;
-  border-radius: 6px;
-  margin-bottom: 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
   border: 1px solid #30363d;
+  font-size: 12px;
+  color: #8b949e;
+  overflow: hidden;
 }
 
-.header-left {
-  font-size: 13px;
+.header-title {
   font-weight: bold;
   color: #58a6ff;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.header-center {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.header-info {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.header-right {
+.ws-status {
+  margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
 }
 
 .status-indicator {
@@ -401,16 +403,6 @@ body {
   color: #f85149;
 }
 
-.page-info {
-  font-size: 12px;
-  color: #8b949e;
-}
-
-.current-time {
-  font-size: 12px;
-  color: #8b949e;
-}
-
 .chart-container {
   margin-top: 12px;
   padding-top: 12px;
@@ -431,22 +423,10 @@ body {
   }
 
   .header {
-    padding: 8px 12px;
-    margin-bottom: 8px;
-    border-radius: 6px;
-    flex-wrap: wrap;
+    padding: 3px 8px;
     gap: 6px;
-  }
-
-  .header-left {
-    font-size: 14px;
-  }
-
-  .header-center {
-    gap: 10px;
-    order: 3;
-    width: 100%;
-    justify-content: center;
+    font-size: 11px;
+    margin-bottom: 4px;
   }
 
   .assets-container {
@@ -497,10 +477,5 @@ body {
     margin-top: 8px;
     padding: 10px;
     border-radius: 6px;
-  }
-
-  .page-info,
-  .current-time {
-    font-size: 12px;
   }
 }

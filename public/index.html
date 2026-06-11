@@ -14,15 +14,12 @@
 
 <body>
   <div class="header">
-    <div class="header-left">交易监控面板</div>
-    <div class="header-center">
-      <span class="current-time" id="currentTime"></span>
-      <span class="page-info">资产数: <span id="assetCount">0</span></span>
-    </div>
-    <div class="header-right">
-      <span style="font-size: 12px; color: #8b949e;">WS</span>
-      <div class="status-indicator" id="statusIndicator"></div>
-    </div>
+    <span class="header-title">交易监控</span>
+    <span class="header-info" id="currentTime"></span>
+    <span class="header-info">资产:<span id="assetCount">0</span></span>
+    <span class="header-info ws-status">
+      <span class="status-indicator" id="statusIndicator"></span>
+    </span>
   </div>
 
   <div class="assets-container" id="assetsContainer">
