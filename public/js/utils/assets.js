@@ -339,9 +339,18 @@ window.TradingApp.Assets = {
       }
     });
 
-    // 实时更新最后一根K线的收盘价
-    if (indicators.price !== undefined) {
-      TradingApp.Charts.updateLastCandleClose(assetName, indicators.price);
+    // 更新 factors 信号区
+    if (indicators.factors) {
+      const signalSection = card.querySelector('.signal-section');
+      const newHtml = this.renderFactors(indicators.factors);
+      if (signalSection) {
+        signalSection.outerHTML = newHtml;
+      } else {
+        const summarySection = card.querySelector('.summary-section');
+        if (summarySection) {
+          summarySection.insertAdjacentHTML('beforebegin', newHtml);
+        }
+      }
     }
 
     // 更新进度条

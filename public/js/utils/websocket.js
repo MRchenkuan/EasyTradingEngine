@@ -1,12 +1,13 @@
 window.TradingApp = window.TradingApp || {};
 window.TradingApp.WebSocket = {
-  ws: null,
+  wsIndicators: null,
+  wsChart: null,
+  wsTick: null,
   getToken: function () {
-    // 从 URL 路径中获取 token (格式: /token)
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     return pathParts[0] || '';
   },
-  connect: function (onAssetsUpdate, onLogReceived) {
+  connect: function (onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname || 'localhost';
     const port = window.location.port || 8080;
@@ -17,31 +18,57 @@ window.TradingApp.WebSocket = {
       return;
     }
 
-    this.ws = new WebSocket(`${protocol}//${host}:${port}/?token=${token}`);
+    const self = this;
 
-    this.ws.onopen = function () {
+    // indicators WebSocket：轻量指标数据
+    this.wsIndicators = new WebSocket(`${protocol}//${host}:${port}/?token=${token}`);
+    this.wsIndicators.onopen = function () {
       document.getElementById('statusIndicator').classList.add('connected');
-      console.log('WebSocket 连接已建立');
     };
-
-    this.ws.onmessage = function (event) {
+    this.wsIndicators.onmessage = function (event) {
       const data = JSON.parse(event.data);
-
-      if (data.type === 'assets') {
-        onAssetsUpdate(data.payload);
+      if (data.type === 'indicators') {
+        onIndicatorsUpdate(data.payload);
       } else if (data.type === 'logs') {
         onLogReceived(data.payload);
       }
     };
-
-    this.ws.onclose = function () {
+    this.wsIndicators.onclose = function () {
       document.getElementById('statusIndicator').classList.remove('connected');
-      console.log('WebSocket 连接已关闭，正在重连...');
-      setTimeout(() => window.TradingApp.WebSocket.connect(onAssetsUpdate, onLogReceived), 3000);
+      setTimeout(() => {
+        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+      }, 3000);
     };
+    this.wsIndicators.onerror = function () {};
 
-    this.ws.onerror = function (error) {
-      console.error('WebSocket 错误:', error);
+    // chart WebSocket：完整K线数据（低频，新K线产生时才推送）
+    this.wsChart = new WebSocket(`${protocol}//${host}:${port}/chart?token=${token}`);
+    this.wsChart.onmessage = function (event) {
+      const data = JSON.parse(event.data);
+      if (data.type === 'chart') {
+        onChartUpdate(data.payload);
+      }
     };
+    this.wsChart.onclose = function () {
+      setTimeout(() => {
+        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+      }, 3000);
+    };
+    this.wsChart.onerror = function () {};
+
+    // tick WebSocket：最后一根K线更新（高频）
+    this.wsTick = new WebSocket(`${protocol}//${host}:${port}/tick?token=${token}`);
+    this.wsTick.onmessage = function (event) {
+      const data = JSON.parse(event.data);
+      if (data.type === 'tick') {
+        onTickUpdate(data.payload);
+      }
+    };
+    this.wsTick.onclose = function () {
+      setTimeout(() => {
+        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+      }, 3000);
+    };
+    this.wsTick.onerror = function () {};
   },
 };

@@ -27,9 +27,19 @@ export class MonitorServer {
   constructor(port = 8080) {
     this.port = port;
     this.app = express();
-    this.wss = null;
-    this.clients = new Set();
+    this.server = null;
+    // 三个 WebSocket 通道：
+    // indicators - 轻量指标（position, gridParams, shouldTrade 等）
+    // chart - 完整K线数据（连接时 + 新K线产生时）
+    // tick - 最后一根K线更新（高频）
+    this.wssIndicators = null;
+    this.wssChart = null;
+    this.wssTick = null;
+    this.indicatorClients = new Set();
+    this.chartClients = new Set();
+    this.tickClients = new Set();
     this.assetData = {};
+    this.lastCandleCount = {}; // 记录每个资产上次发送的K线数量，用于判断是否有新K线
     this.logs = [];
     this.originalConsole = {
       log: console.log.bind(console),
@@ -75,7 +85,6 @@ export class MonitorServer {
   }
 
   setupExpress() {
-    // API token 验证中间件
     const validateToken = (req, res, next) => {
       const token = req.query.token || req.headers['x-auth-token'];
       if (token !== this.currentToken) {
@@ -90,22 +99,18 @@ export class MonitorServer {
 
     this.app.get('/:token', (req, res, next) => {
       const token = req.params.token;
-
       const excludedPaths = ['api', 'js', 'css', 'images', 'assets'];
       if (excludedPaths.includes(token)) {
         return next();
       }
-
       if (token !== this.currentToken) {
         return res.status(403).send('禁止访问');
       }
-
       res.sendFile(path.join(__dirname, '../public/index.html'));
     });
 
     this.app.use(express.static(path.join(__dirname, '../public')));
 
-    // API 路由需要 token 验证
     this.app.get('/api/assets', validateToken, (_req, res) => {
       res.json({ success: true, data: Object.keys(this.assetData) });
     });
@@ -131,45 +136,131 @@ export class MonitorServer {
       );
     });
 
-    this.wss = new WebSocketServer({
-      server: this.server,
-      verifyClient: (info, callback) => {
-        // 从 URL 参数中获取 token
-        const url = new URL(info.req.url, `http://${info.req.headers.host}`);
-        const token = url.searchParams.get('token');
+    const verifyClient = (info, callback) => {
+      const url = new URL(info.req.url, `http://${info.req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (token !== this.currentToken) {
+        return callback(false, 403, '禁止访问');
+      }
+      callback(true);
+    };
 
-        if (token !== this.currentToken) {
-          return callback(false, 403, '禁止访问');
-        }
-        callback(true);
-      },
-    });
-
-    this.wss.on('connection', ws => {
+    // indicators WebSocket：轻量数据
+    this.wssIndicators = new WebSocketServer({ noServer: true, verifyClient });
+    this.wssIndicators.on('connection', ws => {
       this.originalConsole.log(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 WebSocket 连接`
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 indicators WebSocket 连接`
       );
-      this.clients.add(ws);
-
-      // 发送当前资产列表
-      this.sendAssets();
-
-      ws.on('message', message => {
-        this.originalConsole.log('收到消息:', message.toString());
-      });
-
-      ws.on('close', () => {
-        this.originalConsole.log(
-          `[${new Date().toLocaleString('zh-CN', { hour12: false })}] WebSocket 连接已关闭`
-        );
-        this.clients.delete(ws);
-      });
-
-      ws.on('error', error => {
-        this.originalConsole.error('WebSocket 错误:', error);
-        this.clients.delete(ws);
-      });
+      this.indicatorClients.add(ws);
+      ws.send(
+        JSON.stringify({
+          type: 'indicators',
+          payload: this._extractIndicators(),
+        })
+      );
+      ws.on('close', () => this.indicatorClients.delete(ws));
+      ws.on('error', () => this.indicatorClients.delete(ws));
     });
+
+    // chart WebSocket：完整K线数据（连接时 + 新K线产生时才推送）
+    this.wssChart = new WebSocketServer({ noServer: true, verifyClient });
+    this.wssChart.on('connection', ws => {
+      this.originalConsole.log(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 chart WebSocket 连接`
+      );
+      this.chartClients.add(ws);
+      ws.send(
+        JSON.stringify({
+          type: 'chart',
+          payload: this._extractChartData(),
+        })
+      );
+      ws.on('close', () => this.chartClients.delete(ws));
+      ws.on('error', () => this.chartClients.delete(ws));
+    });
+
+    // tick WebSocket：最后一根K线更新（高频）
+    this.wssTick = new WebSocketServer({ noServer: true, verifyClient });
+    this.wssTick.on('connection', ws => {
+      this.originalConsole.log(
+        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 tick WebSocket 连接`
+      );
+      this.tickClients.add(ws);
+      // 连接时发送当前最后一根K线
+      ws.send(
+        JSON.stringify({
+          type: 'tick',
+          payload: this._extractTick(),
+        })
+      );
+      ws.on('close', () => this.tickClients.delete(ws));
+      ws.on('error', () => this.tickClients.delete(ws));
+    });
+
+    // 根据 URL 路径分发
+    this.server.on('upgrade', (request, socket, head) => {
+      const url = new URL(request.url, `http://${request.headers.host}`);
+      const pathname = url.pathname;
+
+      if (pathname === '/chart') {
+        this.wssChart.handleUpgrade(request, socket, head, ws => {
+          this.wssChart.emit('connection', ws, request);
+        });
+      } else if (pathname === '/tick') {
+        this.wssTick.handleUpgrade(request, socket, head, ws => {
+          this.wssTick.emit('connection', ws, request);
+        });
+      } else {
+        this.wssIndicators.handleUpgrade(request, socket, head, ws => {
+          this.wssIndicators.emit('connection', ws, request);
+        });
+      }
+    });
+  }
+
+  // 提取指标数据（轻量，不含 chartData）
+  _extractIndicators() {
+    const result = {};
+    for (const [name, data] of Object.entries(this.assetData)) {
+      const { chartData, ...indicators } = data;
+      result[name] = indicators;
+    }
+    return result;
+  }
+
+  // 提取完整图表数据
+  _extractChartData() {
+    const result = {};
+    for (const [name, data] of Object.entries(this.assetData)) {
+      if (data.chartData) {
+        result[name] = { chartData: data.chartData };
+      }
+    }
+    return result;
+  }
+
+  // 提取最后一根K线的 tick 数据
+  _extractTick() {
+    const result = {};
+    for (const [name, data] of Object.entries(this.assetData)) {
+      const chart = data.chartData;
+      if (chart && chart.candleData && chart.candleData.length > 0) {
+        const lastCandle = chart.candleData[chart.candleData.length - 1];
+        const lastLabel = chart.labels ? chart.labels[chart.labels.length - 1] : null;
+        const tick = { candle: lastCandle, label: lastLabel };
+        // boll 最后一组值
+        if (chart.boll) {
+          tick.boll = {};
+          for (const band of ['upper', 'middle', 'lower']) {
+            if (chart.boll[band] && chart.boll[band].length > 0) {
+              tick.boll[band] = chart.boll[band][chart.boll[band].length - 1];
+            }
+          }
+        }
+        result[name] = tick;
+      }
+    }
+    return result;
   }
 
   redirectConsole() {
@@ -213,7 +304,22 @@ export class MonitorServer {
 
   updateAsset(name, data) {
     this.assetData[name] = data;
-    this.sendAssets();
+
+    // 判断是否有新K线产生（K线数量变化）
+    const candleCount = data.chartData?.candleData?.length || 0;
+    const prevCount = this.lastCandleCount[name] || 0;
+    const hasNewCandle = candleCount !== prevCount;
+    this.lastCandleCount[name] = candleCount;
+
+    this.sendIndicators();
+
+    // 只有新K线产生时才发送完整 chart 数据
+    if (hasNewCandle) {
+      this.sendChart();
+    }
+
+    // 每次都发送 tick（最后一根K线更新）
+    this.sendTick();
   }
 
   addLog(message, level = 'info') {
@@ -224,7 +330,6 @@ export class MonitorServer {
     };
     this.logs.push(log);
 
-    // 保持日志数量在合理范围内
     if (this.logs.length > 100) {
       this.logs = this.logs.slice(-100);
     }
@@ -232,26 +337,50 @@ export class MonitorServer {
     this.sendLogs();
   }
 
-  sendAssets() {
-    const data = {
-      type: 'assets',
-      payload: this.assetData, // 发送完整的资产数据
-    };
-    this.broadcast(JSON.stringify(data));
+  sendIndicators() {
+    const data = JSON.stringify({
+      type: 'indicators',
+      payload: this._extractIndicators(),
+    });
+    this.indicatorClients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
+  }
+
+  sendChart() {
+    const data = JSON.stringify({
+      type: 'chart',
+      payload: this._extractChartData(),
+    });
+    this.chartClients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
+  }
+
+  sendTick() {
+    const data = JSON.stringify({
+      type: 'tick',
+      payload: this._extractTick(),
+    });
+    this.tickClients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
   }
 
   sendLogs() {
-    const data = {
+    const data = JSON.stringify({
       type: 'logs',
       payload: this.logs[this.logs.length - 1],
-    };
-    this.broadcast(JSON.stringify(data));
-  }
-
-  broadcast(message) {
-    this.clients.forEach(client => {
+    });
+    this.indicatorClients.forEach(client => {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
+        client.send(data);
       }
     });
   }
@@ -259,21 +388,18 @@ export class MonitorServer {
   stop() {
     this.isStarted = false;
 
-    // 恢复 console
     console.log = this.originalConsole.log;
     console.error = this.originalConsole.error;
     console.warn = this.originalConsole.warn;
 
-    if (this.wss) {
-      this.wss.close();
-    }
-    if (this.server) {
-      this.server.close();
-    }
+    if (this.wssIndicators) this.wssIndicators.close();
+    if (this.wssChart) this.wssChart.close();
+    if (this.wssTick) this.wssTick.close();
+    if (this.server) this.server.close();
+
     this.originalConsole.log('监控服务器已停止');
   }
 }
 
-// 创建单例
 const monitorServer = new MonitorServer(8080);
 export { monitorServer };

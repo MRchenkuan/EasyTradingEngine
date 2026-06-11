@@ -3,10 +3,12 @@ window.TradingApp.Charts = {
   charts: {},
   chartDataCache: {}, // 缓存图表数据用于实时更新
   viewports: {}, // 每个资产的视口偏移量（从右侧算起的偏移量，0=最新数据）
-  DEFAULT_VISIBLE_COUNT: 200, // 默认可见K线数量
-  isDragging: false,
-  dragStartX: 0,
-  dragStartOffset: 0,
+  visibleCounts: {}, // 每个资产的可见K线数量
+  DEFAULT_VISIBLE_COUNT: 200,
+  MIN_VISIBLE_COUNT: 20,
+  MAX_VISIBLE_COUNT: 500,
+  // 拖拽状态改为按资产独立存储
+  dragStates: {},
 
   // 格式化价格，整数位+小数位最多4位，超过则只保留整数位
   formatPrice: function (price) {
@@ -22,8 +24,9 @@ window.TradingApp.Charts = {
     if (!cachedData) return { start: 0, end: 0 };
     const totalCount = cachedData.allBodyData.length;
     const offset = this.viewports[assetName] || 0;
+    const visibleCount = this.visibleCounts[assetName] || this.DEFAULT_VISIBLE_COUNT;
     const end = totalCount - offset;
-    const start = Math.max(0, end - this.DEFAULT_VISIBLE_COUNT);
+    const start = Math.max(0, end - visibleCount);
     return { start, end };
   },
 
@@ -38,6 +41,37 @@ window.TradingApp.Charts = {
 
     // 更新缓存数据
     cachedData.allBodyData[lastIndex].c = currentPrice;
+
+    // 如果视口在最新位置，更新图表
+    const offset = this.viewports[assetName] || 0;
+    if (offset === 0) {
+      this.refreshViewport(assetName);
+    }
+  },
+
+  // 更新最后一根K线的 tick 数据（candle + boll）
+  updateTick: function (assetName, tick) {
+    const chart = this.charts[assetName];
+    const cachedData = this.chartDataCache[assetName];
+    if (!chart || !cachedData) return;
+
+    const lastIndex = cachedData.allBodyData.length - 1;
+    if (lastIndex < 0) return;
+
+    // 更新最后一根K线
+    if (tick.candle) {
+      cachedData.allBodyData[lastIndex].c = tick.candle.close;
+      cachedData.allBodyData[lastIndex].h = tick.candle.high;
+      cachedData.allBodyData[lastIndex].l = tick.candle.low;
+      cachedData.allCandleData[lastIndex] = tick.candle;
+    }
+
+    // 更新最后一根 boll
+    if (tick.boll) {
+      if (tick.boll.upper != null) cachedData.allBollUpper[lastIndex] = tick.boll.upper;
+      if (tick.boll.middle != null) cachedData.allBollMiddle[lastIndex] = tick.boll.middle;
+      if (tick.boll.lower != null) cachedData.allBollLower[lastIndex] = tick.boll.lower;
+    }
 
     // 如果视口在最新位置，更新图表
     const offset = this.viewports[assetName] || 0;
@@ -193,6 +227,7 @@ window.TradingApp.Charts = {
 
     // 初始化视口偏移（0=最新数据）
     this.viewports[assetName] = 0;
+    this.visibleCounts[assetName] = this.DEFAULT_VISIBLE_COUNT;
 
     // 获取初始可见数据
     const { start, end } = this.getVisibleRange(assetName);
@@ -217,6 +252,9 @@ window.TradingApp.Charts = {
     const padding = priceRange * 0.15;
     const yMin = priceMin - padding;
     const yMax = priceMax + padding;
+
+    // 使用最新K线的收盘价作为当前价格（用于价格线颜色计算，不随视口变化）
+    const latestPrice = allBodyData.length > 0 ? allBodyData[allBodyData.length - 1].c : 0;
 
     this.charts[assetName] = new Chart(ctx, {
       type: 'bar',
@@ -442,14 +480,9 @@ window.TradingApp.Charts = {
 
             const visibleBodyData = cached.bodyData;
             const visibleLabels = cached.labels;
-            const visibleBuyPoints = cached.allBuyPoints.slice(
-              self.getVisibleRange(assetName).start,
-              self.getVisibleRange(assetName).end
-            );
-            const visibleSellPoints = cached.allSellPoints.slice(
-              self.getVisibleRange(assetName).start,
-              self.getVisibleRange(assetName).end
-            );
+            const { start: viewStart, end: viewEnd } = self.getVisibleRange(assetName);
+            const visibleBuyPoints = cached.allBuyPoints.slice(viewStart, viewEnd);
+            const visibleSellPoints = cached.allSellPoints.slice(viewStart, viewEnd);
 
             // 在图表内部绘制 y 轴刻度
             const chartArea = chart.chartArea;
@@ -511,16 +544,15 @@ window.TradingApp.Charts = {
             }
 
             // 绘制开仓均价、盈亏平衡价和完全平仓价水平线
+            // 使用最新K线收盘价计算颜色，不随视口变化
             const position = chartData.position;
             const gridParams = chartData.gridParams;
             if (position && position.avgPx && position.bePx) {
               const chartArea = chart.chartArea;
-              const currentPrice =
-                visibleBodyData.length > 0 ? visibleBodyData[visibleBodyData.length - 1].c : 0;
               const posSign = Math.sign(position.pos);
 
-              const calcColor = (currentPrice, avgPx, posSign) => {
-                const isOver = currentPrice > avgPx ? 1 : -1;
+              const calcColor = (price, avgPx, posSign) => {
+                const isOver = price > avgPx ? 1 : -1;
                 const profitSign = isOver * posSign;
                 return profitSign > 0 ? '#ec7063' : '#52be80';
               };
@@ -556,13 +588,13 @@ window.TradingApp.Charts = {
 
               drawPriceLine(
                 avgPx,
-                calcColor(currentPrice, avgPx, posSign),
+                calcColor(latestPrice, avgPx, posSign),
                 '开仓均价',
                 isAvgPxLarger ? -10 : 10
               );
               drawPriceLine(
                 bePx,
-                calcColor(currentPrice, bePx, posSign),
+                calcColor(latestPrice, bePx, posSign),
                 '盈亏平衡',
                 isAvgPxLarger ? 10 : -10
               );
@@ -581,14 +613,14 @@ window.TradingApp.Charts = {
                 if (closeY >= chartArea.top && closeY <= chartArea.bottom) {
                   drawPriceLine(
                     closePrice,
-                    calcColor(currentPrice, closePrice, -posSign),
+                    calcColor(latestPrice, closePrice, -posSign),
                     '完全平仓',
                     posSign > 0 ? -10 : 10
                   );
                 } else {
                   // 超出图表区域，绘制在边缘
                   const edgeY = closeY < chartArea.top ? chartArea.top + 4 : chartArea.bottom - 4;
-                  const edgeColor = calcColor(currentPrice, closePrice, -posSign);
+                  const edgeColor = calcColor(latestPrice, closePrice, -posSign);
                   ctx.font = '10px Arial';
                   ctx.textAlign = 'right';
                   ctx.textBaseline = closeY < chartArea.top ? 'top' : 'bottom';
@@ -688,9 +720,16 @@ window.TradingApp.Charts = {
       ],
     });
 
-    // 拖动平移交互
+    // ===== 拖拽平移 + 滚轮/双指缩放交互 =====
     const chartInstance = this.charts[assetName];
     const canvasEl = canvas;
+
+    // 初始化该资产的独立拖拽状态
+    this.dragStates[assetName] = {
+      isDragging: false,
+      startX: 0,
+      startOffset: 0,
+    };
 
     // 计算每根K线占用的像素宽度
     const getBarPixelWidth = () => {
@@ -699,42 +738,79 @@ window.TradingApp.Charts = {
       return visibleCount > 0 ? xScale.width / visibleCount : 10;
     };
 
-    // 鼠标拖动
+    // 鼠标拖动（仅平移，不缩放）
     canvasEl.addEventListener('mousedown', function (e) {
-      self.isDragging = true;
-      self.dragStartX = e.clientX;
-      self.dragStartOffset = self.viewports[assetName] || 0;
+      self.dragStates[assetName].isDragging = true;
+      self.dragStates[assetName].startX = e.clientX;
+      self.dragStates[assetName].startOffset = self.viewports[assetName] || 0;
       canvasEl.style.cursor = 'grabbing';
+      e.preventDefault(); // 防止选中文本
     });
 
-    window.addEventListener('mousemove', function (e) {
-      if (!self.isDragging) return;
-      const dx = e.clientX - self.dragStartX;
+    // mousemove 和 mouseup 绑定在 canvas 上，避免影响其他图表
+    canvasEl.addEventListener('mousemove', function (e) {
+      const ds = self.dragStates[assetName];
+      if (!ds || !ds.isDragging) return;
+      const dx = e.clientX - ds.startX;
       const barWidth = getBarPixelWidth();
       if (barWidth <= 0) return;
       const barShift = Math.round(dx / barWidth);
       const cached = self.chartDataCache[assetName];
       if (!cached) return;
       const totalCount = cached.allBodyData.length;
-      // 向左拖动 = 查看更早的数据 = offset增大
-      let newOffset = self.dragStartOffset + barShift;
-      newOffset = Math.max(0, Math.min(totalCount - 20, newOffset)); // 至少保留20根K线
+      let newOffset = ds.startOffset + barShift;
+      newOffset = Math.max(0, Math.min(totalCount - self.MIN_VISIBLE_COUNT, newOffset));
       if (newOffset !== self.viewports[assetName]) {
         self.viewports[assetName] = newOffset;
         self.refreshViewport(assetName);
       }
     });
 
-    window.addEventListener('mouseup', function () {
-      if (self.isDragging) {
-        self.isDragging = false;
+    canvasEl.addEventListener('mouseup', function () {
+      const ds = self.dragStates[assetName];
+      if (ds && ds.isDragging) {
+        ds.isDragging = false;
         canvasEl.style.cursor = 'grab';
       }
     });
 
-    // 触摸拖动（移动端）
+    canvasEl.addEventListener('mouseleave', function () {
+      const ds = self.dragStates[assetName];
+      if (ds && ds.isDragging) {
+        ds.isDragging = false;
+        canvasEl.style.cursor = 'grab';
+      }
+    });
+
+    // PC端：触控板双指缩放（ctrlKey+wheel）或鼠标滚轮缩放
+    canvasEl.addEventListener(
+      'wheel',
+      function (e) {
+        // 仅在 ctrlKey 时缩放（触控板双指捏合）
+        if (!e.ctrlKey) return;
+        e.preventDefault();
+        const cached = self.chartDataCache[assetName];
+        if (!cached) return;
+
+        const currentCount = self.visibleCounts[assetName] || self.DEFAULT_VISIBLE_COUNT;
+        // pinch in = 放大（看更少K线），pinch out = 缩小（看更多K线）
+        const delta = e.deltaY > 0 ? 20 : -20;
+        let newCount = currentCount + delta;
+        newCount = Math.max(self.MIN_VISIBLE_COUNT, Math.min(self.MAX_VISIBLE_COUNT, newCount));
+
+        if (newCount !== currentCount) {
+          self.visibleCounts[assetName] = newCount;
+          self.refreshViewport(assetName);
+        }
+      },
+      { passive: false }
+    );
+
+    // 触摸拖动 + 双指缩放（移动端）
     let touchStartX = 0;
     let touchStartOffset = 0;
+    let pinchStartDist = 0;
+    let pinchStartCount = 0;
 
     canvasEl.addEventListener(
       'touchstart',
@@ -742,13 +818,21 @@ window.TradingApp.Charts = {
         if (e.touches.length === 1) {
           touchStartX = e.touches[0].clientX;
           touchStartOffset = self.viewports[assetName] || 0;
+        } else if (e.touches.length === 2) {
+          // 双指缩放开始
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          pinchStartDist = Math.sqrt(dx * dx + dy * dy);
+          pinchStartCount = self.visibleCounts[assetName] || self.DEFAULT_VISIBLE_COUNT;
         }
         // 同时保留原有的tooltip交互
-        const touch = e.touches[0];
-        const rect = canvasEl.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-        chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          const rect = canvasEl.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        }
       },
       { passive: true }
     );
@@ -757,6 +841,7 @@ window.TradingApp.Charts = {
       'touchmove',
       function (e) {
         if (e.touches.length === 1) {
+          // 单指拖动平移
           const dx = e.touches[0].clientX - touchStartX;
           const barWidth = getBarPixelWidth();
           if (barWidth <= 0) return;
@@ -765,18 +850,34 @@ window.TradingApp.Charts = {
           if (!cached) return;
           const totalCount = cached.allBodyData.length;
           let newOffset = touchStartOffset + barShift;
-          newOffset = Math.max(0, Math.min(totalCount - 20, newOffset));
+          newOffset = Math.max(0, Math.min(totalCount - self.MIN_VISIBLE_COUNT, newOffset));
           if (newOffset !== self.viewports[assetName]) {
             self.viewports[assetName] = newOffset;
             self.refreshViewport(assetName);
           }
+        } else if (e.touches.length === 2) {
+          // 双指缩放
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const currentDist = Math.sqrt(dx * dx + dy * dy);
+          if (pinchStartDist > 0) {
+            const scale = pinchStartDist / currentDist;
+            let newCount = Math.round(pinchStartCount * scale);
+            newCount = Math.max(self.MIN_VISIBLE_COUNT, Math.min(self.MAX_VISIBLE_COUNT, newCount));
+            if (newCount !== self.visibleCounts[assetName]) {
+              self.visibleCounts[assetName] = newCount;
+              self.refreshViewport(assetName);
+            }
+          }
         }
         // 同时保留原有的tooltip交互
-        const touch = e.touches[0];
-        const rect = canvasEl.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-        chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        if (e.touches.length === 1) {
+          const touch = e.touches[0];
+          const rect = canvasEl.getBoundingClientRect();
+          const x = touch.clientX - rect.left;
+          const y = touch.clientY - rect.top;
+          chartInstance._eventHandler({ type: 'mousemove', x: x, y: y, native: e });
+        }
       },
       { passive: true }
     );
