@@ -203,7 +203,7 @@ window.TradingApp.Assets = {
         tooltip: indicators.frq_rest ? this._buildTradeConditionTooltip(indicators.frq_rest) : null,
       },
       {
-        label: '📦持仓',
+        label: '📦持仓金额',
         value:
           indicators.position && indicators.position.notionalUsd !== undefined
             ? (indicators.position.notionalUsd > 0 ? '+' : '') +
@@ -229,6 +229,32 @@ window.TradingApp.Assets = {
               : indicators.position.mgnRatio < 200
                 ? 'metric-warning'
                 : ''
+            : '',
+      },
+      {
+        label: '💰已实现收益',
+        value:
+          indicators.position && indicators.position.realizedPnl !== undefined
+            ? '$ ' + (indicators.position.realizedPnl * 1).toFixed(2)
+            : '-',
+        className:
+          indicators.position && indicators.position.realizedPnl !== undefined
+            ? indicators.position.realizedPnl * 1 >= 0
+              ? 'metric-long'
+              : 'metric-short'
+            : '',
+      },
+      {
+        label: '📊未实现收益',
+        value:
+          indicators.position && indicators.position.upl !== undefined
+            ? '$ ' + (indicators.position.upl * 1).toFixed(2)
+            : '-',
+        className:
+          indicators.position && indicators.position.upl !== undefined
+            ? indicators.position.upl * 1 >= 0
+              ? 'metric-long'
+              : 'metric-short'
             : '',
       },
     ];

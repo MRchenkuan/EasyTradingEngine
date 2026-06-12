@@ -64,6 +64,9 @@ window.TradingApp.Charts = {
       cachedData.allBodyData[lastIndex].h = tick.candle.high;
       cachedData.allBodyData[lastIndex].l = tick.candle.low;
       cachedData.allCandleData[lastIndex] = tick.candle;
+      if (tick.candle.vol != null) {
+        cachedData.allVolData[lastIndex] = tick.candle.vol;
+      }
     }
 
     // 更新最后一根 boll
@@ -95,6 +98,7 @@ window.TradingApp.Charts = {
     const visibleBollLower = cachedData.allBollLower.slice(start, end);
     const visibleBuyPoints = cachedData.allBuyPoints.slice(start, end);
     const visibleSellPoints = cachedData.allSellPoints.slice(start, end);
+    const visibleVolData = cachedData.allVolData.slice(start, end);
 
     // 计算可见区域的Y轴范围
     const prices = visibleCandleData.flatMap(d => [d.high, d.low]);
@@ -118,6 +122,7 @@ window.TradingApp.Charts = {
     cachedData.bodyData = visibleBodyData;
     cachedData.labels = visibleLabels;
     cachedData.candleData = visibleCandleData;
+    cachedData.volData = visibleVolData;
 
     chart.update('none');
   },
@@ -150,6 +155,7 @@ window.TradingApp.Charts = {
     const allBollUpper = chartData.boll?.upper || [];
     const allBollMiddle = chartData.boll?.middle || [];
     const allBollLower = chartData.boll?.lower || [];
+    const allVolData = allCandleData.map(d => d.vol || 0);
     const orders = chartData.orders || [];
     const gridLines = chartData.gridParams?.grid || [];
 
@@ -219,10 +225,12 @@ window.TradingApp.Charts = {
       allBollLower,
       allBuyPoints,
       allSellPoints,
+      allVolData,
       orderInfoMap,
       bodyData: [],
       labels: [],
       candleData: [],
+      volData: [],
     };
 
     // 初始化视口偏移（0=最新数据）
@@ -239,11 +247,13 @@ window.TradingApp.Charts = {
     const bollLower = allBollLower.slice(start, end);
     const buyPointsData = allBuyPoints.slice(start, end);
     const sellPointsData = allSellPoints.slice(start, end);
+    const volData = allVolData.slice(start, end);
 
     // 更新缓存中的可见数据引用
     this.chartDataCache[assetName].bodyData = bodyData;
     this.chartDataCache[assetName].labels = labels;
     this.chartDataCache[assetName].candleData = candleData;
+    this.chartDataCache[assetName].volData = volData;
 
     const prices = candleData.flatMap(d => [d.high, d.low]);
     const priceMin = Math.min(...prices);
@@ -381,6 +391,18 @@ window.TradingApp.Charts = {
               // K线价格信息
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">开: <span style="color:#c9d1d9;">${self.formatPrice(candle.open)}</span> 高: <span style="color:#ec7063;">${self.formatPrice(candle.high)}</span></td></tr>`;
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">低: <span style="color:#52be80;">${self.formatPrice(candle.low)}</span> 收: <span style="color:${candle.close >= candle.open ? '#ec7063' : '#52be80'};">${self.formatPrice(candle.close)}</span></td></tr>`;
+
+              // 成交量
+              const vol = cached.volData ? cached.volData[visibleIndex] : null;
+              if (vol != null) {
+                const volStr =
+                  vol >= 1000000
+                    ? (vol / 1000000).toFixed(2) + 'M'
+                    : vol >= 1000
+                      ? (vol / 1000).toFixed(1) + 'K'
+                      : vol.toFixed(0);
+                innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">量: <span style="color:#c9d1d9;">${volStr}</span></td></tr>`;
+              }
 
               // 计算全局索引查找买卖点
               const { start: viewStart } = self.getVisibleRange(assetName);
@@ -523,6 +545,26 @@ window.TradingApp.Charts = {
               ctx.fillStyle = color;
               ctx.fillRect(xCenter - halfWidth, bodyTop, barWidthPx, bodyBottom - bodyTop);
             });
+
+            // 绘制成交量柱状图（底部，最高不超过图表10%高度）
+            const visibleVolData = cached.volData;
+            if (visibleVolData && visibleVolData.length > 0) {
+              const maxVol = Math.max(...visibleVolData);
+              if (maxVol > 0) {
+                const volMaxHeight = (chartArea.bottom - chartArea.top) * 0.1;
+                visibleBodyData.forEach((data, index) => {
+                  const xCenter = xScale.getPixelForValue(index);
+                  const barWidthPx = (xScale.width / visibleLabels.length) * 0.8;
+                  const halfWidth = barWidthPx / 2;
+                  const isUp = data.c >= data.o;
+                  const volHeight = (visibleVolData[index] / maxVol) * volMaxHeight;
+                  const volY = chartArea.bottom - volHeight;
+
+                  ctx.fillStyle = isUp ? 'rgba(236, 112, 99, 0.4)' : 'rgba(82, 190, 128, 0.4)';
+                  ctx.fillRect(xCenter - halfWidth, volY, barWidthPx, volHeight);
+                });
+              }
+            }
 
             // 绘制网格水平线
             if (gridLines.length > 0) {
