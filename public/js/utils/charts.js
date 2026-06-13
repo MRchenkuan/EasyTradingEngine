@@ -679,9 +679,27 @@ window.TradingApp.Charts = {
                   );
                 }
               }
-            }
 
-            // 绘制买卖点文字标识 B/S（带圆角方框和虚线）
+              // 绘制强平线（来自 OKX API liqPx）
+              const liqPx = parseFloat(position.liqPx) || 0;
+              if (liqPx > 0) {
+                const liqY = yScale.getPixelForValue(liqPx);
+                if (liqY >= chartArea.top && liqY <= chartArea.bottom) {
+                  drawPriceLine(liqPx, '#12b942', '强平', posSign > 0 ? 10 : -10);
+                } else {
+                  const edgeY = liqY < chartArea.top ? chartArea.top + 4 : chartArea.bottom - 4;
+                  ctx.font = '10px Arial';
+                  ctx.textAlign = 'right';
+                  ctx.textBaseline = liqY < chartArea.top ? 'top' : 'bottom';
+                  ctx.fillStyle = '#12b942';
+                  ctx.fillText(
+                    `强平 ${self.formatPrice(liqPx)} ${liqY < chartArea.top ? '↑' : '↓'}`,
+                    chartArea.right - 4,
+                    edgeY
+                  );
+                }
+              }
+            }
             ctx.font = 'bold 10px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
