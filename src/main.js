@@ -148,6 +148,30 @@ try {
 // 启动 WebSocket 连接
 initBusinessWebSocket();
 
+// 消息超时检测：如果长时间没有收到消息，认为连接已死
+let lastMessageTime = Date.now();
+const MESSAGE_TIMEOUT = 60000; // 60秒无消息视为连接断开
+let heartbeatTimer = null;
+
+function startHeartbeatMonitor() {
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = setInterval(() => {
+    const ws = ws_connection_pool['ws_business'];
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // 主动发送 ping
+    ws.ping();
+
+    const elapsed = Date.now() - lastMessageTime;
+    if (elapsed > MESSAGE_TIMEOUT) {
+      console.warn(
+        `[心跳检测] 超过 ${Math.round(elapsed / 1000)} 秒未收到消息，主动断开连接以触发重连`
+      );
+      ws.terminate(); // 强制断开，触发 close 事件
+    }
+  }, 15000); // 每15秒检查一次
+}
+
 function initBusinessWebSocket() {
   const ws = new WebSocket(base_url + '/ws/v5/business');
   storeConnection('ws_business', ws);
@@ -160,10 +184,17 @@ function initBusinessWebSocket() {
     assets.map(async it => {
       await subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
     });
+    lastMessageTime = Date.now();
+    startHeartbeatMonitor();
   });
 
   ws.on('message', message => {
-    const { arg = {}, data } = JSON.parse(message.toString());
+    lastMessageTime = Date.now();
+    const raw = message.toString();
+    // OKX 心跳响应：{"event":"pong"}
+    if (raw === '{"event":"pong"}') return;
+
+    const { arg = {}, data } = JSON.parse(raw);
     const { channel, instId } = arg;
     if (channel.indexOf('candle') === 0) {
       if (data) {
@@ -176,21 +207,28 @@ function initBusinessWebSocket() {
 
   ws.on('error', error => {
     console.error('ws_business WebSocket 错误:', error.message);
-    // 触发关闭事件，进入重连逻辑
-    handleWebSocketClose(1011, error.message); // 使用一个自定义的错误码，例如 1011
+    // error 事件后通常会紧跟 close 事件，不需要手动触发重连
+    // 避免与 close 事件重复触发 handleWebSocketClose
   });
 
-  ws.on('close', handleWebSocketClose);
+  ws.on('close', (code, reason) => {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    handleWebSocketClose(code, reason);
+  });
 }
 
 // 全局重连尝试计数器
 let reconnectAttempts = 0;
+let isReconnecting = false; // 防止并发重连
 const MAX_RECONNECT_ATTEMPTS = 10; // 最大重连尝试次数
 const BACKOFF_BASE = 5000; // 基础重试间隔（毫秒）
 const BACKOFF_MULTIPLIER = 1.5; // 指数退避乘数
 const MAX_BACKOFF = 60000; // 最大重试间隔（毫秒）
 
 async function handleWebSocketClose(code, reason) {
+  if (isReconnecting) return; // 防止并发重连
+  isReconnecting = true;
+
   console.log(`ws_business连接已关闭, 关闭码: ${code}, 原因: ${reason}`);
 
   // 停止引擎
@@ -241,6 +279,7 @@ async function handleWebSocketClose(code, reason) {
 
       // 重置重连尝试计数器
       reconnectAttempts = 0;
+      isReconnecting = false;
       // 重新建立连接
       initBusinessWebSocket();
     } else {
@@ -248,6 +287,7 @@ async function handleWebSocketClose(code, reason) {
     }
   } catch (error) {
     console.error('重连失败:', error.message);
+    isReconnecting = false;
     // 递归重试
     handleWebSocketClose(code, reason);
   }

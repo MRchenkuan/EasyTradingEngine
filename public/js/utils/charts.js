@@ -65,7 +65,8 @@ window.TradingApp.Charts = {
       cachedData.allBodyData[lastIndex].l = tick.candle.low;
       cachedData.allCandleData[lastIndex] = tick.candle;
       if (tick.candle.vol != null) {
-        cachedData.allVolData[lastIndex] = tick.candle.vol;
+        cachedData.allVolData[lastIndex] =
+          tick.candle.vol * ((tick.candle.open + tick.candle.close) / 2);
       }
     }
 
@@ -155,7 +156,7 @@ window.TradingApp.Charts = {
     const allBollUpper = chartData.boll?.upper || [];
     const allBollMiddle = chartData.boll?.middle || [];
     const allBollLower = chartData.boll?.lower || [];
-    const allVolData = allCandleData.map(d => d.vol || 0);
+    const allVolData = allCandleData.map(d => (d.vol || 0) * ((d.open + d.close) / 2));
     const orders = chartData.orders || [];
     const gridLines = chartData.gridParams?.grid || [];
 
@@ -392,7 +393,7 @@ window.TradingApp.Charts = {
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">开: <span style="color:#c9d1d9;">${self.formatPrice(candle.open)}</span> 高: <span style="color:#ec7063;">${self.formatPrice(candle.high)}</span></td></tr>`;
               innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">低: <span style="color:#52be80;">${self.formatPrice(candle.low)}</span> 收: <span style="color:${candle.close >= candle.open ? '#ec7063' : '#52be80'};">${self.formatPrice(candle.close)}</span></td></tr>`;
 
-              // 成交量
+              // 成交额
               const vol = cached.volData ? cached.volData[visibleIndex] : null;
               if (vol != null) {
                 const volStr =
@@ -401,7 +402,7 @@ window.TradingApp.Charts = {
                     : vol >= 1000
                       ? (vol / 1000).toFixed(1) + 'K'
                       : vol.toFixed(0);
-                innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">量: <span style="color:#c9d1d9;">${volStr}</span></td></tr>`;
+                innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">额: <span style="color:#c9d1d9;">$${volStr}</span></td></tr>`;
               }
 
               // 计算全局索引查找买卖点
@@ -642,13 +643,17 @@ window.TradingApp.Charts = {
               );
 
               // 绘制完全平仓线
-              const pos = parseFloat(position.notionalUsd);
+              const notionalUsd = Math.abs(parseFloat(position.notionalUsd));
+              const posContracts = Math.abs(parseFloat(position.pos));
               const gridWidth = parseFloat(gridParams?.grid_width) || 0;
               const baseAmount = parseFloat(gridParams?.base_amount) || 30;
-              if (pos !== 0 && gridWidth > 0 && baseAmount > 0) {
-                const gridSpan = Math.abs(pos) / baseAmount;
+              const lastTradePrice = parseFloat(gridParams?.last_trade_price);
+              const gridBasePrice = parseFloat(gridParams?.grid_base_price);
+              if (notionalUsd > 0 && gridWidth > 0 && baseAmount > 0 && posContracts > 0) {
+                const basePrice = lastTradePrice || gridBasePrice || avgPx;
+                const gridSpan = notionalUsd / baseAmount;
                 const totalSpan = gridSpan * gridWidth;
-                const closePrice = avgPx * (1 + posSign * totalSpan);
+                const closePrice = basePrice * (1 + posSign * totalSpan);
                 const chartArea = chart.chartArea;
                 const closeY = yScale.getPixelForValue(closePrice);
 
