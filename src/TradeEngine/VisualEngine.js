@@ -724,12 +724,10 @@ export class VisualEngine {
     const data = assetIds.map((assetId, i_info) => {
       // 价格
       const { prices, ts } = TradeEngine.getMarketData(assetId);
-      if (!prices || !prices.length) return ['-', '-', '-'];
       const start_price = prices[0];
       const price = prices.at(-1);
-      const rate = start_price ? (price - start_price) / start_price : 0;
-      const beta = beta_map[assetId]?.[0];
-      return [beta !== undefined ? beta.toFixed(6) : '-', price, rate];
+      const rate = (price - start_price) / start_price;
+      return [beta_map[assetId][0].toFixed(6), price, rate];
     });
 
     const cellWidth = 90; // 单元格宽度
