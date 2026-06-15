@@ -13,8 +13,9 @@ import {
 import { base_url } from '../config.security.js';
 import { subscribeKlineChanel } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
-import { VisualEngine } from './TradeEngine/VisualEngine.js';
-import { KLine, MainGraph, Strategies } from '../config.js';
+import { VisualWorkerManager } from './workers/VisualWorkerManager.js';
+import { KLine, MainGraph, Strategies, Env } from '../config.js';
+import { TradeEnv } from './enum.js';
 
 const ws_connection_pool = {};
 
@@ -65,12 +66,14 @@ Strategies.forEach(strategy => {
 });
 
 /**
- * 启动图像引擎
+ * 启动图像引擎（Worker 线程，不阻塞主线程）
  */
-VisualEngine.setMetaInfo({
+const painting_interval = Env === TradeEnv.MIMIC ? 1000 : 10000;
+VisualWorkerManager.init({
   assets,
   show_order_his: MainGraph.order_his_show,
-}).start();
+  painting_interval,
+});
 
 const assetIds = assets.map(it => it.id);
 
@@ -147,6 +150,9 @@ try {
 
 // 启动 WebSocket 连接
 initBusinessWebSocket();
+
+// K线数据已加载，启动 Visual Worker
+VisualWorkerManager.start();
 
 // 消息超时检测：如果长时间没有收到消息，认为连接已死
 let lastMessageTime = Date.now();
@@ -233,7 +239,7 @@ async function handleWebSocketClose(code, reason) {
 
   // 停止引擎
   TradeEngine.stop();
-  VisualEngine.stop();
+  VisualWorkerManager.stop();
 
   reconnectAttempts++;
 
@@ -275,7 +281,7 @@ async function handleWebSocketClose(code, reason) {
 
       // 重新启动引擎
       TradeEngine.start();
-      VisualEngine.start();
+      VisualWorkerManager.start();
 
       // 重置重连尝试计数器
       reconnectAttempts = 0;
