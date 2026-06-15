@@ -417,6 +417,10 @@ body {
 .chart-canvas {
   width: 100% !important;
   height: 100% !important;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* 移动端适配 */
