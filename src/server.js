@@ -62,7 +62,7 @@ export class MonitorServer {
   _scheduleDailyTokenUpdate() {
     const now = new Date();
     const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setDate(tomorrow.getDate() + 7);
     tomorrow.setHours(0, 0, 0, 0);
 
     const timeUntilTomorrow = tomorrow - now;
@@ -70,7 +70,9 @@ export class MonitorServer {
     setTimeout(() => {
       this.currentToken = this._generateToken();
       this.originalConsole.log(`访问Token已更新: ${this.currentToken}`);
-      this.originalConsole.log(`新的访问地址: http://localhost:${this.port}/${this.currentToken}`);
+      this.originalConsole.log(
+        `新的访问地址: http://154.9.24.206:${this.port}/${this.currentToken}`
+      );
       this._scheduleDailyTokenUpdate();
     }, timeUntilTomorrow);
   }
@@ -148,9 +150,6 @@ export class MonitorServer {
     // indicators WebSocket：轻量数据
     this.wssIndicators = new WebSocketServer({ noServer: true, verifyClient });
     this.wssIndicators.on('connection', ws => {
-      this.originalConsole.log(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 indicators WebSocket 连接`
-      );
       this.indicatorClients.add(ws);
       ws.send(
         JSON.stringify({
@@ -165,9 +164,6 @@ export class MonitorServer {
     // chart WebSocket：完整K线数据（连接时 + 新K线产生时才推送）
     this.wssChart = new WebSocketServer({ noServer: true, verifyClient });
     this.wssChart.on('connection', ws => {
-      this.originalConsole.log(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 chart WebSocket 连接`
-      );
       this.chartClients.add(ws);
       ws.send(
         JSON.stringify({
@@ -182,9 +178,6 @@ export class MonitorServer {
     // tick WebSocket：最后一根K线更新（高频）
     this.wssTick = new WebSocketServer({ noServer: true, verifyClient });
     this.wssTick.on('connection', ws => {
-      this.originalConsole.log(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}] 新的 tick WebSocket 连接`
-      );
       this.tickClients.add(ws);
       // 连接时发送当前最后一根K线
       ws.send(
