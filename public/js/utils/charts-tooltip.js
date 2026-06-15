@@ -11,6 +11,12 @@ window.TradingApp.ChartTooltip = {
         document.body.appendChild(tooltipEl);
       }
 
+      // 非长按模式下不显示tooltip
+      if (!self.longPressActive?.[assetName]) {
+        tooltipEl.style.opacity = '0';
+        return;
+      }
+
       // 隐藏tooltip
       const tooltipModel = context.tooltip;
       if (tooltipModel.opacity === 0) {

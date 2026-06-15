@@ -128,6 +128,8 @@ window.TradingApp.ChartInteraction = {
           clearTimeout(longPressTimer);
           longPressTimer = setTimeout(() => {
             isLongPress = true;
+            if (!self.longPressActive) self.longPressActive = {};
+            self.longPressActive[assetName] = true;
             canvasEl.style.cursor = 'crosshair';
             // 显示十字线和 tooltip
             updateLongPressCrosshair(e.touches[0].clientX);
@@ -212,6 +214,7 @@ window.TradingApp.ChartInteraction = {
       function () {
         clearTimeout(longPressTimer);
         isLongPress = false;
+        if (self.longPressActive) delete self.longPressActive[assetName];
         canvasEl.style.cursor = 'grab';
         clearLongPressCrosshair();
         // 松开时隐藏tooltip
