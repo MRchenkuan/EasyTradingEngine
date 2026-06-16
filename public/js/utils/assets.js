@@ -205,9 +205,8 @@ window.TradingApp.Assets = {
       {
         label: '📦持仓金额',
         value:
-          indicators.position && indicators.position.notionalUsd !== undefined
-            ? (indicators.position.notionalUsd > 0 ? '+' : '') +
-              parseFloat(indicators.position.notionalUsd).toFixed(2)
+          indicators.position && indicators.position.pos !== undefined
+            ? '$ ' + parseFloat(indicators.position.notionalUsd).toFixed(2)
             : '-',
         className:
           indicators.position && indicators.position.pos > 0
