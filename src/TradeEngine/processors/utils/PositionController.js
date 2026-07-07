@@ -207,8 +207,6 @@ export class PositionController {
     threshold,
     gridCount,
     grid_span_abs,
-    last_open_grid_span,
-    last_close_grid_span
   ) {
     const actionType = this.getPositionAction(tendency);
     const riskLevel = this.getMixedRiskLevel();
