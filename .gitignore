@@ -19,3 +19,4 @@ okx-trading.tar
 /chart/*
 !chart/.gitkeep.DS_Store
 .DS_Store
+/kline_data/*

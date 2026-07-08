@@ -14,6 +14,7 @@ import { base_url } from '../config.security.js';
 import { subscribeKlineChanel } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
 import { VisualEngine } from './TradeEngine/VisualEngine.js';
+import { startAutoFlush, stopAutoFlush } from './TradeEngine/KlineLogger.js';
 import { KLine, MainGraph, Strategies } from '../config.js';
 
 const ws_connection_pool = {};
@@ -147,6 +148,19 @@ try {
 
 // 启动 WebSocket 连接
 initBusinessWebSocket();
+
+// 启动 K 线数据自动刷盘
+startAutoFlush();
+
+// 进程退出时确保数据刷盘
+process.on('SIGINT', () => {
+  stopAutoFlush();
+  process.exit(0);
+});
+process.on('SIGTERM', () => {
+  stopAutoFlush();
+  process.exit(0);
+});
 
 // 消息超时检测：如果长时间没有收到消息，认为连接已死
 let lastMessageTime = Date.now();

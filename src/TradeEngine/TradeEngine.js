@@ -12,6 +12,7 @@ import { HedgeProcessor } from './processors/HedgeProcessor.js';
 import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 import { calculateChipDistribution } from '../indicators/CD.js';
+import { logCandle, logCandles } from './KlineLogger.js';
 
 export class TradeEngine {
   static processors = [];
@@ -389,6 +390,9 @@ export class TradeEngine {
       existingCandles.splice(insertIndex, 0, candleInfo);
     }
     this.market_candle[bar_type][assetId] = existingCandles.slice(-this._max_candle_size);
+
+    // 记录 K 线数据到本地文件
+    logCandle(assetId, bar_type, candleInfo);
   }
 
   static updateCandleDates(assetId, bar_type, candle_data_array) {
@@ -422,6 +426,9 @@ export class TradeEngine {
     this.market_candle[bar_type][assetId] = sortedTimestamps
       .map(ts => candleMap.get(ts))
       .slice(-this._max_candle_size);
+
+    // 批量记录 K 线数据到本地文件
+    logCandles(assetId, bar_type, candleInfoArray);
   }
 
   /**
