@@ -55,7 +55,6 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/config.js ./
 COPY --from=builder /app/config.security.js ./
 COPY --from=builder /app/config.security.mimic.js ./
-COPY --from=builder /app/transform.js ./
 COPY --from=builder /app/public ./public
 
 # 创建必要的目录并设置权限
