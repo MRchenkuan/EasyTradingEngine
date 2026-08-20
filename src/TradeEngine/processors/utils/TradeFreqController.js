@@ -28,11 +28,17 @@ export function TradeFreqController(params) {
     [PositionAction.CLOSE]: last_close_grid_span,
   }[position_action];
 
-  // 节流距离计算
-  const throttleSpan = {
+  // 节流距离计算：开仓和平仓分开
+  // 开仓：高风险高节流（需要更大跨度才放行）
+  const openThrottleSpan = {
     emergency: 1 + lastTradeGridSpan * 2,
     high: 1 + lastTradeGridSpan * 1.5,
     low: 1 + lastTradeGridSpan * 1.25,
+  };
+  // 平仓：高风险低节流（更容易平仓以减少风险暴露）
+  const closeThrottleSpan = {
+    high: 1 + lastTradeGridSpan * 1.25,
+    low: 1 + lastTradeGridSpan * 1.5,
   };
 
   // 风险等级分组
@@ -51,16 +57,16 @@ export function TradeFreqController(params) {
   const passOverThrottleResetTime = time_since_last_trade > throttleResetTime;
   const passOverThrottleDistance = grid_span_abs > maxThrottleDistance;
 
-  // 平仓条件
+  // 平仓条件（高风险低节流，更容易平仓）
   const passCloseEmergencyNoThrottle = isClose && isEmergencyRisk;
-  const passCloseHighRiskSpan = isClose && isHighRisk && grid_span_abs >= throttleSpan.high;
-  const passCloseLowRiskSpan = isClose && grid_span_abs >= throttleSpan.low;
+  const passCloseHighRiskSpan = isClose && isHighRisk && grid_span_abs >= closeThrottleSpan.high;
+  const passCloseLowRiskSpan = isClose && grid_span_abs >= closeThrottleSpan.low;
 
-  // 开仓条件
+  // 开仓条件（高风险高节流，更难开仓）
   const passOpenEmergencySpan =
-    isOpen && isEmergencyRisk && grid_span_abs >= throttleSpan.emergency;
-  const passOpenHighRiskSpan = isOpen && isHighRisk && grid_span_abs >= throttleSpan.high;
-  const passOpenLowRiskSpan = isOpen && grid_span_abs >= throttleSpan.low;
+    isOpen && isEmergencyRisk && grid_span_abs >= openThrottleSpan.emergency;
+  const passOpenHighRiskSpan = isOpen && isHighRisk && grid_span_abs >= openThrottleSpan.high;
+  const passOpenLowRiskSpan = isOpen && grid_span_abs >= openThrottleSpan.low;
 
   const args = {
     // 通用条件
@@ -112,15 +118,15 @@ export function TradeFreqController(params) {
         ...args,
       };
     }
-    // 2 在高风险下，有限节流
-    if (isHighRisk && grid_span_abs < throttleSpan.high) {
+    // 2 在高风险下，低节流（更容易平仓）
+    if (isHighRisk && grid_span_abs < closeThrottleSpan.high) {
       return {
         shouldTrade: false,
         ...args,
       };
     }
     // 3 在低风险下，常规节流
-    if (grid_span_abs < throttleSpan.low) {
+    if (grid_span_abs < closeThrottleSpan.low) {
       return {
         shouldTrade: false,
         ...args,
@@ -131,21 +137,21 @@ export function TradeFreqController(params) {
   // 对于开仓，根据风险设定节流距离
   if (position_action === PositionAction.OPEN) {
     // 1 在紧急状况下，高度节流
-    if (isEmergencyRisk && grid_span_abs < throttleSpan.emergency) {
+    if (isEmergencyRisk && grid_span_abs < openThrottleSpan.emergency) {
       return {
         shouldTrade: false,
         ...args,
       };
     }
     // 2 在高风险下，强化节流
-    if (isHighRisk && grid_span_abs < throttleSpan.high) {
+    if (isHighRisk && grid_span_abs < openThrottleSpan.high) {
       return {
         shouldTrade: false,
         ...args,
       };
     }
     // 3 在低风险下，常规节流
-    if (grid_span_abs < throttleSpan.low) {
+    if (grid_span_abs < openThrottleSpan.low) {
       return {
         shouldTrade: false,
         ...args,
