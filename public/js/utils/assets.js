@@ -74,8 +74,8 @@ window.TradingApp.Assets = {
         html +=
           '<div class="tooltip-section-title">平仓节流 <span class="tooltip-hint">(紧急避险优先)</span></div>';
         html += renderRow('紧急避险放行', frq_rest.passCloseEmergencyNoThrottle);
-        html += renderRow('高风险 · 距离≥1.5倍', frq_rest.passCloseHighRiskSpan);
-        html += renderRow('低风险 · 距离≥1.25倍', frq_rest.passCloseLowRiskSpan);
+        html += renderRow('高风险 · 距离≥1.25倍', frq_rest.passCloseHighRiskSpan);
+        html += renderRow('低风险 · 距离≥1.5倍', frq_rest.passCloseLowRiskSpan);
         html += '</div>';
       }
     }
