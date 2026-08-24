@@ -37,8 +37,8 @@ export function TradeFreqController(params) {
   };
   // 平仓：高风险低节流（更容易平仓以减少风险暴露）
   const closeThrottleSpan = {
-    high: 1 + lastTradeGridSpan * 1.25,
-    low: 1 + lastTradeGridSpan * 1.5,
+    high: 1 + lastTradeGridSpan,
+    low: 1 + lastTradeGridSpan * 1.25,
   };
 
   // 风险等级分组

@@ -63,9 +63,9 @@ window.TradingApp.Assets = {
         html += '<div class="tooltip-section">';
         html +=
           '<div class="tooltip-section-title">开仓节流 <span class="tooltip-hint">(按风险等级递进)</span></div>';
-        html += renderRow('紧急风险 · 距离≥2倍', frq_rest.passOpenEmergencySpan);
-        html += renderRow('高风险 · 距离≥1.5倍', frq_rest.passOpenHighRiskSpan);
-        html += renderRow('低风险 · 距离≥1.25倍', frq_rest.passOpenLowRiskSpan);
+        html += renderRow('紧急风险 · 距离≥1+2倍', frq_rest.passOpenEmergencySpan);
+        html += renderRow('高风险 · 距离≥1+1.5倍', frq_rest.passOpenHighRiskSpan);
+        html += renderRow('低风险 · 距离≥1+1.25倍', frq_rest.passOpenLowRiskSpan);
         html += '</div>';
       }
 
@@ -74,8 +74,8 @@ window.TradingApp.Assets = {
         html +=
           '<div class="tooltip-section-title">平仓节流 <span class="tooltip-hint">(紧急避险优先)</span></div>';
         html += renderRow('紧急避险放行', frq_rest.passCloseEmergencyNoThrottle);
-        html += renderRow('高风险 · 距离≥1.25倍', frq_rest.passCloseHighRiskSpan);
-        html += renderRow('低风险 · 距离≥1.5倍', frq_rest.passCloseLowRiskSpan);
+        html += renderRow('高风险 · 距离≥1+1倍', frq_rest.passCloseHighRiskSpan);
+        html += renderRow('低风险 · 距离≥1+1.25倍', frq_rest.passCloseLowRiskSpan);
         html += '</div>';
       }
     }
