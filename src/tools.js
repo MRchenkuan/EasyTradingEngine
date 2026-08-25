@@ -107,11 +107,16 @@ export async function getPrices(
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
-      const { data } = await marketCandles(assetId, bar, last_ts, to_when, once_limit);
-      console.log(assetId, formatTimestamp(last_ts), bar, data.length);
-      if (!(data && data.length > 0)) break;
-      last_ts = parseCandleData(data[data.length - 1])['ts'];
-      collections = collections.concat(data);
+      try {
+        const { data } = await marketCandles(assetId, bar, last_ts, to_when, once_limit);
+        console.log(assetId, formatTimestamp(last_ts), bar, data.length);
+        if (!(data && data.length > 0)) break;
+        last_ts = parseCandleData(data[data.length - 1])['ts'];
+        collections = collections.concat(data);
+      } catch (pageErr) {
+        console.warn(`${assetId} K线第 ${times + 1} 页获取失败: ${pageErr.message}，跳过剩余页`);
+        break;
+      }
     }
     return {
       id: assetId,
@@ -136,11 +141,18 @@ export async function getHistoryPrices(
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
-      const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
-      console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length);
-      if (!(data && data.length > 0)) break;
-      last_ts = parseCandleData(data[data.length - 1])['ts'];
-      collections = collections.concat(data);
+      try {
+        const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
+        console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length);
+        if (!(data && data.length > 0)) break;
+        last_ts = parseCandleData(data[data.length - 1])['ts'];
+        collections = collections.concat(data);
+      } catch (pageErr) {
+        console.warn(
+          `${assetId}(HIS) 历史K线第 ${times + 1} 页获取失败: ${pageErr.message}，跳过剩余页`
+        );
+        break;
+      }
     }
     return {
       id: assetId,
@@ -165,18 +177,25 @@ export async function getHistoryOpenInterest(
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
-      const { data } = await getOpenInterestHistory(assetId, bar, to_when, last_ts, once_limit);
-      console.log(
-        assetId + `(INTEREST - HIS ${page - times}/${page})`,
-        formatTimestamp(last_ts),
-        bar,
-        data.length
-      );
-      if (!(data && data.length > 1)) break;
-      last_ts = parseCandleData(data[data.length - 1])['ts'];
-      collections = collections.concat(data);
-      // 等待 300ms
-      await new Promise(resolve => setTimeout(resolve, 300));
+      try {
+        const { data } = await getOpenInterestHistory(assetId, bar, to_when, last_ts, once_limit);
+        console.log(
+          assetId + `(INTEREST - HIS ${page - times}/${page})`,
+          formatTimestamp(last_ts),
+          bar,
+          data.length
+        );
+        if (!(data && data.length > 1)) break;
+        last_ts = parseCandleData(data[data.length - 1])['ts'];
+        collections = collections.concat(data);
+        // 等待 300ms
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (pageErr) {
+        console.warn(
+          `${assetId} 持仓量历史第 ${page - times}/${page} 页获取失败: ${pageErr.message}，跳过剩余页`
+        );
+        break;
+      }
     }
     return collections;
   } catch (e) {

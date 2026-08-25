@@ -195,9 +195,17 @@ function initBusinessWebSocket() {
     console.log(
       `监控服务器已启动，访问 http://154.9.24.206:${monitorServer.port}/${monitorServer.currentToken}`
     );
-    assets.map(async it => {
-      await subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
+    // 逐个订阅，确保每个订阅都发送成功
+    let subscribed = 0;
+    assets.forEach(it => {
+      try {
+        subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
+        subscribed++;
+      } catch (e) {
+        console.error(`订阅 ${it.id} 失败:`, e.message);
+      }
     });
+    console.log(`K线频道订阅完成: ${subscribed}/${assets.length}`);
     lastMessageTime = Date.now();
     startHeartbeatMonitor();
   });
@@ -207,6 +215,17 @@ function initBusinessWebSocket() {
     const raw = message.toString();
     // OKX 心跳响应：{"event":"pong"}
     if (raw === '{"event":"pong"}') return;
+
+    // 订阅确认消息：{"event":"subscribe","arg":{"channel":"candle5m","instId":"BTC-USDT-SWAP"}}
+    if (raw.includes('"event":"subscribe"')) {
+      console.log(`订阅成功: ${raw}`);
+      return;
+    }
+    // 订阅错误消息：{"event":"error","code":...,"msg":...}
+    if (raw.includes('"event":"error"')) {
+      console.error(`订阅错误: ${raw}`);
+      return;
+    }
 
     const { arg = {}, data } = JSON.parse(raw);
     const { channel, instId } = arg;

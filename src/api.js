@@ -7,6 +7,9 @@ import { TradeEnv } from './enum.js';
 
 const base_url = 'https://www.okx.com';
 const MIMIC = Env === TradeEnv.MIMIC;
+
+// 设置全局默认超时，避免 Docker 环境中 API 调用无限挂起
+axios.defaults.timeout = 15000;
 export async function marketCandles(instId, bar, after, before, limit) {
   const { data } = await axios.get(base_url + '/api/v5/market/candles', {
     params: {
@@ -77,7 +80,10 @@ export async function getOrderHistory(params = {}) {
     const { data } = await axios.get(base_url + fullPath, { headers });
     return data;
   } catch (error) {
-    console.error('获取订单历史失败:', error.response?.data || error.message);
+    console.error(
+      `获取订单历史失败 [${params.instId || '未知'}]:`,
+      error.response?.data || error.message
+    );
     throw error;
   }
 }
@@ -297,7 +303,10 @@ export async function getOpenInterestHistory(instId, period, begin, end, limit =
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种持仓历史信息失败:', error.response?.data || error.message);
+    console.error(
+      `获取交易品种持仓历史信息失败 [${instId}]:`,
+      error.response?.data || error.message
+    );
     return { data: [] };
   }
 }
@@ -349,7 +358,10 @@ export async function getPositions(instId, instType, posId) {
     }
     return { ...data, success: true };
   } catch (error) {
-    console.error('获取交易品种个人持仓信息失败:', error.response?.data || error.message);
+    console.error(
+      `获取交易品种个人持仓信息失败 [${instId}]:`,
+      error.response?.data || error.message
+    );
     throw error;
   }
 }
@@ -382,12 +394,15 @@ export async function getOpenInterest(instType, instId, uly, instFamily) {
       throw new Error(data.msg);
     }
     if (!data.data || !data.data.length) {
-      console.warn(`未获取到交易品种市场持仓信息: ${instId} ${ordId}`);
+      console.warn(`未获取到交易品种市场持仓信息: ${instId}`);
       return { data: [] };
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种市场持仓信息失败:', error.response?.data || error.message);
+    console.error(
+      `获取交易品种市场持仓信息失败 [${instId}]:`,
+      error.response?.data || error.message
+    );
     return { data: [] };
   }
 }
@@ -420,12 +435,12 @@ export async function getInstruments(instType, instId) {
     }
     // 确保返回的数据格式正确
     if (!data.data || !data.data.length) {
-      console.warn(`未获取到交易品种基础信息: ${instId} ${ordId}`);
+      console.warn(`未获取到交易品种基础信息: ${instId}`);
       return { data: [] };
     }
     return data;
   } catch (error) {
-    console.error('获取交易品种基础信息失败:', error.response?.data || error.message);
+    console.error(`获取交易品种基础信息失败 [${instId}]:`, error.response?.data || error.message);
     return { data: [] };
   }
 }
@@ -465,7 +480,7 @@ export async function getOrderInfo(instId, ordId) {
     }
     return data;
   } catch (error) {
-    console.error('获取订单信息失败:', error.response?.data || error.message);
+    console.error(`获取订单信息失败 [${instId}]:`, error.response?.data || error.message);
     return { data: [] };
   }
 }
