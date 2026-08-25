@@ -42,7 +42,7 @@ export function TradeFreqController(params) {
   };
 
   // 风险等级分组
-  const emergencyRiskLevels = [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH];
+  const emergencyRiskLevels = [ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH, CROSS_EMERGENCY];
   const highRiskLevels = [ISOLATE_HIGHT, DUAL_HIGH, CROSS_EMERGENCY];
 
   const isEmergencyRisk = emergencyRiskLevels.includes(risk_level);
