@@ -599,7 +599,7 @@ export class GridTradingSlice extends AbstractPainter {
                   `${(turnover * 100).toFixed(4)}%：换手率`,
                   `$ ${(Math.sign(pos) * notionalUsd).toFixed(2)} USD/${pos} 张：持仓`,
                   `${Math.round(mgnRatio * 100)}%：维持保证金`,
-                  `${processor._position_risk_level}：风险等级`,
+                  `${processor?._position_risk_level ?? '-'}：风险等级`,
                   `$ ${(realizedPnl * 1).toFixed(2)}：已实现收益`,
                   `$ ${(upl * 1).toFixed(2)}：未实现收益`,
                 ],

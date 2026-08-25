@@ -835,7 +835,7 @@ export class TradeEngine {
         }
       } catch (e) {
         // API 调用失败，保持原有持仓信息不变
-        console.log(`获取个人持仓信息失败: ${e.message}`);
+        console.log(`获取个人持仓信息失败 [${assetName}]: ${e.message}`);
       } finally {
         // 设置定时器
         this._position_timers[assetName] = setTimeout(

@@ -408,41 +408,57 @@ export async function getOpenInterest(instType, instId, uly, instFamily) {
 }
 
 // 获取交易品种信息
+// 全局请求队列：确保每秒只发出一个请求
+let _instrumentsQueue = Promise.resolve();
+let _instrumentsLastCall = 0;
+
+function enqueueInstrumentsRequest(fn) {
+  const now = Date.now();
+  const wait = Math.max(0, 1000 - (now - _instrumentsLastCall));
+  _instrumentsLastCall = now + wait;
+  _instrumentsQueue = _instrumentsQueue
+    .then(() => new Promise(resolve => setTimeout(resolve, wait)))
+    .then(fn);
+  return _instrumentsQueue;
+}
+
 export async function getInstruments(instType, instId) {
-  const security = MIMIC ? mimic : firm;
+  return enqueueInstrumentsRequest(async () => {
+    const security = MIMIC ? mimic : firm;
 
-  const timestamp = new Date().toISOString();
-  const method = 'GET';
-  const requestPath = `/api/v5/public/instruments?instType=${instType}&instId=${instId}`;
-  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
+    const timestamp = new Date().toISOString();
+    const method = 'GET';
+    const requestPath = `/api/v5/public/instruments?instType=${instType}&instId=${instId}`;
+    const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
 
-  const headers = {
-    'OK-ACCESS-KEY': security.api_key,
-    'OK-ACCESS-SIGN': sign,
-    'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
-    // 'x-simulated-trading': 1,
-  };
+    const headers = {
+      'OK-ACCESS-KEY': security.api_key,
+      'OK-ACCESS-SIGN': sign,
+      'OK-ACCESS-TIMESTAMP': timestamp,
+      'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+      // 'x-simulated-trading': 1,
+    };
 
-  if (MIMIC) {
-    headers['x-simulated-trading'] = 1;
-  }
-
-  try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
-    if (data.code != 0) {
-      throw new Error(data.msg);
+    if (MIMIC) {
+      headers['x-simulated-trading'] = 1;
     }
-    // 确保返回的数据格式正确
-    if (!data.data || !data.data.length) {
-      console.warn(`未获取到交易品种基础信息: ${instId}`);
+
+    try {
+      const { data } = await axios.get(base_url + requestPath, { headers });
+      if (data.code != 0) {
+        throw new Error(data.msg);
+      }
+      // 确保返回的数据格式正确
+      if (!data.data || !data.data.length) {
+        console.warn(`未获取到交易品种基础信息: ${instId}`);
+        return { data: [] };
+      }
+      return data;
+    } catch (error) {
+      console.error(`获取交易品种基础信息失败 [${instId}]:`, error.response?.data || error.message);
       return { data: [] };
     }
-    return data;
-  } catch (error) {
-    console.error(`获取交易品种基础信息失败 [${instId}]:`, error.response?.data || error.message);
-    return { data: [] };
-  }
+  });
 }
 
 // 获取订单信息
