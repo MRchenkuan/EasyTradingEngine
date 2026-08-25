@@ -8,8 +8,7 @@ window.TradingApp.Assets = {
     const maxDisplay = 10;
     const full = Math.min(Math.floor(abs), maxDisplay);
     const hasDecimal = abs - Math.floor(abs) > 0 && full < maxDisplay;
-    const overflow = Math.floor(abs) > maxDisplay ? `+${Math.floor(abs) - maxDisplay}` : '';
-    return `${sign}${'█'.repeat(full)}${hasDecimal ? '░' : ''}${overflow} ${count}`;
+    return `${sign}${'█'.repeat(full)}${hasDecimal ? '░' : ''} ${count}`;
   },
 
   // 格式化价差格数：█=1格，░=小数，最多显示10格
