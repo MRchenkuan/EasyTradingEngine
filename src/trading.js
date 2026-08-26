@@ -8,7 +8,6 @@ import {
   updateTransaction,
 } from './recordTools.js';
 import { calcProfit, hashString } from './tools.js';
-import { TradeEngine } from './TradeEngine/TradeEngine.js';
 import { generateCounterBasedId } from './uuid.js';
 
 function getBetaMap() {
@@ -125,11 +124,12 @@ export async function executeOrders(orderList) {
 }
 
 // 修改 open_position 函数
-export async function open_position(short, long, size) {
+// getRealtimePrice: (instId) => number — 由调用方注入，避免 trading.js → TradeEngine.js 循环依赖
+export async function open_position(short, long, size, getRealtimePrice) {
   console.log('开仓...', short, long, size);
   const tradeId = hashString(generateCounterBasedId());
 
-  const short_price = TradeEngine.getRealtimePrice(short);
+  const short_price = getRealtimePrice(short);
   const short_size = size / short_price;
   const long_size = size;
 

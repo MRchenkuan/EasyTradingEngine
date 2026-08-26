@@ -1,6 +1,8 @@
 import { getAccountBalance } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import { monitorServer } from '../server.js';
+import { RiskControl } from '../../config.js';
+import { Liquidator } from './Liquidator.js';
 
 /**
  * 账户风控监控器（余额/回撤/杠杆）
@@ -19,25 +21,25 @@ export class AccountRiskMonitor {
     this.engine = engine;
     this._account_balance = null; // 账户余额数据（含 totalEq 总权益，回撤控制口径）
     this._balance_timer = null; // 账户余额定时器
-    this._balance_refresh_interval = 30000; // 账户余额刷新间隔 30秒
+    this._balance_refresh_interval = RiskControl.balance_refresh_interval; // 账户余额刷新间隔
     this._balance_started = false; // 余额定时拉取是否已启动（幂等保护，避免 start() 重入时重复启动）
     // 总权益历史极值（持久化，重启不丢失；用于回撤控制基准）
     // 结构：{ maxEq, minEq, maxEqTs, minEqTs, lastConfirmedEq }
     this._account_eq_stats = new LocalVariable('TradeEngine/accountEqStats');
     // 内存备份：LocalVariable proxy 在某些场景下读取不可靠，用普通对象做双保险
     this._eq_mem = {};
-    // 跳变防护：raw 与 confirmed 偏差超此阈值视为可疑，需连续两次相近值才采纳
-    // 阈值 0.3 > 回撤清仓线 0.2，保证真实 20% 回撤能即时反映，仅 >30% 的跳变需确认
-    this._balance_jump_threshold = 0.3;
+    // 跳变防护阈值（从 config.js RiskControl 读取）
+    this._balance_jump_threshold = RiskControl.balance_jump_threshold;
     this._balance_pending_jump = null; // 待确认的跳变值（内存，重启重置）
-    // 回撤控制：回撤率 = (maxEq - confirmedEq) / maxEq
-    this._drawdown_liquidation_threshold = 0.2; // 回撤达到 20% 触发清仓（未来用）
-    this._drawdown_warn_threshold = 0.1; // 回撤达到 10% 预警展示
-    // 实际账户杠杆等级阈值：<3x 正常 / 3~8x 预警 / >8x 危险
-    this._leverage_warn_threshold = 3;
-    this._leverage_danger_threshold = 8;
+    // 回撤控制阈值（从 config.js RiskControl 读取）
+    this._drawdown_liquidation_threshold = RiskControl.drawdown_liquidation_threshold;
+    this._drawdown_warn_threshold = RiskControl.drawdown_warn_threshold;
+    // 实际账户杠杆等级阈值（从 config.js RiskControl 读取）
+    this._leverage_warn_threshold = RiskControl.leverage_warn_threshold;
+    this._leverage_danger_threshold = RiskControl.leverage_danger_threshold;
     this._account_leverage = { lever: 0, level: 0, notional: 0, ts: null }; // 缓存（内存，每次持仓或余额刷新重算）
     this._lev_logged = new Set(); // notionalUsd fallback 日志按 assetName 节流
+    this._peak_reset_pending = false; // 清仓后标记：等下一次余额刷新再用真实权益重置峰谷
   }
 
   /**
@@ -51,6 +53,36 @@ export class AccountRiskMonitor {
   start() {
     if (this._balance_started) return;
     this._balance_started = true;
+
+    // 修复卡死状态：liquidationTriggered=true 但峰谷未重置（清仓异常导致 maxEq 仍为旧峰值）
+    // 重启后回撤率仍 ≥ 清仓线，但 liquidationTriggered=true 既不触发也不自动复位 → 卡死
+    // 注意：如果 peakResetPending=true，说明是清仓后正常等待余额刷新，不算卡死
+    const stats = this._account_eq_stats;
+    if (
+      stats.liquidationTriggered &&
+      !stats.peakResetPending &&
+      stats.maxEq != null &&
+      stats.lastConfirmedEq != null &&
+      stats.maxEq > stats.lastConfirmedEq
+    ) {
+      const ddRatio = (stats.maxEq - stats.lastConfirmedEq) / stats.maxEq;
+      if (ddRatio >= this._drawdown_liquidation_threshold) {
+        const eq = stats.lastConfirmedEq;
+        const oldMax = stats.maxEq;
+        stats.maxEq = eq;
+        stats.minEq = eq;
+        stats.maxEqTs = Date.now();
+        stats.minEqTs = stats.maxEqTs;
+        this._eq_mem.maxEq = eq;
+        this._eq_mem.minEq = eq;
+        this._eq_mem.maxEqTs = stats.maxEqTs;
+        this._eq_mem.minEqTs = stats.minEqTs;
+        console.warn(
+          `[Liquidation] 检测到卡死状态（liquidationTriggered=true 但 maxEq=${oldMax} 未重置），峰谷已重置为 ${eq}`
+        );
+      }
+    }
+
     const updateBalance = async () => {
       try {
         const balance = await getAccountBalance();
@@ -101,8 +133,65 @@ export class AccountRiskMonitor {
         }
         // 极值 & 回撤率 只基于 confirmed 更新（待确认状态跳过，避免异常值污染）
         if (this._balance_pending_jump == null) {
+          // 清仓后延迟重置峰谷：用清仓后的真实权益（而非清仓前含未实现盈亏的旧值）
+          // 避免人造回撤导致反复清仓
+          if (this._peak_reset_pending || stats.peakResetPending || mem.peakResetPending) {
+            stats.maxEq = confirmed;
+            stats.minEq = confirmed;
+            stats.maxEqTs = Date.now();
+            stats.minEqTs = stats.maxEqTs;
+            mem.maxEq = confirmed;
+            mem.minEq = confirmed;
+            mem.maxEqTs = stats.maxEqTs;
+            mem.minEqTs = stats.minEqTs;
+            stats.peakResetPending = false;
+            mem.peakResetPending = false;
+            this._peak_reset_pending = false;
+            console.warn(`[Liquidation] 峰谷已重置（清仓后真实权益）：maxEq=minEq=${confirmed}`);
+          }
           this._updateExtremes(confirmed);
-          this._calcDrawdown();
+          const drawdownResult = this._calcDrawdown();
+          // === 回撤清仓触发（设计文档 §3）===
+          // 入口必用离散化 drawdownLevel >= 2，不比浮点 drawdownPct >= 20，防浮点尾差漏触发
+          // liquidationTriggered 持久化在 _account_eq_stats，重启后仍记住"已触发过"，绝不自动复位
+          if (
+            drawdownResult.level >= 2 &&
+            !stats.liquidationTriggered &&
+            !mem.liquidationTriggered
+          ) {
+            stats.liquidationTriggered = true;
+            stats.liquidationTriggeredTs = Date.now();
+            stats.liquidationTriggeredMax = mem.maxEq ?? stats.maxEq;
+            stats.liquidationTriggeredEq = confirmed;
+            mem.liquidationTriggered = true;
+            mem.liquidationTriggeredTs = stats.liquidationTriggeredTs;
+            console.warn(
+              `[Liquidation] 触发清仓！drawdownPct=${drawdownResult.pct}%, maxEq=${mem.maxEq ?? stats.maxEq}, confirmedEq=${confirmed}`
+            );
+            // 同步执行清仓：await 让余额定时器暂停，避免清仓过程中再次触发；
+            // liquidationTriggered=true 已防止重复触发，await 仅为让定时器节奏更清晰
+            try {
+              await Liquidator.liquidate(this.engine);
+            } catch (e) {
+              console.error(`[Liquidation] 清仓执行异常: ${e.message}`);
+            } finally {
+              // 不在此处重置峰谷！confirmed 是清仓前的值（含未实现盈亏），
+              // 清仓实现亏损后实际权益更低，用旧值重置会产生人造回撤，极端情况导致反复清仓。
+              // 标记 _peak_reset_pending，等下一次余额刷新拿到真实权益后再重置。
+              stats.peakResetPending = true;
+              mem.peakResetPending = true;
+              this._peak_reset_pending = true;
+              console.warn(`[Liquidation] 峰谷重置已延迟，等待下一次余额刷新获取真实权益`);
+            }
+          }
+          // === 自动复位：清仓后峰谷已重置，下一轮回撤率归零后自动恢复交易 ===
+          // 触发轮 drawdownResult 仍是旧值（level≥2），不会同轮复位；
+          // 下一轮基于重置后峰谷重算，level<2 时自动复位，策略恢复交易
+          if (stats.liquidationTriggered && drawdownResult.level < 2) {
+            stats.liquidationTriggered = false;
+            mem.liquidationTriggered = false;
+            console.warn('[Liquidation] 回撤已恢复（< 清仓线），自动复位，策略恢复交易');
+          }
           // confirmedEq 刚变（分母变）→ 重算实际杠杆（Σ|notional| / confirmedEq）
           this.calcLeverage();
         } else {
@@ -294,6 +383,8 @@ export class AccountRiskMonitor {
       liquidationEq,
       rangeMin: rangeMin != null ? +rangeMin : null,
       rangeMax: maxEq,
+      liquidationTriggered: mem.liquidationTriggered ?? stats.liquidationTriggered ?? false,
+      liquidationTriggeredTs: mem.liquidationTriggeredTs || stats.liquidationTriggeredTs || null,
       lever: lev.lever ?? 0,
       leverLevel: lev.level ?? 0,
       leverNotional: lev.notional ?? 0,
@@ -309,5 +400,15 @@ export class AccountRiskMonitor {
    */
   getBalance() {
     return this._account_balance;
+  }
+
+  /**
+   * 清仓是否已触发（回撤恢复后自动复位，见 start() 中的自动复位逻辑）
+   * @returns {boolean}
+   */
+  isLiquidationTriggered() {
+    const stats = this._account_eq_stats;
+    const mem = this._eq_mem;
+    return !!(mem.liquidationTriggered ?? stats.liquidationTriggered);
   }
 }

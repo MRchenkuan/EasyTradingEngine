@@ -1,4 +1,5 @@
 import { open_position } from '../trading.js';
+import { TradeEngine } from '../TradeEngine/TradeEngine.js';
 import { spawn } from 'child_process';
 
 const [asset1, asset2, amount] = process.argv.slice(2);
@@ -18,11 +19,12 @@ function formatAssetName(asset) {
 try {
   const formattedAsset1 = formatAssetName(asset1);
   const formattedAsset2 = formatAssetName(asset2);
-  const result = await open_position(formattedAsset1, formattedAsset2, Number(amount));
+  const result = await open_position(formattedAsset1, formattedAsset2, Number(amount), a =>
+    TradeEngine.getRealtimePrice(a)
+  );
 
   if (result.success) {
     console.log(`开仓成功，交易ID: ${result.tradeId}`);
-
   } else {
     console.log(`开仓失败, ${result.msg}`);
   }

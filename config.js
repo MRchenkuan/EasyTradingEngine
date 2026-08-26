@@ -6,6 +6,22 @@ export const Env = TradeEnv.MIMIC;
 export const trade_open = true;
 // export const trade_open = false;
 
+// ==================== 风控配置 ====================
+export const RiskControl = {
+  // 回撤控制（口径见 docs/drawdown-liquidation-design.md）
+  drawdown_liquidation_threshold: 0.19, // 回撤达到 20% 触发清仓
+  drawdown_warn_threshold: 0.1, // 回撤达到 10% 预警展示
+  // 余额跳变防护：raw 与 confirmed 偏差超此阈值视为可疑，需连续两次相近才采纳
+  // 阈值 0.3 > 回撤清仓线 0.2，保证真实 20% 回撤能即时反映，仅 >30% 的跳变需确认
+  balance_jump_threshold: 0.3,
+  balance_refresh_interval: 10000, // 账户余额刷新间隔（30 秒）
+  // 实际账户杠杆等级阈值：<3x 正常 / 3~8x 预警 / >8x 危险
+  leverage_warn_threshold: 3,
+  leverage_danger_threshold: 8,
+  // 清仓下单失败重试次数
+  liquidation_max_retry: 3,
+};
+
 export const KLine = {
   max_days: 3650,
   bar_type: BarType.MINUTE_5,

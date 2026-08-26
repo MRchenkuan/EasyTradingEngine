@@ -1,6 +1,6 @@
 import { AbstractProcessor } from './AbstractProcessor.js';
 import { LocalVariable } from '../../LocalVariable.js';
-import { create_order_market, executeOrders, fetchOrders } from '../../trading.js';
+import { create_order_market, fetchOrders } from '../../trading.js';
 import { updateGridTradeOrder } from '../../recordTools.js';
 import { trendReversalThreshold } from './utils/TrendReversalCalculator.js';
 import {
@@ -10,7 +10,6 @@ import {
   SettlementType,
   StopLossLevel,
 } from '../../enum.js';
-import { trade_open } from '../../../config.js';
 import { PositionController } from './utils/PositionController.js';
 import { TradeFreqController } from './utils/TradeFreqController.js';
 import { monitorServer } from '../../server.js';
@@ -273,6 +272,12 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 更新拐点价格
     this._refreshTurningPoint();
 
+    // 清仓触发后暂停交易（回撤恢复后 AccountRiskMonitor 自动复位，策略恢复交易）
+    if (this.engine.isLiquidationTriggered()) {
+      this._saveState();
+      return;
+    }
+
     // 执行交易策略
 
     this._orderStrategy(gridCount);
@@ -328,7 +333,7 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @returns {number} 持仓合约数量
    */
   _getPositionContracts() {
-    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).pos);
+    return parseFloat((this.engine.getPositionList(this.asset_name) || {}).pos || 0);
   }
 
   /** 获取当前持仓的价值
@@ -578,12 +583,9 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
 
     console.log(`💰${orderDesc}：${this._current_price} ${amount} 个`);
-    // 然后执行交易
     const order = create_order_market(this.asset_name, Math.abs(amount), amount / Math.abs(amount));
 
-    await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-      ...order,
-      order_status: OrderStatus.PENDING,
+    const meta = {
       snapshot: Object.keys(this._snapshot)
         .map(key => `[${key}]:${this._snapshot[key]};`)
         .join('|'),
@@ -593,82 +595,29 @@ export class GridTradingProcessor extends AbstractProcessor {
       accFillSz: Math.abs(amount),
       ts: this._current_price_ts,
       logs: [this._current_price, this._threshold, this._correction(), orderDesc].join('::'),
-    });
-    // todo 1.先记录...
-    // todo 2.然后执行
-    // waring 一定要先保存成交点，否则容易重复下单
+    };
+
+    // 重置关键价（策略特定，必须在 _placeOrderStaged 之前，避免重复下单）
     this._resetKeyPrices(this._current_price, this._current_price_ts);
-    if (!trade_open) return;
-    const result = await executeOrders([order]);
 
-    // todo 3.如果失败则重置关键参数,并更新记录状态：交易成功|失败
-    if (!result.success) {
-      console.error(`⛔${this.asset_name} 交易失败: ${orderDesc}`);
-      await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-        order_status: OrderStatus.UNSUCESS,
-        error: result.msg,
-        retry_count,
-      });
-      // 再次尝试下单
-      if (retry_count < 3) {
-        await this._placeOrder(gridCount, orderDesc, retry_count + 1);
-      } else {
-        await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: OrderStatus.FAILED,
-          retry_count,
-          error: result.msg,
-        });
-      }
-      return;
-    } else {
-      // todo 3.2 成功则先查询
-      const { originalOrder, clOrdId, ordId, tag, ...rest } = result.data[0];
-      await updateGridTradeOrder(this.asset_name, clOrdId, ordId, {
-        clOrdId,
-        ordId,
-        ...rest,
-        ...order,
-        ...originalOrder,
-        order_status: OrderStatus.PLACED,
-        retry_count,
-      });
+    // 分阶段下单：PENDING → PLACED → CONFIRMED（含重试）
+    await AbstractProcessor._placeOrderStaged(order, meta, retry_count);
 
-      console.log(`✅${this.asset_name} 交易成功: ${orderDesc}`);
-      // 重置关键参数
-      this._saveState(); // 立即保存状态
-      try {
-        // todo 3.2.1 开始查询订单信息，更新关键参数
-        const [o] = (await fetchOrders(result.data)) || [];
-        if (o && o.avgPx && o.fillTime) {
-          console.log(
-            `✅${this.asset_name} 远程重置关键参数成功`,
-            parseFloat(o.avgPx),
-            parseFloat(o.fillTime)
-          );
-          // todo 3.2.2 最终完成记录
-          // todo 3.2 成功则先查询
-          await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-            avgPx: o.avgPx,
-            ts: o.fillTime,
-            order_status: OrderStatus.CONFIRMED,
-          });
-        } else {
-          await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-            order_status: OrderStatus.CONFIRM_FAILED,
-            error: '未获取到订单信息',
-          });
-          console.error(`⛔${this.asset_name} 远程重置关键参数失败: 未获取到订单信息`);
-        }
-      } catch (e) {
-        await updateGridTradeOrder(this.asset_name, order.clOrdId, null, {
-          order_status: OrderStatus.CONFIRM_ERROR,
-          error: '订单确认错误',
-        });
-        // todo 3.3 报错，记录为查询失败
-        console.error(`⛔${this.asset_name} 远程重置关键参数失败: ${e.message}`);
-      }
-      this._saveState(); // 立即保存状态
-    }
+    this._saveState();
+  }
+
+  /**
+   * 清仓后重置策略状态（由 Liquidator 在平仓完成后调用）
+   * 重置关键价 + 网格距离，让策略从当前价重新开始
+   */
+  resetAfterLiquidation() {
+    const price = this._current_price || this.engine.getRealtimePrice(this.asset_name);
+    const ts = this._current_price_ts || Date.now();
+    this._resetKeyPrices(price, ts);
+    this._last_open_grid_span = -1;
+    this._last_close_grid_span = -1;
+    this._saveState();
+    console.log(`[${this.asset_name}] 策略状态已重置（清仓后）`);
   }
 
   async confirmOrder(order) {

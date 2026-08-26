@@ -898,6 +898,14 @@ export class TradeEngine {
   }
 
   /**
+   * 清仓是否已触发（门面委托至 AccountRiskMonitor，策略 tick() 中拦截交易）
+   * @returns {boolean}
+   */
+  static isLiquidationTriggered() {
+    return this.#riskMonitor.isLiquidationTriggered();
+  }
+
+  /**
    * 创建网格交易处理器
    * @param {string} assetName - 交易资产名称
    * @param {object} params - 网格参数

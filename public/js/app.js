@@ -124,6 +124,15 @@ function _setTextIfChanged(el, next) {
   if (el && el.textContent !== next) el.textContent = next;
 }
 
+// 设置标签位置（translateX 自适应边缘，防止移动端溢出）
+function _setLabelPos(el, pct) {
+  if (!el || pct == null) return;
+  el.style.left = pct + '%';
+  if (pct < 8) el.style.transform = 'translateX(0)';
+  else if (pct > 92) el.style.transform = 'translateX(-100%)';
+  else el.style.transform = 'translateX(-50%)';
+}
+
 function onAccountBalanceUpdate(payload) {
   if (!payload) return;
   const el = document.getElementById('totalEquity');
@@ -157,7 +166,7 @@ function onAccountBalanceUpdate(payload) {
       lLabel.style.display = '';
       if (haveRange) {
         const pct = _posPct(minEq, rMin, rMax);
-        if (pct != null) lLabel.style.left = pct + '%';
+        _setLabelPos(lLabel, pct);
       }
     } else {
       lLabel.style.display = 'none';
@@ -208,7 +217,7 @@ function onAccountBalanceUpdate(payload) {
     const pct = _posPct(liqEq, rMin, rMax);
     if (pct != null) {
       liqEl.style.left = pct + '%';
-      if (liqLabel) liqLabel.style.left = pct + '%';
+      _setLabelPos(liqLabel, pct);
     }
     liqEl.style.display = '';
     _setTextIfChanged(liqLabel, '清仓线 $ ' + liqEq.toFixed(0));

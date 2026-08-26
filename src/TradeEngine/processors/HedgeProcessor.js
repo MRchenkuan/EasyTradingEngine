@@ -298,10 +298,12 @@ export class HedgeProcessor extends AbstractProcessor {
           );
 
           // 开仓
-          if (this._enable_trade)
+          if (this._enable_trade) {
+            const getRealtimePrice = a => this.engine.getRealtimePrice(a);
             spx1 > spx2
-              ? open_position(instId1, instId2, this._position_size)
-              : open_position(instId2, instId1, this._position_size);
+              ? open_position(instId1, instId2, this._position_size, getRealtimePrice)
+              : open_position(instId2, instId1, this._position_size, getRealtimePrice);
+          }
           console.log(
             `- 执行开仓，买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
           );
@@ -318,10 +320,12 @@ export class HedgeProcessor extends AbstractProcessor {
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
-        if (this._enable_trade)
+        if (this._enable_trade) {
+          const getRealtimePrice = a => this.engine.getRealtimePrice(a);
           spx1 > spx2
-            ? open_position(instId1, instId2, this._position_size)
-            : open_position(instId2, instId1, this._position_size);
+            ? open_position(instId1, instId2, this._position_size, getRealtimePrice)
+            : open_position(instId2, instId1, this._position_size, getRealtimePrice);
+        }
         console.log(
           `- 买入:${spx1 > spx2 ? instId2 : instId1}($${spx2}), 卖出:${spx1 < spx2 ? instId2 : instId1}($${spx1})`
         );
