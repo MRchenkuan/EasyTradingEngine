@@ -1,7 +1,7 @@
 import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 
-export const Env = TradeEnv.MIMIC;
-// export const Env = TradeEnv.PRODUCTION;
+// export const Env = TradeEnv.MIMIC;
+export const Env = TradeEnv.PRODUCTION;
 
 export const trade_open = true;
 // export const trade_open = false;
@@ -18,7 +18,7 @@ export const RiskControl = {
   // 实际账户杠杆等级阈值：<3x 正常 / 3~8x 预警 / >8x 危险
   leverage_warn_threshold: 3,
   leverage_danger_threshold: 8,
-  // 清仓下单失败重试次数
+  // 止损下单失败重试次数
   liquidation_max_retry: 3,
 };
 

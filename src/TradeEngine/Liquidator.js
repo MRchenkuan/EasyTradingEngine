@@ -25,7 +25,7 @@ export class Liquidator {
    */
   static async liquidate(engine = null, instId = null) {
     const IS_MIMIC = Env === TradeEnv.MIMIC;
-    console.warn(`[Liquidation] 开始清仓 ${instId || '全部'}（${IS_MIMIC ? '模拟盘' : '实盘'}）`);
+    console.warn(`[Liquidation] 开始止损 ${instId || '全部'}（${IS_MIMIC ? '模拟盘' : '实盘'}）`);
 
     // ==================== 1. 获取持仓 ====================
     let positions;

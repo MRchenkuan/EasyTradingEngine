@@ -220,7 +220,7 @@ function onAccountBalanceUpdate(payload) {
       _setLabelPos(liqLabel, pct);
     }
     liqEl.style.display = '';
-    _setTextIfChanged(liqLabel, '清仓线 $ ' + liqEq.toFixed(0));
+    _setTextIfChanged(liqLabel, '止损线 $ ' + liqEq.toFixed(0));
     if (liqLabel) liqLabel.style.display = '';
     hasLiq = true;
   } else {
