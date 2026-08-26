@@ -1,0 +1,313 @@
+import { getAccountBalance } from '../api.js';
+import { LocalVariable } from '../LocalVariable.js';
+import { monitorServer } from '../server.js';
+
+/**
+ * 账户风控监控器（余额/回撤/杠杆）
+ *
+ * 从 TradeEngine 抽出，专注账户总权益的拉取、跳变防护、极值/回撤率计算与实际账户杠杆，
+ * 并把结果推送到监控面板。TradeEngine 通过静态门面委托调用，外部零改动。
+ *
+ * 设计文档见 docs/drawdown-liquidation-design.md（口径/模式选型/清仓模板/反模式/多级风控占位）
+ */
+export class AccountRiskMonitor {
+  /**
+   * @param {typeof import('./TradeEngine.js').TradeEngine} engine - TradeEngine 类引用，
+   *   用于访问 _position_list / _instrument_info / getRealtimePrice 等共享状态
+   */
+  constructor(engine) {
+    this.engine = engine;
+    this._account_balance = null; // 账户余额数据（含 totalEq 总权益，回撤控制口径）
+    this._balance_timer = null; // 账户余额定时器
+    this._balance_refresh_interval = 30000; // 账户余额刷新间隔 30秒
+    this._balance_started = false; // 余额定时拉取是否已启动（幂等保护，避免 start() 重入时重复启动）
+    // 总权益历史极值（持久化，重启不丢失；用于回撤控制基准）
+    // 结构：{ maxEq, minEq, maxEqTs, minEqTs, lastConfirmedEq }
+    this._account_eq_stats = new LocalVariable('TradeEngine/accountEqStats');
+    // 内存备份：LocalVariable proxy 在某些场景下读取不可靠，用普通对象做双保险
+    this._eq_mem = {};
+    // 跳变防护：raw 与 confirmed 偏差超此阈值视为可疑，需连续两次相近值才采纳
+    // 阈值 0.3 > 回撤清仓线 0.2，保证真实 20% 回撤能即时反映，仅 >30% 的跳变需确认
+    this._balance_jump_threshold = 0.3;
+    this._balance_pending_jump = null; // 待确认的跳变值（内存，重启重置）
+    // 回撤控制：回撤率 = (maxEq - confirmedEq) / maxEq
+    this._drawdown_liquidation_threshold = 0.2; // 回撤达到 20% 触发清仓（未来用）
+    this._drawdown_warn_threshold = 0.1; // 回撤达到 10% 预警展示
+    // 实际账户杠杆等级阈值：<3x 正常 / 3~8x 预警 / >8x 危险
+    this._leverage_warn_threshold = 3;
+    this._leverage_danger_threshold = 8;
+    this._account_leverage = { lever: 0, level: 0, notional: 0, ts: null }; // 缓存（内存，每次持仓或余额刷新重算）
+    this._lev_logged = new Set(); // notionalUsd fallback 日志按 assetName 节流
+  }
+
+  /**
+   * 启动账户余额定时拉取（幂等：已启动则直接返回，避免 start() 重入时重复启动）
+   * 拉取 OKX /api/v5/account/balance 的 totalEq 作为账户总权益口径，用于回撤控制
+   *
+   * 跳变防护：raw（本次 API 原始值）与 confirmed（稳定值）偏差超阈值视为可疑，
+   * 需连续两次相近异常值才采纳（识别真实充值/提取/大波动），单次 API 异常被过滤；
+   * 极值 maxEq/minEq 只用 confirmed 更新，单次异常永不污染极值，避免错误清仓。
+   */
+  start() {
+    if (this._balance_started) return;
+    this._balance_started = true;
+    const updateBalance = async () => {
+      try {
+        const balance = await getAccountBalance();
+        // API 失败或空数据：保持上次稳定值，不更新任何状态，仅重推上次 confirmed
+        if (!balance) {
+          this.pushBalance(null);
+          return;
+        }
+        const raw = parseFloat(balance.totalEq);
+        // raw 无效（NaN/0/负）：视为数据获取异常，不更新稳定值/极值，仅重推上次 confirmed
+        if (!(raw > 0)) {
+          this.pushBalance(null);
+          return;
+        }
+        const stats = this._account_eq_stats;
+        const mem = this._eq_mem;
+        const threshold = this._balance_jump_threshold;
+        // 优先从 mem（普通对象，无 proxy 坑）读 confirmed
+        let confirmed = mem.lastConfirmedEq;
+        if (confirmed == null) confirmed = stats.lastConfirmedEq;
+        if (confirmed == null) {
+          // 首次拉取，直接采纳
+          confirmed = raw;
+          stats.lastConfirmedEq = confirmed;
+          mem.lastConfirmedEq = confirmed;
+          this._balance_pending_jump = null;
+        } else {
+          const changeRate = Math.abs(raw - confirmed) / confirmed;
+          if (changeRate <= threshold) {
+            // 正常波动，采纳
+            confirmed = raw;
+            stats.lastConfirmedEq = confirmed;
+            mem.lastConfirmedEq = confirmed;
+            this._balance_pending_jump = null;
+          } else if (
+            this._balance_pending_jump != null &&
+            Math.abs(raw - this._balance_pending_jump) / this._balance_pending_jump <= threshold
+          ) {
+            // 连续两次相近的跳变值，确认为真实变化（充值/提取/大波动），延迟一个周期采纳
+            confirmed = raw;
+            stats.lastConfirmedEq = confirmed;
+            mem.lastConfirmedEq = confirmed;
+            this._balance_pending_jump = null;
+          } else {
+            // 首次跳变，暂存待确认，本次不更新稳定值/极值，仅重推上次 confirmed
+            this._balance_pending_jump = raw;
+          }
+        }
+        // 极值 & 回撤率 只基于 confirmed 更新（待确认状态跳过，避免异常值污染）
+        if (this._balance_pending_jump == null) {
+          this._updateExtremes(confirmed);
+          this._calcDrawdown();
+          // confirmedEq 刚变（分母变）→ 重算实际杠杆（Σ|notional| / confirmedEq）
+          this.calcLeverage();
+        } else {
+          // 即使 confirmed 这次没更新（待确认状态），持仓名义可能变了也得重算；
+          // 这里轻量补一次，避免等到下一轮持仓刷新才反映
+          this.calcLeverage();
+        }
+        this.pushBalance(balance);
+      } catch (e) {
+        this.pushBalance(null);
+      } finally {
+        this._balance_timer = setTimeout(updateBalance, this._balance_refresh_interval);
+      }
+    };
+    updateBalance();
+  }
+
+  /**
+   * 更新总权益历史最大值/最小值（只接受 confirmed 调用）
+   * 峰值 maxEq 是回撤率公式的分母，必须只反映真实、经过确认的最高值——
+   * 否则单次异常大值会拉高 maxEq，让后续正常值都被计算为"回撤"，导致回撤率虚高误清仓。
+   * @param {number} confirmed - 经过跳变防护确认后的稳定权益值
+   */
+  _updateExtremes(confirmed) {
+    const stats = this._account_eq_stats;
+    const mem = this._eq_mem;
+    if (stats.maxEq == null || confirmed > stats.maxEq) {
+      stats.maxEq = confirmed;
+      stats.maxEqTs = Date.now();
+      mem.maxEq = confirmed;
+      mem.maxEqTs = stats.maxEqTs;
+    }
+    if (stats.minEq == null || confirmed < stats.minEq) {
+      stats.minEq = confirmed;
+      stats.minEqTs = Date.now();
+      mem.minEq = confirmed;
+      mem.minEqTs = stats.minEqTs;
+    }
+  }
+
+  /**
+   * 计算回撤率并存入持久化 stats
+   * 口径统一（参考教训：分子分母口径必须明确固化）：
+   * - drawdownRatio = (maxEq - confirmedEq) / maxEq
+   * - 分母固定为 maxEq（历史峰值，回撤控制唯一基准）
+   * - 结果范围：≥0；无峰值或当前值≥峰值时为 0（无回撤）
+   * - drawdownPct：百分比形式（×100，2 位小数），用于展示 & 阈值比较
+   * - drawdownLevel：0=正常 / 1=预警(≥10%) / 2=清仓(≥20%)
+   */
+  _calcDrawdown() {
+    const stats = this._account_eq_stats;
+    const mem = this._eq_mem;
+    // 优先从 mem 读（普通对象，无 proxy 不确定性）
+    const confirmed = mem.lastConfirmedEq ?? stats.lastConfirmedEq;
+    const maxEq = mem.maxEq ?? stats.maxEq;
+    let ratio = 0;
+    if (maxEq != null && maxEq > 0 && confirmed != null && confirmed < maxEq) {
+      ratio = (maxEq - confirmed) / maxEq;
+    }
+    if (ratio < 0) ratio = 0;
+    stats.drawdownRatio = ratio;
+    stats.drawdownPct = +(ratio * 100).toFixed(2);
+    mem.drawdownPct = stats.drawdownPct;
+    mem.drawdownRatio = ratio;
+    if (ratio >= this._drawdown_liquidation_threshold) {
+      stats.drawdownLevel = 2;
+    } else if (ratio >= this._drawdown_warn_threshold) {
+      stats.drawdownLevel = 1;
+    } else {
+      stats.drawdownLevel = 0;
+    }
+    mem.drawdownLevel = stats.drawdownLevel;
+    stats.drawdownTs = Date.now();
+    mem.drawdownTs = stats.drawdownTs;
+    return { ratio, pct: stats.drawdownPct, level: stats.drawdownLevel };
+  }
+
+  /**
+   * 计算实际账户杠杆：Σ|持仓名义 USD| / confirmedEq（总权益）
+   * 这是仓位杠杆倍数 × 资金使用率 的综合结果——真实反映账户整体风险敞口：
+   *   若单仓 20x 杠杆但你只用了 1/5 资金 → 实际杠杆≈4x（不是 20x）
+   * 调用点：持仓刷新成功后（分子变）/ confirmedEq 确认更新后（分母变）
+   * 结果写进 _account_leverage 缓存，pushBalance 时随消息一起推送到前端
+   */
+  calcLeverage() {
+    const confirmed = this._account_eq_stats.lastConfirmedEq;
+    let notional = 0;
+    for (const name of Object.keys(this.engine._position_list)) {
+      const p = this.engine._position_list[name];
+      if (!p) continue;
+      // 优先用 OKX positions 接口返回的 notionalUsd（标准字段，带符号；取绝对值累加）
+      let n = parseFloat(p.notionalUsd);
+      if (isFinite(n) && n !== 0) {
+        notional += Math.abs(n);
+        continue;
+      }
+      // Fallback：如果 notionalUsd 缺失/为 0/为 NaN，自己从 pos × ctVal × ctMult × 价格 计算
+      const posSz = parseFloat(p.pos); // 持仓张数（带符号：正=多/负=空）
+      if (!isFinite(posSz) || posSz === 0) continue; // 没仓位 → 无名义
+      const inst = this.engine._instrument_info[name]; // instrument info 缓存（含 ctVal/ctMult）
+      const ctVal = inst ? parseFloat(inst.ctVal) : NaN;
+      const ctMult = inst ? parseFloat(inst.ctMult) : NaN;
+      // 价格优先级：position 的 markPx > 实时价格缓存 > 持仓均价
+      const markPx = parseFloat(p.markPx);
+      const lastPx = parseFloat(this.engine.getRealtimePrice(name) || NaN);
+      const avgPx = parseFloat(p.avgPx);
+      const price = isFinite(markPx)
+        ? markPx
+        : isFinite(lastPx)
+          ? lastPx
+          : isFinite(avgPx)
+            ? avgPx
+            : NaN;
+      if (isFinite(ctVal) && isFinite(ctMult) && isFinite(price)) {
+        const perContractValueUsd = ctVal * ctMult * price; // 每张合约的 USD 名义
+        const n2 = Math.abs(posSz) * perContractValueUsd;
+        notional += n2;
+        // 仅在 notionalUsd 缺失时打印一次，方便后续定位字段缺失原因（按 assetName 节流）
+        if (!this._lev_logged.has(name)) {
+          this._lev_logged.add(name);
+          console.warn(
+            `[Leverage] ${name}: notionalUsd 字段无效(${p.notionalUsd})，已 fallback 用 pos×ctVal×ctMult×price 计算：|${posSz}| × ${ctVal}×${ctMult} × $${price.toFixed(
+              4
+            )} = $${n2.toFixed(2)}`
+          );
+        }
+      }
+    }
+    let lever = 0;
+    if (confirmed && confirmed > 0) {
+      lever = notional / confirmed;
+    }
+    if (lever < 0) lever = 0;
+    let level = 0;
+    if (lever >= this._leverage_danger_threshold) level = 2;
+    else if (lever >= this._leverage_warn_threshold) level = 1;
+    this._account_leverage = {
+      lever: +lever.toFixed(2),
+      level,
+      notional: +notional.toFixed(2),
+      ts: Date.now(),
+    };
+    return this._account_leverage;
+  }
+
+  /**
+   * 统一推送账户余额到监控面板
+   * totalEq 始终用 confirmed（稳定值），不用 raw，避免前端显示跳变
+   * @param {Object|null} rawBalance - 本次 API 原始返回（用于补充 upl/marginRatio 等非关键字段）；null 表示本次无新数据
+   */
+  pushBalance(rawBalance) {
+    const stats = this._account_eq_stats;
+    const mem = this._eq_mem;
+    // 优先从 mem 读（普通对象，无 proxy 不确定性），fallback 到 stats
+    const confirmed = mem.lastConfirmedEq ?? stats.lastConfirmedEq;
+    // 还没有任何确认值时不推送，避免推送 null/0 造成前端跳变
+    if (confirmed == null) return;
+    const lev = this._account_leverage || {};
+    const prev = this._account_balance || {};
+    // 极值也优先从 mem 读
+    const maxEq = mem.maxEq ?? (stats.maxEq != null ? stats.maxEq : null);
+    const minEq = mem.minEq ?? (stats.minEq != null ? stats.minEq : null);
+    // 清仓线对应的权益值 = 历史峰值 × (1 - 20%清仓线)
+    const liquidationEq =
+      maxEq != null ? +(maxEq * (1 - this._drawdown_liquidation_threshold)).toFixed(4) : null;
+    // 条图可视范围下限：取 min(minEq, liquidationEq)
+    let rangeMin = minEq;
+    if (liquidationEq != null && (rangeMin == null || liquidationEq < rangeMin)) {
+      rangeMin = liquidationEq;
+    }
+    if (maxEq != null && rangeMin != null) {
+      const rangeSpan = maxEq - rangeMin;
+      const bufferedMin = +(rangeMin - rangeSpan * 0.03).toFixed(4);
+      if (bufferedMin < rangeMin) rangeMin = bufferedMin >= 0 ? bufferedMin : 0;
+    }
+    this._account_balance = {
+      totalEq: confirmed,
+      upl: rawBalance ? parseFloat(rawBalance.upl || 0) : (prev.upl ?? 0),
+      marginRatio: rawBalance ? parseFloat(rawBalance.marginRatio || 0) : (prev.marginRatio ?? 0),
+      frozenBal: rawBalance ? parseFloat(rawBalance.frozenBal || 0) : (prev.frozenBal ?? 0),
+      maxEq,
+      minEq,
+      maxEqTs: mem.maxEqTs || stats.maxEqTs || null,
+      minEqTs: mem.minEqTs || stats.minEqTs || null,
+      drawdownRatio: mem.drawdownRatio ?? 0,
+      drawdownPct: mem.drawdownPct ?? 0,
+      drawdownLevel: mem.drawdownLevel ?? 0,
+      drawdownTs: mem.drawdownTs || null,
+      liquidationEq,
+      rangeMin: rangeMin != null ? +rangeMin : null,
+      rangeMax: maxEq,
+      lever: lev.lever ?? 0,
+      leverLevel: lev.level ?? 0,
+      leverNotional: lev.notional ?? 0,
+      leverTs: lev.ts || null,
+      lastUpdateTime: Date.now(),
+    };
+    monitorServer.updateAccountBalance(this._account_balance);
+  }
+
+  /**
+   * 获取账户余额（含 totalEq 总权益）
+   * @returns {Object|null} 账户余额数据
+   */
+  getBalance() {
+    return this._account_balance;
+  }
+}

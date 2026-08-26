@@ -16,48 +16,530 @@ body {
   overscroll-behavior: none;
 }
 
-.header {
-  display: flex;
+/* ==================== 一层主卡：内嵌 META + 3 段 2 分隔线 ==================== */
+/* ---- 色板 ---- */
+:root {
+  --card-bg: #0d1117;
+  --card-bg-2: #161b22;
+  --card-bg-3: #1c232d;
+  --card-border: #21262d;
+  --card-border-2: #30363d;
+  --card-border-soft: rgba(48, 54, 61, 0.6);
+  --txt-1: #e6edf3;
+  --txt-2: #8b949e;
+  --txt-3: #6e7681;
+  --accent-blue: #58a6ff;
+  --accent-blue-soft: rgba(88, 166, 255, 0.12);
+  --tag-green: #3fb950;
+  --tag-yellow: #d29922;
+  --tag-red: #f85149;
+}
+
+/* WS 指示灯（挪到主卡内） */
+.status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tag-red);
+  transition:
+    background 0.3s,
+    box-shadow 0.3s;
+  box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.18);
+  flex-shrink: 0;
+}
+.status-indicator.connected {
+  background: var(--tag-green);
+  box-shadow: 0 0 0 3px rgba(63, 185, 80, 0.22);
+}
+
+/* 一张主卡：顶层外框 + 两行 grid（行1=META横跨全宽；行2=3段2分隔 5 列） */
+.h-balance {
+  display: grid;
+  grid-template-columns:
+    1.2fr
+    min-content
+    1.8fr
+    min-content
+    1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  padding: 4px 10px;
-  background: #161b22;
-  border-radius: 4px;
-  margin-bottom: 6px;
-  border: 1px solid #30363d;
-  font-size: 12px;
-  color: #8b949e;
+  column-gap: 10px;
+  row-gap: 0;
+  padding: 7px 12px 8px 12px;
+  margin: 6px;
+  background: linear-gradient(180deg, #121925 0%, #0e1420 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  min-width: 0;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.02) inset,
+    0 4px 18px rgba(0, 0, 0, 0.28);
+  position: relative;
   overflow: hidden;
 }
-
-.header-title {
-  font-weight: bold;
-  color: #58a6ff;
-  white-space: nowrap;
-  flex-shrink: 0;
+.h-balance::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(88, 166, 255, 0.5) 25%,
+    rgba(175, 130, 255, 0.5) 75%,
+    transparent 100%
+  );
+  opacity: 0.85;
+  z-index: 1;
 }
 
-.header-info {
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.ws-status {
-  margin-left: auto;
+/* 主卡顶部 META 行：跨全 5 列，flex 两端对齐，内嵌时间+WS */
+.h-meta-row {
+  grid-column: 1 / -1;
+  grid-row: 1 / 2;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 7px 2px;
+  color: var(--txt-2);
+  font-size: 11.5px;
+  border-bottom: 1px dashed rgba(48, 54, 61, 0.5);
+  margin-bottom: 8px;
+}
+.h-meta-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--txt-2);
+  white-space: nowrap;
+}
+.h-meta-time > span {
+  color: var(--txt-1);
+  font-weight: 600;
+}
+.h-meta-ws {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.h-meta-ws > span:last-child {
+  font-size: 11.5px;
+  color: var(--txt-1);
+  font-weight: 600;
 }
 
-.status-indicator {
-  width: 8px;
-  height: 8px;
+/* 主卡行 2：3 段 2 分隔线 */
+.balance-left,
+.balance-chart,
+.balance-right,
+.balance-divider {
+  grid-row: 2 / 3;
+}
+
+.balance-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--card-border-soft) 25%,
+    var(--card-border-soft) 75%,
+    transparent 100%
+  );
+}
+
+/* ---- 左块：上=标签；下=总权益数字 + 收益率 pill 同一行 baseline 对齐 ---- */
+.balance-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px; /* 标签 与 主数值行之间 距离压到最小 */
+  min-width: 0;
+}
+.balance-k {
+  font-size: 10px;
+  color: var(--txt-3);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1;
+}
+/* 主数值 + 收益率 pill：对齐 baseline，pill 底部和数字下沿齐平 */
+.balance-main-row {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 9px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.balance-v {
+  font-size: 23px; /* 数字放大一档，之前 19→23 */
+  line-height: 1; /* baseline 对齐时 line-height 越小越准 */
+  color: var(--txt-1);
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 7px rgba(0, 0, 0, 0.22);
+}
+
+/* 中块：上方刻度标签行（谷/峰按刻度位置定位） */
+.eq-hl-row {
+  position: relative;
+  margin-bottom: 1px;
+  min-height: 14px;
+}
+.eq-hl-item {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  background: rgba(201, 209, 217, 0.04);
+  border: 1px solid var(--card-border-soft);
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+.eq-hl-item::before {
+  font-weight: 800;
+  opacity: 0.9;
+}
+.eq-hl-l {
+  color: var(--tag-red);
+  left: 0;
+}
+.eq-hl-l::before {
+  content: '谷';
+  color: var(--tag-red);
+}
+.eq-hl-h {
+  color: var(--tag-green);
+  left: 100%;
+  transform: translateX(-100%);
+}
+.eq-hl-h::before {
+  content: '峰';
+  color: var(--tag-green);
+}
+
+/* ---- 中块：条图（上方图例整行去掉） + 子标签（$ 金额两端） ---- */
+.balance-chart {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* 条图本体：11px（三标记直接识别，不额外放图例标签行） */
+.eq-range-bar {
+  position: relative;
+  width: 100%;
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #21262d 0%, #161b22 100%);
+  overflow: visible;
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.38) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+}
+
+.eq-range-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 6px 0 0 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(248, 81, 73, 0.92) 0%,
+    rgba(210, 153, 34, 0.9) 55%,
+    rgba(63, 185, 80, 0.9) 100%
+  );
+  width: 0%;
+  transition: width 0.45s ease;
+  z-index: 1;
+  box-shadow: 0 0 8px rgba(63, 185, 80, 0.12);
+}
+
+.eq-range-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  left: 0%;
+  transition: left 0.45s ease;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* 当前值白圆点：缩到 12px，匹配条图 11px */
+.eq-range-marker-current {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #f85149;
-  transition: background 0.3s;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(88, 166, 255, 0.7),
+    0 0 0 3px rgba(88, 166, 255, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.45);
 }
 
-.status-indicator.connected {
-  background: #3fb950;
+/* 谷值刻度线：细灰实线，比清仓线低一档 */
+.eq-range-marker-min {
+  width: 2px;
+  height: 15px;
+  border-radius: 1px;
+  background: var(--txt-3);
+  opacity: 0.85;
+}
+
+/* 清仓线：缩高度（20px），不要超得太高 */
+.eq-range-marker-liquidation {
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--tag-red) 0,
+    var(--tag-red) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 6px rgba(248, 81, 73, 0.5);
+  animation: liq-blink 2s ease-in-out infinite;
+}
+
+@keyframes liq-blink {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* 下方刻度标签行：清仓线标签按刻度位置定位 */
+.eq-range-sublegend {
+  position: relative;
+  min-height: 12px;
+  font-size: 9.5px;
+  color: var(--txt-3);
+  line-height: 1;
+}
+.eq-range-sublegend > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* ---- 右块：风险 4 格 —— 横向 4 列，每个 pill 化 ---- */
+.balance-right {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+.metric-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--card-border-soft);
+  position: relative;
+  overflow: hidden;
+}
+.metric-box::before {
+  content: '';
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  left: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent-blue);
+  opacity: 0.5;
+}
+.metric-box-asset::before {
+  background: var(--tag-green);
+  opacity: 0.5;
+}
+.metric-box-k {
+  font-size: 9.5px;
+  color: var(--txt-3);
+  letter-spacing: 0.3px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.metric-box-v {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.metric-asset-count {
+  color: var(--accent-blue);
+}
+.metric-box-notional::before {
+  background: var(--tag-yellow);
+  opacity: 0.5;
+}
+.metric-notional {
+  color: var(--txt-1);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ===== 回撤颜色三级（字号统一压到 13px） ===== */
+.drawdown-normal {
+  color: var(--txt-2);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.drawdown-warn {
+  color: var(--tag-yellow);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.drawdown-danger {
+  color: var(--tag-red);
+  font-weight: 700;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  animation: danger-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes danger-pulse {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(248, 81, 73, 0);
+  }
+  50% {
+    text-shadow: 0 0 6px rgba(248, 81, 73, 0.55);
+  }
+}
+
+/* ===== 杠杆颜色三级 ===== */
+.lever-normal {
+  color: var(--tag-green);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lever-warn {
+  color: var(--tag-yellow);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.lever-danger {
+  color: var(--tag-red);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  animation: danger-pulse 1.4s ease-in-out infinite;
+}
+
+/* ==================== 移动端降级（一层主卡） ==================== */
+@media (max-width: 960px) {
+  /* 主卡：3 段 2 分隔 → 单列堆叠；META 行继续占满整卡顶 */
+  .h-balance {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto; /* 一行 meta + 其余子块按 flow 堆叠 */
+    row-gap: 8px;
+    column-gap: 0;
+    padding: 8px 10px;
+    margin: 4px;
+  }
+  /* 行 2 号规则在小屏下无效：取消 grid-row 绑定，按 flow 顺序自然堆叠 */
+  .balance-left,
+  .balance-chart,
+  .balance-right,
+  .balance-divider {
+    grid-row: auto;
+  }
+  .balance-divider {
+    width: auto;
+    height: 1px;
+    margin: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--card-border-soft) 20%,
+      var(--card-border-soft) 80%,
+      transparent 100%
+    );
+  }
+  .h-meta-row {
+    padding: 2px 0 6px 0;
+    margin-bottom: 4px;
+  }
+  .balance-v {
+    font-size: 22px; /* 放大一档，原 20 → 22 */
+  }
+  .balance-main-row {
+    gap: 8px;
+  }
+  .balance-right {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    padding: 4px;
+  }
+  .h-balance {
+    padding: 6px 8px;
+    margin: 3px;
+    row-gap: 7px;
+  }
+  .h-meta-time,
+  .h-meta-ws > span:last-child {
+    font-size: 10.5px;
+  }
+
+  .balance-v {
+    font-size: 20px; /* 放大一档，原 18 → 20 */
+  }
+  .balance-left {
+    gap: 3px;
+  }
+  .balance-main-row {
+    gap: 7px;
+  }
+  /* 右块风险 4 格：2×2 */
+  .balance-right {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+  }
+  /* H/L 胶囊收小一档 */
+  .eq-hl-item {
+    padding: 1px 5px;
+    font-size: 9px;
+  }
 }
 
 .assets-container {
@@ -423,17 +905,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 移动端适配 */
+/* 移动端适配（768px 只改容器，主卡规则交给 960/640 两档） */
 @media (max-width: 768px) {
   body {
     padding: 4px;
-  }
-
-  .header {
-    padding: 3px 8px;
-    gap: 6px;
-    font-size: 11px;
-    margin-bottom: 4px;
   }
 
   .assets-container {

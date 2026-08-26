@@ -1,18 +1,15 @@
 import { getInstruments, getOpenInterest, getOrderHistory, getPositions } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
-import {
-  getClosingTransaction,
-  getLastTransactions,
-  getOpeningTransaction,
-  updateTransaction,
-} from '../recordTools.js';
+import { getLastTransactions, updateTransaction } from '../recordTools.js';
 import { findBestFitLine } from '../regression.js';
-import { calculateStep, formatTimestamp, parseCandleData } from '../tools.js';
+import { formatTimestamp, parseCandleData } from '../tools.js';
 import { HedgeProcessor } from './processors/HedgeProcessor.js';
 import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 import { calculateChipDistribution } from '../indicators/CD.js';
 import { logCandle, logCandles } from './KlineLogger.js';
+import { AccountRiskMonitor } from './AccountRiskMonitor.js';
+import * as ProfitCalculator from './ProfitCalculator.js';
 
 export class TradeEngine {
   static processors = [];
@@ -46,6 +43,9 @@ export class TradeEngine {
   static _interest_cache = {}; // 持仓兴趣缓存
   static _volume_cache = {}; // 成交量缓存
   static _chip_cache_duration = 10000; // 缓存有效期 5秒
+  // 账户风控监控器（余额/回撤/杠杆）——抽出至 AccountRiskMonitor.js
+  // TradeEngine 通过静态门面方法（startAccountBalanceUpdate/getAccountBalance 等）委托调用，外部零改动
+  static #riskMonitor = new AccountRiskMonitor(this);
 
   /**
    * 对冲监听器
@@ -112,79 +112,37 @@ export class TradeEngine {
     return price * beta[0] + beta[1];
   }
   /**
-   * 获取实时利润
+   * 获取实时利润（门面委托至 ProfitCalculator.calcRealtimeProfits）
    */
   static getRealtimeProfits() {
-    const scaled_prices = this.getAllScaledPrices();
-    const profit = {};
-    for (let i = 0; i < scaled_prices.length - 1; i++) {
-      for (let j = i + 1; j < scaled_prices.length; j++) {
-        const assetId1 = scaled_prices[i].id;
-        const assetId2 = scaled_prices[j].id;
-
-        const prices1 = scaled_prices[i].prices;
-        const prices2 = scaled_prices[j].prices;
-        profit[`${assetId1}:${assetId2}`] = this._calcPriceGapProfit(
-          prices1.at(-1),
-          prices2.at(-1),
-          (prices1.at(-1) + prices2.at(-1)) / 2
-        );
-      }
-    }
-    return profit;
+    return ProfitCalculator.calcRealtimeProfits(this.getAllScaledPrices());
   }
 
   /**
-   * 获取实时利润
+   * 获取各资产对历史利润序列（门面委托至 ProfitCalculator.calcAllHistoryProfits）
    */
   static getAllHistoryProfits() {
-    const scaled_prices = this.getAllScaledPrices();
-    const profit = {};
-    for (let i = 0; i < scaled_prices.length - 1; i++) {
-      for (let j = i + 1; j < scaled_prices.length; j++) {
-        const assetId1 = scaled_prices[i].id;
-        const assetId2 = scaled_prices[j].id;
-        const prices1 = scaled_prices[i].prices;
-        const prices2 = scaled_prices[j].prices;
-
-        profit[`${assetId1}:${assetId2}`] = prices1.map((p1, id) => {
-          const p2 = prices2[id];
-          return this._calcPriceGapProfit(p1, p2, (p1 + p2) / 2);
-        });
-      }
-    }
-    return profit;
+    return ProfitCalculator.calcAllHistoryProfits(this.getAllScaledPrices());
   }
 
   /**
-   * 计算预期开仓利润率
+   * 计算预期开仓利润率（门面委托至 ProfitCalculator.calcPriceGapProfit）
    * @param {*} a
    * @param {*} b
    * @param {*} n
    * @returns
    */
   static _calcPriceGapProfit(a, b, n) {
-    return (((n - b) / b - (n - a) / a) / 2) * (a > b ? 1 : -1);
+    return ProfitCalculator.calcPriceGapProfit(a, b, n);
   }
 
   /**
-   * 计算实际平仓利润率
-   * @param {*} a
-   * @param {*} b
-   * @param {*} n
+   * 计算实际平仓利润率（门面委托至 ProfitCalculator.calcClosingProfitRate）
+   * @param {*} tradeId
    * @returns
    */
   static _calcClosingProfitRate(tradeId) {
-    const { orders: order_o } = getOpeningTransaction(tradeId);
-    const { orders: order_c } = getClosingTransaction(tradeId);
-    const beta_map = Object.fromEntries(order_o.map(o => [o.instId, o.beta]));
-    let [a, b] = order_o
-      .sort((a, b) => a.instId.localeCompare(b.instId))
-      .map(it => parseFloat(beta_map[it.instId][0] * it.avgPx + beta_map[it.instId][1]));
-    let [a2, b2] = order_c
-      .sort((a, b) => a.instId.localeCompare(b.instId))
-      .map(it => parseFloat(beta_map[it.instId][0] * it.avgPx + beta_map[it.instId][1]));
-    return (((b2 - b) / b - (a2 - a) / a) / 2) * (a > b ? 1 : -1);
+    return ProfitCalculator.calcClosingProfitRate(tradeId);
   }
 
   static _orderHistoryCache = {};
@@ -590,43 +548,16 @@ export class TradeEngine {
   }
 
   /**
-   * 根据实时价格计算订单实时净利润
+   * 根据实时价格计算订单实时净利润（门面委托至 ProfitCalculator.calcRealtimeProfit）
    * @param {*} orders
    * @returns
    */
   static _calcRealtimeProfit(orders) {
-    let fee_usdt = 0,
-      cost = 0,
-      sell = 0;
-    const realtime_price_map = TradeEngine.getRealtimePrices();
-
-    orders.map(({ instId, side, sz, tgtCcy, avgPx, accFillSz, fee, feeCcy }) => {
-      const realtime_price = realtime_price_map[instId];
-      if (!realtime_price) {
-        // console.warn(`实时价格获取不到: ${instId}`);
-        return 0;
-      }
-      // 单位 false:本币; true:usdt
-      const unit_fgt = tgtCcy === 'base_ccy' ? false : true;
-      const unit_fee = feeCcy === 'USDT' ? true : false;
-
-      if (side === 'buy') {
-        cost += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-        // 实时估算
-        sell += realtime_price * accFillSz;
-        fee_usdt -= realtime_price * accFillSz * this._trade_fee_rate;
-      }
-
-      if (side === 'sell') {
-        sell += unit_fgt ? parseFloat(sz) : parseFloat(sz * avgPx);
-        // 实时估算
-        cost += realtime_price * accFillSz;
-        fee_usdt -= realtime_price * accFillSz * this._trade_fee_rate;
-      }
-      fee_usdt += unit_fee ? parseFloat(fee) : parseFloat(fee * avgPx);
-    });
-    const profit = sell - cost + fee_usdt;
-    return profit;
+    return ProfitCalculator.calcRealtimeProfit(
+      orders,
+      TradeEngine.getRealtimePrices(),
+      this._trade_fee_rate
+    );
   }
 
   static checkEngine() {
@@ -665,6 +596,10 @@ export class TradeEngine {
   static start() {
     const status = this.checkEngine();
     // const restore = this._rewriteConsole('交易引擎启动中...');
+
+    // 启动账户余额定时拉取（幂等，仅首次生效；推送 totalEq 总权益用于回撤控制）
+    // 委托至 AccountRiskMonitor.start()
+    this.#riskMonitor.start();
 
     try {
       if (status == 2) {
@@ -832,6 +767,14 @@ export class TradeEngine {
             // API 调用成功但没有数据，表示确实没有持仓
             this._position_list[assetName] = null;
           }
+          // 持仓名义（分子）可能变 → 重算实际账户杠杆（委托至 AccountRiskMonitor）
+          this.#riskMonitor.calcLeverage();
+          // 若 confirmedEq 已就绪（已有余额数据）则顺道推一次，让前端看到最新杠杆
+          // （若余额流程先跑完，杠杆会在那里推；这里补一遍防止持仓10s、余额30s 不同步）
+          // 通过 getBalance() != null 判断是否已有 confirmed 值（pushBalance 仅在 confirmed 就绪后才落地 _account_balance）
+          if (this.#riskMonitor.getBalance() != null) {
+            this.#riskMonitor.pushBalance(null);
+          }
         }
       } catch (e) {
         // API 调用失败，保持原有持仓信息不变
@@ -935,6 +878,23 @@ export class TradeEngine {
    */
   static getInstrumentInfo(assetName) {
     return this._instrument_info[assetName] || null;
+  }
+
+  /**
+   * 启动账户余额定时拉取（门面委托至 AccountRiskMonitor.start）
+   * 幂等：已启动则直接返回，避免 start() 重入时重复启动
+   * 实现细节（跳变防护/极值更新/回撤率/杠杆计算/推送）见 AccountRiskMonitor.js
+   */
+  static startAccountBalanceUpdate() {
+    this.#riskMonitor.start();
+  }
+
+  /**
+   * 获取账户余额（门面委托至 AccountRiskMonitor.getBalance）
+   * @returns {Object|null} 账户余额数据（含 totalEq 总权益、回撤率、杠杆等）
+   */
+  static getAccountBalance() {
+    return this.#riskMonitor.getBalance();
   }
 
   /**

@@ -1,5 +1,4 @@
 import { formatTimestamp } from '../tools.js';
-import { TradeEngine } from '../TradeEngine/TradeEngine.js';
 
 /**
  * 多粒度筹码分布计算器（自动适应1m/5m/1H/1D数据）

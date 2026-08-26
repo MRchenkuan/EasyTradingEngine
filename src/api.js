@@ -524,6 +524,42 @@ export async function doLogin(ctx) {
   );
 }
 
+/**
+ * 获取账户余额（总权益 totalEq）
+ * 用途：回撤控制口径——账户全部价值，含持仓保证金+闲置保证金+盈亏+充值/提取+手动买卖持仓
+ * @returns {Promise<Object|null>} 账户余额数据，含 totalEq、upl 等；失败返回 null
+ */
+export async function getAccountBalance() {
+  const security = MIMIC ? mimic : firm;
+
+  const timestamp = new Date().toISOString();
+  const method = 'GET';
+  const requestPath = '/api/v5/account/balance';
+  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
+
+  const headers = {
+    'OK-ACCESS-KEY': security.api_key,
+    'OK-ACCESS-SIGN': sign,
+    'OK-ACCESS-TIMESTAMP': timestamp,
+    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+  };
+
+  if (MIMIC) {
+    headers['x-simulated-trading'] = 1;
+  }
+
+  try {
+    const { data } = await axios.get(base_url + requestPath, { headers });
+    if (data.code != 0) {
+      throw new Error(data.msg);
+    }
+    return data.data && data.data[0] ? data.data[0] : {};
+  } catch (error) {
+    console.error('获取账户余额失败:', error.response?.data || error.message);
+    return null;
+  }
+}
+
 export async function subscribeKlineChanel(ws, channel, instId) {
   ws.send(
     JSON.stringify({

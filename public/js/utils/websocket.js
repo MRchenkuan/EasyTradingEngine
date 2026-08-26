@@ -7,7 +7,13 @@ window.TradingApp.WebSocket = {
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     return pathParts[0] || '';
   },
-  connect: function (onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived) {
+  connect: function (
+    onIndicatorsUpdate,
+    onChartUpdate,
+    onTickUpdate,
+    onLogReceived,
+    onAccountBalance
+  ) {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname || 'localhost';
     const port = window.location.port || 8080;
@@ -24,6 +30,8 @@ window.TradingApp.WebSocket = {
     this.wsIndicators = new WebSocket(`${protocol}//${host}:${port}/?token=${token}`);
     this.wsIndicators.onopen = function () {
       document.getElementById('statusIndicator').classList.add('connected');
+      const lbl = document.getElementById('wsStateLabel');
+      if (lbl) lbl.textContent = '已连接';
     };
     this.wsIndicators.onmessage = function (event) {
       const data = JSON.parse(event.data);
@@ -31,12 +39,22 @@ window.TradingApp.WebSocket = {
         onIndicatorsUpdate(data.payload);
       } else if (data.type === 'logs') {
         onLogReceived(data.payload);
+      } else if (data.type === 'accountBalance') {
+        onAccountBalance(data.payload);
       }
     };
     this.wsIndicators.onclose = function () {
       document.getElementById('statusIndicator').classList.remove('connected');
+      const lbl = document.getElementById('wsStateLabel');
+      if (lbl) lbl.textContent = '未连接';
       setTimeout(() => {
-        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+        self.connect(
+          onIndicatorsUpdate,
+          onChartUpdate,
+          onTickUpdate,
+          onLogReceived,
+          onAccountBalance
+        );
       }, 3000);
     };
     this.wsIndicators.onerror = function () {};
@@ -51,7 +69,13 @@ window.TradingApp.WebSocket = {
     };
     this.wsChart.onclose = function () {
       setTimeout(() => {
-        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+        self.connect(
+          onIndicatorsUpdate,
+          onChartUpdate,
+          onTickUpdate,
+          onLogReceived,
+          onAccountBalance
+        );
       }, 3000);
     };
     this.wsChart.onerror = function () {};
@@ -66,7 +90,13 @@ window.TradingApp.WebSocket = {
     };
     this.wsTick.onclose = function () {
       setTimeout(() => {
-        self.connect(onIndicatorsUpdate, onChartUpdate, onTickUpdate, onLogReceived);
+        self.connect(
+          onIndicatorsUpdate,
+          onChartUpdate,
+          onTickUpdate,
+          onLogReceived,
+          onAccountBalance
+        );
       }, 3000);
     };
     this.wsTick.onerror = function () {};

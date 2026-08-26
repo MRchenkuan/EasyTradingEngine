@@ -13,13 +13,70 @@
 </head>
 
 <body>
-  <div class="header">
-    <span class="header-title">交易监控</span>
-    <span class="header-info" id="currentTime"></span>
-    <span class="header-info">资产:<span id="assetCount">0</span></span>
-    <span class="header-info ws-status">
-      <span class="status-indicator" id="statusIndicator"></span>
-    </span>
+  <!-- ================= 账户概览主卡（一层结构，顶部内嵌 META） ================= -->
+  <div class="h-balance" id="totalEquity" style="display:none;">
+    <!-- 顶部：META 内嵌（只有时间 + WS，品牌整行删除，避免两层） -->
+    <div class="h-meta-row">
+      <span class="h-meta-time">🕒 <span id="currentTime">-</span></span>
+      <div class="h-meta-ws">
+        <span class="status-indicator" id="statusIndicator"></span>
+        <span id="wsStateLabel">未连接</span>
+      </div>
+    </div>
+
+    <!-- ▓▓ 左块：上=标签；下=数字 ▓▓ -->
+    <section class="balance-left">
+      <div class="balance-k">总权益</div>
+      <div class="balance-main-row">
+        <div class="balance-v" id="totalEquityValue">$ 0.00</div>
+      </div>
+    </section>
+
+    <div class="balance-divider" aria-hidden="true"></div>
+
+    <!-- ▓▓ 中块：条图 + 刻度标记（谷/清仓线/峰按刻度定位） ▓▓ -->
+    <section class="balance-chart">
+      <!-- 上方刻度标签：谷/峰，按刻度位置定位 -->
+      <div class="eq-hl-row">
+        <span class="eq-hl-item eq-hl-l" id="eqLLabel" style="display:none;">谷 $ -</span>
+        <span class="eq-hl-item eq-hl-h" id="eqHLabel" style="display:none;">峰 $ -</span>
+      </div>
+
+      <div class="eq-range-bar">
+        <div class="eq-range-fill" id="eqRangeFill"></div>
+        <div class="eq-range-marker eq-range-marker-min" id="eqMarkerMin"></div>
+        <div class="eq-range-marker eq-range-marker-liquidation" id="eqMarkerLiq"></div>
+        <div class="eq-range-marker eq-range-marker-current" id="eqRangeMarker"></div>
+      </div>
+
+      <!-- 下方刻度标签：清仓线，按刻度位置定位 -->
+      <div class="eq-range-sublegend" id="eqSublegend">
+        <span id="eqLiqLabel" style="display:none;">清仓线 $ -</span>
+      </div>
+    </section>
+
+    <!-- ▓▓ 分隔竖线（视觉） ▓▓ -->
+    <div class="balance-divider" aria-hidden="true"></div>
+
+    <!-- ▓▓ 右块：风险指标 4 格横排（回撤/杠杆/总头寸/资产数） ▓▓ -->
+    <section class="balance-right">
+      <div class="metric-box">
+        <div class="metric-box-k">当前回撤</div>
+        <div class="metric-box-v drawdown-normal" id="drawdownPctValue">0.00%</div>
+      </div>
+      <div class="metric-box">
+        <div class="metric-box-k">实际杠杆</div>
+        <div class="metric-box-v lever-normal" id="leverValue">0.00x</div>
+      </div>
+      <div class="metric-box metric-box-notional">
+        <div class="metric-box-k">总头寸</div>
+        <div class="metric-box-v metric-notional" id="notionalValue">$ 0</div>
+      </div>
+      <div class="metric-box metric-box-asset">
+        <div class="metric-box-k">持仓资产</div>
+        <div class="metric-box-v metric-asset-count" id="assetCountBig">0</div>
+      </div>
+    </section>
   </div>
 
   <div class="assets-container" id="assetsContainer">

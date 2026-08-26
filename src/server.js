@@ -40,6 +40,7 @@ export class MonitorServer {
     this.tickClients = new Set();
     this.assetData = {};
     this.lastCandleCount = {}; // 记录每个资产上次发送的K线数量，用于判断是否有新K线
+    this.accountBalance = null; // 账户余额数据（含 totalEq 总权益，回撤控制口径）
     this.logs = [];
     this.originalConsole = {
       log: console.log.bind(console),
@@ -157,6 +158,15 @@ export class MonitorServer {
           payload: this._extractIndicators(),
         })
       );
+      // 连接建立时立即推送最新账户总权益（若已缓存），避免刷新页面后需等待下一次定时刷新
+      if (this.accountBalance) {
+        ws.send(
+          JSON.stringify({
+            type: 'accountBalance',
+            payload: this.accountBalance,
+          })
+        );
+      }
       ws.on('close', () => this.indicatorClients.delete(ws));
       ws.on('error', () => this.indicatorClients.delete(ws));
     });
@@ -313,6 +323,25 @@ export class MonitorServer {
 
     // 每次都发送 tick（最后一根K线更新）
     this.sendTick();
+  }
+
+  updateAccountBalance(balance) {
+    this.accountBalance = balance;
+    // 通过 indicators 通道推送账户总权益
+    this.sendAccountBalance();
+  }
+
+  sendAccountBalance() {
+    if (!this.accountBalance) return;
+    const data = JSON.stringify({
+      type: 'accountBalance',
+      payload: this.accountBalance,
+    });
+    this.indicatorClients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(data);
+      }
+    });
   }
 
   addLog(message, level = 'info') {
