@@ -87,15 +87,28 @@ function onTickUpdate(payload) {
     if (assets[name] && assets[name].chartData) {
       const chart = assets[name].chartData;
       if (tick.candle && chart.candleData && chart.candleData.length > 0) {
-        chart.candleData[chart.candleData.length - 1] = tick.candle;
-      }
-      if (tick.boll && chart.boll) {
-        if (tick.boll.upper != null)
-          chart.boll.upper[chart.boll.upper.length - 1] = tick.boll.upper;
-        if (tick.boll.middle != null)
-          chart.boll.middle[chart.boll.middle.length - 1] = tick.boll.middle;
-        if (tick.boll.lower != null)
-          chart.boll.lower[chart.boll.lower.length - 1] = tick.boll.lower;
+        const lastCandle = chart.candleData[chart.candleData.length - 1];
+        if (tick.candle.ts > lastCandle.ts) {
+          // 新 K 线周期开始，追加
+          chart.candleData.push(tick.candle);
+          // BOLL 也需追加，保持长度一致
+          if (tick.boll && chart.boll) {
+            for (const key of ['upper', 'middle', 'lower']) {
+              if (chart.boll[key]) chart.boll[key].push(tick.boll[key] ?? null);
+            }
+          }
+        } else {
+          // 同周期，更新最后一根
+          chart.candleData[chart.candleData.length - 1] = tick.candle;
+          // BOLL 同周期覆盖
+          if (tick.boll && chart.boll) {
+            for (const key of ['upper', 'middle', 'lower']) {
+              if (tick.boll[key] != null && chart.boll[key]) {
+                chart.boll[key][chart.boll[key].length - 1] = tick.boll[key];
+              }
+            }
+          }
+        }
       }
     }
     // 轻量更新图表，不重建

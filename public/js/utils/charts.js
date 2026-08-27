@@ -57,20 +57,44 @@ window.TradingApp.Charts = {
     if (lastIndex < 0) return;
 
     if (tick.candle) {
-      cachedData.allBodyData[lastIndex].c = tick.candle.close;
-      cachedData.allBodyData[lastIndex].h = tick.candle.high;
-      cachedData.allBodyData[lastIndex].l = tick.candle.low;
-      cachedData.allCandleData[lastIndex] = tick.candle;
-      if (tick.candle.vol != null) {
-        cachedData.allVolData[lastIndex] =
-          tick.candle.vol * ((tick.candle.open + tick.candle.close) / 2);
+      const lastCandle = cachedData.allCandleData[lastIndex];
+      if (lastCandle && tick.candle.ts > lastCandle.ts) {
+        // 新 K 线周期开始，追加
+        cachedData.allCandleData.push(tick.candle);
+        cachedData.allBodyData.push({
+          o: tick.candle.open,
+          h: tick.candle.high,
+          l: tick.candle.low,
+          c: tick.candle.close,
+        });
+        cachedData.allLabels.push(tick.candle.ts);
+        cachedData.allVolData.push(
+          tick.candle.vol != null
+            ? tick.candle.vol * ((tick.candle.open + tick.candle.close) / 2)
+            : 0
+        );
+        cachedData.allBollUpper.push(null);
+        cachedData.allBollMiddle.push(null);
+        cachedData.allBollLower.push(null);
+      } else {
+        // 同周期，更新最后一根
+        cachedData.allBodyData[lastIndex].c = tick.candle.close;
+        cachedData.allBodyData[lastIndex].h = tick.candle.high;
+        cachedData.allBodyData[lastIndex].l = tick.candle.low;
+        cachedData.allCandleData[lastIndex] = tick.candle;
+        if (tick.candle.vol != null) {
+          cachedData.allVolData[lastIndex] =
+            tick.candle.vol * ((tick.candle.open + tick.candle.close) / 2);
+        }
       }
     }
 
+    // BOLL 更新（无论追加还是覆盖，都更新最后一个元素）
     if (tick.boll) {
-      if (tick.boll.upper != null) cachedData.allBollUpper[lastIndex] = tick.boll.upper;
-      if (tick.boll.middle != null) cachedData.allBollMiddle[lastIndex] = tick.boll.middle;
-      if (tick.boll.lower != null) cachedData.allBollLower[lastIndex] = tick.boll.lower;
+      const idx = cachedData.allBollUpper.length - 1;
+      if (tick.boll.upper != null) cachedData.allBollUpper[idx] = tick.boll.upper;
+      if (tick.boll.middle != null) cachedData.allBollMiddle[idx] = tick.boll.middle;
+      if (tick.boll.lower != null) cachedData.allBollLower[idx] = tick.boll.lower;
     }
 
     const offset = this.viewports[assetName] || 0;
