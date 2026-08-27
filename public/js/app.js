@@ -18,6 +18,10 @@ function renderAssets() {
     !assetNames.every(name => existingAssets.includes(name));
 
   if (needsFullRebuild) {
+    // 先销毁所有 Chart 实例，避免 innerHTML 替换 canvas 后 Chart.js 注册表残留
+    TradingApp.Charts.destroyAllCharts();
+    lastChartData = {};
+
     let html = '';
     assetNames.forEach(assetName => {
       const assetData = assets[assetName];

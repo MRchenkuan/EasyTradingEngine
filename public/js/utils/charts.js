@@ -67,7 +67,7 @@ window.TradingApp.Charts = {
           l: tick.candle.low,
           c: tick.candle.close,
         });
-        cachedData.allLabels.push(tick.candle.ts);
+        cachedData.allLabels.push(tick.label || String(tick.candle.ts));
         cachedData.allVolData.push(
           tick.candle.vol != null
             ? tick.candle.vol * ((tick.candle.open + tick.candle.close) / 2)
@@ -141,7 +141,27 @@ window.TradingApp.Charts = {
     cachedData.candleData = visibleCandleData;
     cachedData.volData = visibleVolData;
 
-    chart.update('none');
+    try {
+      chart.update('none');
+    } catch (e) {
+      // chart 可能已被 renderChart 销毁重建，忽略此次更新
+      console.warn(`[Charts] refreshViewport 跳过（chart 可能已重建）: ${e.message}`);
+    }
+  },
+
+  // 销毁所有 chart 实例并清空缓存（DOM 重建前调用，避免 Canvas 泄漏）
+  destroyAllCharts: function () {
+    for (const assetName of Object.keys(this.charts)) {
+      try {
+        this.charts[assetName].destroy();
+      } catch (e) {
+        // 忽略销毁异常
+      }
+    }
+    this.charts = {};
+    this.chartDataCache = {};
+    this.viewports = {};
+    this.visibleCounts = {};
   },
 
   renderChart: function (assetName, chartData) {

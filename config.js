@@ -3,8 +3,8 @@ import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 // export const Env = TradeEnv.MIMIC;
 export const Env = TradeEnv.PRODUCTION;
 
-export const trade_open = true;
-// export const trade_open = false;
+// export const trade_open = true;
+export const trade_open = false;
 
 // ==================== 风控配置 ====================
 export const RiskControl = {
