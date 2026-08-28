@@ -2,12 +2,13 @@ import { PositionAction, PositionCompositeRiskLevel } from '../../../enum.js';
 
 export function TradeFreqController(params) {
   const {
-    last_open_grid_span,
-    last_close_grid_span,
+    last_trade_grid_span, // 上次同类交易的网格跨度（统一通道，不分开仓/平仓）
     grid_span_abs,
     position_action,
     time_since_last_trade,
     risk_level,
+    current_trade_side, // 本次买卖方向 (1=买, -1=卖)
+    last_trade_side, // 上次买卖方向 (1=买, -1=卖, 0=无)
   } = params;
 
   // 节流重置时间
@@ -15,18 +16,17 @@ export function TradeFreqController(params) {
   // 最大节流距离
   const maxThrottleDistance = 10;
 
-  const isSerialTrade = {
-    [PositionAction.OPEN]: last_open_grid_span > 0,
-    [PositionAction.CLOSE]: last_close_grid_span > 0,
-  }[position_action];
+  // 连续同类交易判断：基于实际买卖方向（尊重价格趋势延续性）
+  // 平多(卖)→开空(卖) 仍视为连续卖出；平多(卖)→平空(买) 方向切换不视为连续
+  const isSerialTradeBase = last_trade_grid_span > 0;
+  const isSameTradeDirection = last_trade_side !== 0 && last_trade_side === current_trade_side;
+  const isSerialTrade = isSerialTradeBase && isSameTradeDirection;
 
   const { ISOLATE_HIGHT, ISOLATE_EMERGENCY, DUAL_EMERGENCY, DUAL_HIGH, CROSS_EMERGENCY } =
     PositionCompositeRiskLevel;
 
-  const lastTradeGridSpan = {
-    [PositionAction.OPEN]: last_open_grid_span,
-    [PositionAction.CLOSE]: last_close_grid_span,
-  }[position_action];
+  // 节流距离基于上次同类交易的网格跨度（统一通道）
+  const lastTradeGridSpan = last_trade_grid_span;
 
   // 节流距离计算：开仓和平仓分开
   // 开仓：高风险高节流（需要更大跨度才放行）

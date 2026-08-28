@@ -101,6 +101,10 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._last_upper_turning_price_ts = this.local_variables.last_upper_turning_price_ts;
     this._last_open_grid_span = this.local_variables.last_open_grid_count;
     this._last_close_grid_span = this.local_variables.last_close_grid_count;
+    // 上次实际买卖方向 (1=买, -1=卖, 0=无)，用于连续同类交易的方向一致性判断
+    this._last_trade_side = this.local_variables.last_trade_side || 0;
+    // 上次同类交易的网格跨度（统一通道，不分开仓/平仓），用于连续交易节流
+    this._last_trade_grid_span = this.local_variables.last_trade_grid_count ?? -1;
 
     // this._current_price = this.local_variables.current_price;
     // this._current_price_ts = this.local_variables.current_price_ts;
@@ -122,6 +126,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this.local_variables.last_upper_turning_price_ts = this._last_upper_turning_price_ts;
     this.local_variables.last_open_grid_count = this._last_open_grid_span;
     this.local_variables.last_close_grid_count = this._last_close_grid_span;
+    this.local_variables.last_trade_side = this._last_trade_side;
+    this.local_variables.last_trade_grid_count = this._last_trade_grid_span;
 
     this.local_variables.prev_price = this._prev_price;
     this.local_variables.current_price = this._current_price;
@@ -366,6 +372,13 @@ export class GridTradingProcessor extends AbstractProcessor {
         ? PositionAction.CLOSE
         : PositionAction.OPEN;
 
+    // 计算本次实际买卖方向 (1=买, -1=卖)
+    // 开仓：跟随趋势方向（开多=买，开空=卖）；平仓：与持仓方向相反（平多=卖，平空=买）
+    const current_trade_side =
+      position_action === PositionAction.OPEN
+        ? Math.sign(this._tendency)
+        : -Math.sign(pos_contracts);
+
     try {
       this._stratage_locked = true;
 
@@ -420,12 +433,13 @@ export class GridTradingProcessor extends AbstractProcessor {
       // 计算交易频率控制
       const { shouldTrade, ...frq_rest } = TradeFreqController({
         asset_name: this.asset_name,
-        last_open_grid_span: this._last_open_grid_span,
-        last_close_grid_span: this._last_close_grid_span,
+        last_trade_grid_span: this._last_trade_grid_span,
         grid_span_abs,
         position_action,
         time_since_last_trade: now - this._last_trade_price_ts,
         risk_level: this._position_risk_level,
+        current_trade_side,
+        last_trade_side: this._last_trade_side,
       });
 
       // 立即更新监控显示（包含止损等级、阈值调整信息和交易状态）
@@ -456,8 +470,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       }
 
       if (Math.abs(adjustedGridCount) >= 1) {
-        // 更新连续同类交易的网格距离
-        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
+        // 更新连续同类交易的网格距离（传入带符号的 tradeCount 以记录买卖方向）
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs, adjustedTradeCount);
 
         // 执行下单
         await this._placeOrder(adjustedTradeCount, `- 回调下单 - ${tradeDescription} `);
@@ -473,7 +487,9 @@ export class GridTradingProcessor extends AbstractProcessor {
         grid_span_abs > this._last_close_grid_span &&
         position_action === PositionAction.CLOSE
       ) {
-        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs);
+        // 格内交易方向：tendency>0 卖出(1)，tendency<0 买入(-1)
+        const intraGridTradeCount = this._tendency > 0 ? 1 : -1;
+        this._refreshLastSerialTradeGridSpan(position_action, grid_span_abs, intraGridTradeCount);
 
         if (this._tendency > 0) {
           await this._placeOrder(1, `- 回调下单:格内 - ${tradeDescription} `);
@@ -572,15 +588,32 @@ export class GridTradingProcessor extends AbstractProcessor {
    * @param {string} orderDesc 订单类型
    */
   async _placeOrder(gridCount, orderDesc, retry_count = 0) {
-    const { ctVal } = this._instrument_info;
+    const { ctVal, lotSz, minSz } = this._instrument_info || {};
+    // lotSize: 下单数量必须为该值的整数倍；minSize: 最小下单数量
+    const lotSize = parseFloat(lotSz) || 1;
+    const minSize = parseFloat(minSz) || 0;
+
     let amount = 0;
     if (this._settlement_type === SettlementType.VALUE) {
       const swap_price = this._current_price * ctVal;
       const swap_amount = this._base_amount / swap_price;
-      amount = (-gridCount * swap_amount).toFixed(2);
+      amount = -gridCount * swap_amount;
     } else if (this._settlement_type === SettlementType.QUANTITY) {
       amount = (-gridCount * this._base_quantity) / ctVal;
     }
+
+    // 调整为 lotSize 的整数倍（向 0 取整，避免超量下单）
+    const sign = Math.sign(amount);
+    let adjustedAmount = Math.floor(Math.abs(amount) / lotSize) * lotSize;
+
+    // 调整后数量低于最小交易单位时跳过下单（避免 OKX 拒单与无效重试）
+    if (adjustedAmount <= 0 || (minSize > 0 && adjustedAmount < minSize)) {
+      console.log(
+        `⚠️[${this.asset_name}]${orderDesc}：计算数量 ${Math.abs(amount).toFixed(4)} 调整为 lotSize(${lotSize}) 倍数后为 ${adjustedAmount}，低于最小交易量 ${minSize}，跳过下单`
+      );
+      return;
+    }
+    amount = sign * adjustedAmount;
 
     console.log(`💰${orderDesc}：${this._current_price} ${amount} 个`);
     const order = create_order_market(this.asset_name, Math.abs(amount), amount / Math.abs(amount));
@@ -616,6 +649,8 @@ export class GridTradingProcessor extends AbstractProcessor {
     this._resetKeyPrices(price, ts);
     this._last_open_grid_span = -1;
     this._last_close_grid_span = -1;
+    this._last_trade_side = 0;
+    this._last_trade_grid_span = -1;
     this._saveState();
     console.log(`[${this.asset_name}] 策略状态已重置（清仓后）`);
   }
@@ -674,7 +709,19 @@ export class GridTradingProcessor extends AbstractProcessor {
     }
   }
 
-  _refreshLastSerialTradeGridSpan(position_action, grid_span_abs) {
+  /**
+   * 更新连续同类交易的网格距离
+   * @param {PositionAction} position_action 开仓/平仓
+   * @param {number} grid_span_abs 网格跨度绝对值
+   * @param {number} tradeCount 带符号的交易份数（>0=卖, <0=买），用于记录实际买卖方向
+   */
+  _refreshLastSerialTradeGridSpan(position_action, grid_span_abs, tradeCount) {
+    // 记录实际买卖方向 (1=买, -1=卖)：与 _placeOrder 中 amount=-gridCount*... 对应
+    this._last_trade_side = -Math.sign(tradeCount);
+    // 统一通道：记录上次同类交易的网格跨度（不分开仓/平仓）
+    this._last_trade_grid_span = grid_span_abs;
+
+    // 保留 open/close 分通道记录（格内交易条件等原有逻辑使用）
     if (position_action === PositionAction.OPEN) {
       this._last_open_grid_span = grid_span_abs;
       this._last_close_grid_span = -1;

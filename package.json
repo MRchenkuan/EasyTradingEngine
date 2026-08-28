@@ -11,6 +11,7 @@
     "check-format": "prettier --check \"src/**/*.js\"",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:liquidation": "node src/scripts/test-liquidation.js",
+    "test:instrument": "node src/scripts/test-instrument.js",
     "liquidate": "node src/scripts/liquidate.js",
     "start": "node src/main.js",
     "start:arm": "/Users/chenkuan/.nvm/versions/node/v20.19.6/bin/node src/main.js",
