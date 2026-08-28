@@ -9,7 +9,7 @@ import { LocalVariable } from '../LocalVariable.js';
 import { calculateBOLL } from '../indicators/BOLL.js';
 import { GridTradingSlice } from './painters/GridTradingSlice.js';
 import { MainGraph } from './painters/MainGraph.js';
-import { Env } from '../../config.js';
+import { Env, disable_chart } from '../../config.js';
 import { TradeEnv } from '../enum.js';
 
 export class VisualEngine {
@@ -62,8 +62,10 @@ export class VisualEngine {
   static start() {
     const status = TradeEngine.checkEngine();
     if (status == 2) {
-      this.modules.forEach(it => {
-        it.draw();
+      this.modules.forEach((mod, name) => {
+        // disable_chart 只跳过 GridTradingSlice（chart/grid/*.jpg），保留 MainGraph（main.jpg）
+        if (disable_chart && name === 'GridTradingSlice') return;
+        mod.draw();
       });
     }
     clearTimeout(this._timer.start);

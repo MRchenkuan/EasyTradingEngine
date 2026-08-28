@@ -11,8 +11,12 @@ window.TradingApp.ChartTooltip = {
         document.body.appendChild(tooltipEl);
       }
 
-      // 非长按模式下不显示tooltip
-      if (!self.longPressActive?.[assetName]) {
+      // PC端（可悬停设备）：非拖动状态下允许tooltip显示
+      // 移动端：仅长按模式下显示tooltip（避免拖拽时误触发）
+      const isHoverable = window.matchMedia('(hover: hover)').matches;
+      const isDragging = self.dragStates?.[assetName]?.isDragging;
+      const shouldShow = self.longPressActive?.[assetName] || (isHoverable && !isDragging);
+      if (!shouldShow) {
         tooltipEl.style.opacity = '0';
         return;
       }

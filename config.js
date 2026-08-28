@@ -37,6 +37,7 @@ const _strategyList = _strategiesConfig.assets.map(a => ({
 
 export const Env = TradeEnv[_strategiesConfig.env] || TradeEnv.PRODUCTION;
 export const trade_open = _strategiesConfig.trade_open ?? false;
+export const disable_chart = _strategiesConfig.disable_chart ?? false;
 
 // ==================== 风控配置 ====================
 // 清仓阈值从 JSON 读取，其余为代码默认值
