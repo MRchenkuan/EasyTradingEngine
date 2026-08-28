@@ -578,12 +578,11 @@ body {
     0 1px 0 rgba(255, 255, 255, 0.02) inset,
     0 4px 18px rgba(0, 0, 0, 0.28);
   position: relative;
-  overflow: hidden;
 }
 .asset-card::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
+  inset: 0 14px auto 14px;
   height: 1px;
   background: linear-gradient(
     90deg,
@@ -637,7 +636,6 @@ body {
   border-radius: 7px;
   font-size: 11.5px;
   position: relative;
-  overflow: hidden;
 }
 .metric-item::before {
   content: '';
@@ -667,6 +665,159 @@ body {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
+}
+
+.metric-item .metric-value {
+  flex-shrink: 0;
+}
+
+/* 空仓占位：弱化显示，与有数据的指标区分 */
+.metric-value.metric-empty {
+  color: var(--txt-3);
+  font-weight: 500;
+  font-size: 11px;
+}
+
+/* ---------- 迷你可视化（条/点，嵌入胶囊内不占额外空间） ---------- */
+.metric-viz {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  margin: 0 6px;
+}
+
+.m-bar {
+  position: relative;
+  flex: 1;
+  height: 5px;
+  min-width: 24px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3) inset;
+  overflow: hidden;
+}
+
+.m-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-blue);
+  transition: width 0.3s ease;
+}
+.m-fill.c-green {
+  background: var(--tag-green);
+}
+.m-fill.c-yellow {
+  background: var(--tag-yellow);
+}
+.m-fill.c-orange {
+  background: #f0883e;
+}
+.m-fill.c-red {
+  background: var(--tag-red);
+}
+
+/* 量能平衡点标记（100% 基准线） */
+.m-marker {
+  position: absolute;
+  top: -1px;
+  width: 2px;
+  height: 7px;
+  border-radius: 1px;
+  background: var(--txt-3);
+  transform: translateX(-1px);
+}
+
+/* ATR 三联条 */
+.atr-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.atr-num {
+  font-size: 10px;
+  color: var(--txt-2);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* RSI 双轨条：30/70 安全区着色 + 快线填充 + 慢线游标 */
+.rsi-zone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+.rsi-zone.z-low {
+  left: 0;
+  width: 30%;
+  background: rgba(63, 185, 80, 0.14);
+}
+.rsi-zone.z-high {
+  right: 0;
+  width: 30%;
+  background: rgba(248, 81, 73, 0.14);
+}
+.rsi-marker {
+  position: absolute;
+  top: -1px;
+  width: 2px;
+  height: 7px;
+  border-radius: 1px;
+  background: #f0883e;
+  transform: translateX(-1px);
+}
+
+/* 止损等级：4 点严重度 */
+.level-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.level-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+.level-dots i.on.c-green {
+  background: var(--tag-green);
+  box-shadow: 0 0 4px rgba(63, 185, 80, 0.5);
+}
+.level-dots i.on.c-yellow {
+  background: var(--tag-yellow);
+  box-shadow: 0 0 4px rgba(210, 153, 34, 0.5);
+}
+.level-dots i.on.c-orange {
+  background: #f0883e;
+  box-shadow: 0 0 4px rgba(240, 136, 62, 0.5);
+}
+.level-dots i.on.c-red {
+  background: var(--tag-red);
+  box-shadow: 0 0 4px rgba(248, 81, 73, 0.5);
+}
+
+/* 交易状态呼吸点 */
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.c-green {
+  background: var(--tag-green);
+  box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.18);
+}
+.status-dot.c-red {
+  background: var(--tag-red);
+  box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.18);
 }
 
 .signal-section {
@@ -799,7 +950,7 @@ body {
 .logs-section::before {
   content: '';
   position: absolute;
-  inset: 0 0 auto 0;
+  inset: 0 14px auto 14px;
   height: 1px;
   background: linear-gradient(
     90deg,

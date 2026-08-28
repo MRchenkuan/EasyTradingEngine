@@ -107,10 +107,16 @@ window.TradingApp.Assets = {
       const valueClass = metric.className ? `metric-value ${metric.className}` : 'metric-value';
       const tooltipHtml = metric.tooltip || '';
       const itemClass = metric.tooltip ? `${spanClass} has-trade-tooltip` : spanClass;
+      const vizHtml = metric.viz
+        ? `<span class="metric-viz">${this.renderViz(metric.viz)}</span>`
+        : '';
+      const valueHtml =
+        metric.value !== null && metric.value !== undefined
+          ? `<span class="${valueClass}">${metric.value}</span>`
+          : '';
       html += `
-        <div class="${itemClass}">
-          <span class="metric-label">${metric.label}</span>
-          <span class="${valueClass}">${metric.value}</span>${tooltipHtml}
+        <div class="${itemClass}"${metric.title ? ` title="${metric.title}"` : ''}>
+          <span class="metric-label">${metric.label}</span>${vizHtml}${valueHtml}${tooltipHtml}
         </div>
       `;
     });
@@ -128,18 +134,95 @@ window.TradingApp.Assets = {
     return html;
   },
 
+  // ---------- 迷你可视化 helpers ----------
+  // 通用条形：value/cap 映射为 0-100% 宽度
+  _bar: function (value, cap, color) {
+    const pct = cap > 0 ? (value / cap) * 100 : 0;
+    return { type: 'bar', pct: Math.max(0, Math.min(100, pct)), color: color || '' };
+  },
+
+  // 止损等级 → 严重度（1-4 点）+ 颜色
+  _stopLossSeverity: function (level) {
+    const l = String(level || '').toLowerCase();
+    if (l.includes('emergency') || l.includes('dual_high')) return { level: 4, color: 'c-red' };
+    if (l.includes('high') || l.includes('hight')) return { level: 3, color: 'c-orange' };
+    if (l.includes('notice')) return { level: 2, color: 'c-yellow' };
+    return { level: 1, color: 'c-green' };
+  },
+
+  // 止损等级 → 汉字短标签（避免英文长等级溢出）
+  _stopLossLabel: function (level) {
+    const map = {
+      NORMAL: '正常',
+      NOTICE: '关注',
+      HIGHT: '高风险',
+      HIGH: '高风险',
+      EMERGENCY: '紧急',
+      CROSS_HIGH: '全仓高',
+      CROSS_HIGHT: '全仓高',
+      CROSS_EMERGENCY: '全仓急',
+      ISOLATE_HIGH: '逐仓高',
+      ISOLATE_HIGHT: '逐仓高',
+      ISOLATE_EMERGENCY: '逐仓急',
+      DUAL_HIGH: '双高',
+      DUAL_EMERGENCY: '双急',
+    };
+    const key = String(level || '').toUpperCase();
+    return map[key] || level;
+  },
+
+  // 渲染迷你可视化元素
+  renderViz: function (viz) {
+    if (!viz) return '';
+    switch (viz.type) {
+      case 'bar':
+        return `<span class="m-bar"><span class="m-fill ${viz.color}" style="width:${viz.pct}%"></span>${viz.marker != null ? `<span class="m-marker" style="left:${viz.marker}%"></span>` : ''}</span>`;
+      case 'atr':
+        return viz.items
+          .map(
+            it =>
+              `<span class="atr-group"><span class="m-bar"><span class="m-fill" style="width:${it.pct}%"></span></span><span class="atr-num">${it.text}</span></span>`
+          )
+          .join('');
+      case 'rsi':
+        return `<span class="m-bar rsi-bar"><span class="rsi-zone z-low"></span><span class="rsi-zone z-high"></span><span class="m-fill" style="width:${viz.fast}%"></span><span class="rsi-marker" style="left:${viz.slow}%"></span></span>`;
+      case 'dots': {
+        let dots = '';
+        for (let i = 0; i < 4; i++) {
+          dots += `<i class="${i < viz.level ? 'on ' + viz.color : ''}"></i>`;
+        }
+        return `<span class="level-dots">${dots}</span>`;
+      }
+      case 'dot':
+        return `<span class="status-dot ${viz.color}"></span>`;
+      default:
+        return '';
+    }
+  },
+
   buildMetrics: function (indicators) {
-    // 将三个ATR指标合并到一行显示
-    const atr6 = indicators.atr_6 !== undefined ? (indicators.atr_6 * 100).toFixed(2) + '%' : '-';
-    const atr22 =
-      indicators.atr_22 !== undefined ? (indicators.atr_22 * 100).toFixed(2) + '%' : '-';
-    const atr120 =
-      indicators.atr_120 !== undefined ? (indicators.atr_120 * 100).toFixed(2) + '%' : '-';
+    const has = v => v !== undefined && v !== null && isFinite(parseFloat(v));
+    const pos = indicators.position || {};
+    const posNum = parseFloat(pos.pos);
+
+    // ATR 三联条（各自量程：6→1.5% / 22→3% / 120→6%）
+    const atrItems = [
+      ['atr_6', 1.5],
+      ['atr_22', 3],
+      ['atr_120', 6],
+    ].map(([key, cap]) => {
+      const v = indicators[key];
+      return {
+        pct: has(v) ? Math.min((v * 100) / cap, 1) * 100 : 0,
+        text: has(v) ? (v * 100).toFixed(2) : '-',
+      };
+    });
 
     return [
       {
         label: '📈ATR(6/22/120)',
-        value: `${atr6}/${atr22}/${atr120}`,
+        value: null,
+        viz: { type: 'atr', items: atrItems },
         span: 2,
       },
       {
@@ -160,6 +243,7 @@ window.TradingApp.Assets = {
           indicators.volatility !== undefined
             ? (indicators.volatility * 100).toFixed(2) + '%'
             : '-',
+        viz: has(indicators.volatility) ? this._bar(indicators.volatility * 100, 1) : null, // 量程 1%
       },
       {
         label: '🔶布林带宽',
@@ -167,12 +251,23 @@ window.TradingApp.Assets = {
           indicators.boll_bandwidth !== undefined
             ? (indicators.boll_bandwidth * 100).toFixed(2) + '%'
             : '-',
+        viz: has(indicators.boll_bandwidth) ? this._bar(indicators.boll_bandwidth * 100, 5) : null, // 量程 5%
       },
-
       {
         label: '🔋量能因子',
         value:
           indicators.vol_power !== undefined ? (indicators.vol_power * 100).toFixed(2) + '%' : '-',
+        viz: has(indicators.vol_power)
+          ? (() => {
+              const v = indicators.vol_power;
+              // 量程 200%（满条封顶），灰色标记线 = 100%（快慢量能平衡点）
+              // 配色分级：<100% 绿（萎缩）/ 100~150% 蓝（温和放大）/ 150~200% 橙（显著放大）/ ≥200% 红色满条（异常放量）
+              const color = v >= 2 ? 'c-red' : v >= 1.5 ? 'c-orange' : v >= 1 ? '' : 'c-green';
+              return { ...this._bar(v * 100, 200, color), marker: 50 };
+            })()
+          : null,
+        title:
+          '量能因子 = 快/慢量能均线比；灰线为 100% 平衡点；>150% 显著放大，≥200% 红色满条（异常放量）',
       },
       {
         label: '📊RSI(f/s)',
@@ -180,14 +275,30 @@ window.TradingApp.Assets = {
           indicators.rsi_fast !== undefined && indicators.rsi_slow !== undefined
             ? `${Math.round(indicators.rsi_fast)}/${Math.round(indicators.rsi_slow)}`
             : '-',
+        viz:
+          indicators.rsi_fast !== undefined && indicators.rsi_slow !== undefined
+            ? {
+                type: 'rsi',
+                fast: Math.round(indicators.rsi_fast),
+                slow: Math.round(indicators.rsi_slow),
+              }
+            : null,
       },
       {
         label: '🛡止损等级',
-        value: indicators.stopLossLevel !== undefined ? indicators.stopLossLevel : '-',
+        value:
+          indicators.stopLossLevel !== undefined
+            ? this._stopLossLabel(indicators.stopLossLevel)
+            : '-',
         className:
           indicators.stopLossLevel !== undefined
             ? `metric-stop-loss metric-stop-loss-${indicators.stopLossLevel.toLowerCase()}`
             : 'metric-stop-loss',
+        viz:
+          indicators.stopLossLevel !== undefined
+            ? { type: 'dots', ...this._stopLossSeverity(indicators.stopLossLevel) }
+            : null,
+        title: indicators.stopLossLevel !== undefined ? indicators.stopLossLevel : '',
       },
       {
         label: '🔔交易状态',
@@ -199,64 +310,92 @@ window.TradingApp.Assets = {
               ? 'metric-trade-allow'
               : 'metric-trade-forbid'
             : '',
+        viz:
+          indicators.shouldTrade !== undefined
+            ? { type: 'dot', color: indicators.shouldTrade ? 'c-green' : 'c-red' }
+            : null,
         tooltip: indicators.frq_rest ? this._buildTradeConditionTooltip(indicators.frq_rest) : null,
       },
       {
         label: '📦持仓金额',
         value:
-          indicators.position && indicators.position.pos !== undefined
+          pos.pos !== undefined
             ? (() => {
-                const n = parseFloat(indicators.position.notionalUsd);
-                return isFinite(n) ? '$ ' + n.toFixed(2) : '-';
+                if (posNum === 0) return '空仓';
+                const n = parseFloat(pos.notionalUsd);
+                return isFinite(n) ? '$ ' + (posNum > 0 ? '+' : '-') + n.toFixed(2) : '-';
               })()
             : '-',
         className:
-          indicators.position && indicators.position.pos > 0
+          posNum > 0
             ? 'metric-long'
-            : indicators.position && indicators.position.pos < 0
+            : posNum < 0
               ? 'metric-short'
-              : '',
+              : posNum === 0
+                ? 'metric-empty'
+                : '',
       },
       {
         label: '🛡维持保证金',
-        value:
-          indicators.position && indicators.position.mgnRatio !== undefined
-            ? Math.round(indicators.position.mgnRatio * 100) + '%'
-            : '-',
-        className:
-          indicators.position && indicators.position.mgnRatio !== undefined
-            ? indicators.position.mgnRatio < 50
-              ? 'metric-danger'
-              : indicators.position.mgnRatio < 200
-                ? 'metric-warning'
-                : ''
-            : '',
+        value: (() => {
+          const r = parseFloat(pos.mgnRatio);
+          return isFinite(r) && r > 0 ? Math.round(r * 100) + '%' : '空仓';
+        })(),
+        className: (() => {
+          const r = parseFloat(pos.mgnRatio);
+          if (!(isFinite(r) && r > 0)) return 'metric-empty';
+          // 对齐后端 PositionController 阈值（×100 后）：4000% 止损 / 6000% 抑制 / 10000% 关注
+          return r < 40 ? 'metric-danger' : r < 100 ? 'metric-warning' : '';
+        })(),
+        viz: (() => {
+          const r = parseFloat(pos.mgnRatio);
+          if (!(isFinite(r) && r > 0)) return null; // 无持仓不渲染空进度条
+          // mgnRatio 为倍率，×100 = 百分比；清仓线 100%（即 r=1）
+          // 配色对齐后端阈值：<40 红(低于4000%止损线) / <60 橙 / <100 黄 / ≥100 绿
+          const color = r < 40 ? 'c-red' : r < 60 ? 'c-orange' : r < 100 ? 'c-yellow' : 'c-green';
+          return this._bar(r, 100, color); // 量程 10000%（r=100 满条）
+        })(),
+        title: '维持保证金率 = raw×100；清仓线 100%；配色对齐后端风控阈值 4000%/6000%/10000%',
       },
       {
         label: '💰已实现收益',
         value:
-          indicators.position && indicators.position.realizedPnl !== undefined
-            ? '$ ' + (indicators.position.realizedPnl * 1).toFixed(2)
-            : '-',
+          pos.realizedPnl !== undefined && posNum !== 0
+            ? (() => {
+                const p = pos.realizedPnl * 1;
+                return '$ ' + (p >= 0 ? '+' : '-') + Math.abs(p).toFixed(2);
+              })()
+            : posNum === 0
+              ? '空仓'
+              : '-',
         className:
-          indicators.position && indicators.position.realizedPnl !== undefined
-            ? indicators.position.realizedPnl * 1 >= 0
+          pos.realizedPnl !== undefined && posNum !== 0
+            ? pos.realizedPnl * 1 >= 0
               ? 'metric-long'
               : 'metric-short'
-            : '',
+            : posNum === 0
+              ? 'metric-empty'
+              : '',
       },
       {
         label: '📊未实现收益',
         value:
-          indicators.position && indicators.position.upl !== undefined
-            ? '$ ' + (indicators.position.upl * 1).toFixed(2)
-            : '-',
+          pos.upl !== undefined && posNum !== 0
+            ? (() => {
+                const p = pos.upl * 1;
+                return '$ ' + (p >= 0 ? '+' : '-') + Math.abs(p).toFixed(2);
+              })()
+            : posNum === 0
+              ? '空仓'
+              : '-',
         className:
-          indicators.position && indicators.position.upl !== undefined
-            ? indicators.position.upl * 1 >= 0
+          pos.upl !== undefined && posNum !== 0
+            ? pos.upl * 1 >= 0
               ? 'metric-long'
               : 'metric-short'
-            : '',
+            : posNum === 0
+              ? 'metric-empty'
+              : '',
       },
     ];
   },
@@ -342,27 +481,54 @@ window.TradingApp.Assets = {
     metricItems.forEach(item => {
       const labelEl = item.querySelector('.metric-label');
       const valueEl = item.querySelector('.metric-value');
-      if (labelEl && valueEl) {
-        const label = labelEl.textContent;
-        const metric = metrics.find(m => m.label === label);
-        if (metric) {
-          if (valueEl.textContent !== metric.value) {
+      if (!labelEl) return;
+      const label = labelEl.textContent;
+      const metric = metrics.find(m => m.label === label);
+      if (!metric) return;
+
+      // 同步 title 提示
+      if (item.title !== (metric.title || '')) {
+        item.title = metric.title || '';
+      }
+
+      // 更新 value（可能不存在，如 ATR 三联条）
+      if (metric.value !== null && metric.value !== undefined) {
+        if (valueEl) {
+          if (valueEl.textContent !== String(metric.value)) {
             valueEl.textContent = metric.value;
           }
-          // 更新className
           valueEl.className = metric.className
             ? `metric-value ${metric.className}`
             : 'metric-value';
-          // 更新tooltip
-          const oldTooltip = item.querySelector('.trade-forbid-tooltip');
-          if (oldTooltip) oldTooltip.remove();
-          if (metric.tooltip) {
-            item.classList.add('has-trade-tooltip');
-            valueEl.insertAdjacentHTML('afterend', metric.tooltip);
-          } else {
-            item.classList.remove('has-trade-tooltip');
-          }
         }
+      } else if (valueEl) {
+        valueEl.remove();
+      }
+
+      // 同步 viz
+      const vizWrap = item.querySelector('.metric-viz');
+      if (metric.viz) {
+        const vizHtml = this.renderViz(metric.viz);
+        if (vizWrap) {
+          if (vizWrap.innerHTML !== vizHtml) vizWrap.innerHTML = vizHtml;
+        } else {
+          labelEl.insertAdjacentHTML('afterend', `<span class="metric-viz">${vizHtml}</span>`);
+        }
+      } else if (vizWrap) {
+        vizWrap.remove();
+      }
+
+      // 更新tooltip
+      const oldTooltip = item.querySelector('.trade-forbid-tooltip');
+      if (oldTooltip) oldTooltip.remove();
+      if (metric.tooltip) {
+        item.classList.add('has-trade-tooltip');
+        (item.querySelector('.metric-value') || labelEl).insertAdjacentHTML(
+          'afterend',
+          metric.tooltip
+        );
+      } else {
+        item.classList.remove('has-trade-tooltip');
       }
     });
 
