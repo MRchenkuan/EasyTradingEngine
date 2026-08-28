@@ -13,7 +13,7 @@ export class AbstractProcessor {
   engine = null;
   asset_name = '';
 
-  static _max_retry = 3;
+  static _max_retry = 5;
 
   constructor(engine, asset_name) {
     if (new.target === AbstractProcessor) {
