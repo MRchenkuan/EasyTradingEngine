@@ -509,12 +509,12 @@ body {
 
 @media (max-width: 640px) {
   body {
-    padding: 4px;
+    padding: 2px;
   }
   .h-balance {
-    padding: 6px 8px;
-    margin: 3px;
-    row-gap: 7px;
+    padding: 5px 6px;
+    margin: 2px;
+    row-gap: 5px;
   }
   .h-meta-time,
   .h-meta-ws > span:last-child {
@@ -522,13 +522,13 @@ body {
   }
 
   .balance-v {
-    font-size: 20px; /* 放大一档，原 18 → 20 */
+    font-size: 20px;
   }
   .balance-left {
-    gap: 3px;
+    gap: 2px;
   }
   .balance-main-row {
-    gap: 7px;
+    gap: 6px;
   }
   /* 右块风险 4 格：2×2 */
   .balance-right {
@@ -537,7 +537,7 @@ body {
   }
   /* H/L 胶囊收小一档 */
   .eq-hl-item {
-    padding: 1px 5px;
+    padding: 1px 4px;
     font-size: 9px;
   }
 }
@@ -976,27 +976,28 @@ body {
 /* 移动端适配（768px 只改容器，主卡规则交给 960/640 两档） */
 @media (max-width: 768px) {
   body {
-    padding: 4px;
+    padding: 2px;
   }
 
   .assets-container {
     flex-direction: column;
-    gap: 8px;
-    padding-bottom: 8px;
+    gap: 4px;
+    padding: 2px;
+    padding-bottom: 4px;
     overflow-x: hidden;
   }
 
   .asset-card {
     min-width: 100%;
     max-width: 100%;
-    padding: 8px 10px;
-    border-radius: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
   }
 
   .asset-title {
     font-size: 13px;
-    margin-bottom: 8px;
-    padding-bottom: 6px;
+    margin-bottom: 6px;
+    padding-bottom: 5px;
   }
 
   .asset-price {
@@ -1004,12 +1005,12 @@ body {
   }
 
   .metrics-grid {
-    gap: 4px;
-    margin-bottom: 8px;
+    gap: 3px;
+    margin-bottom: 6px;
   }
 
   .metric-item {
-    padding: 4px 6px;
+    padding: 3px 6px;
     font-size: 11px;
   }
 
@@ -1019,13 +1020,13 @@ body {
 
   .chart-container {
     height: 220px;
-    margin-top: 8px;
-    padding-top: 8px;
+    margin-top: 6px;
+    padding-top: 6px;
   }
 
   .logs-section {
-    margin: 4px;
-    padding: 8px 10px;
-    border-radius: 10px;
+    margin: 2px;
+    padding: 6px 8px;
+    border-radius: 8px;
   }
 }
