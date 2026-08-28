@@ -861,6 +861,7 @@ body {
 }
 
 .threshold-bar {
+  position: relative;
   margin: 6px 0;
 }
 
@@ -882,12 +883,32 @@ body {
   transition: width 0.3s ease;
 }
 
-.threshold-bar-final {
-  background: var(--tag-yellow);
-}
-
 .threshold-bar-current {
   background: var(--accent-blue);
+}
+
+/* 最终阈值刻度线（贯穿 track 的竖线，略凸出上下） */
+.threshold-bar-mark {
+  position: absolute;
+  top: -2px;
+  height: 12px;
+  width: 2px;
+  background: var(--tag-yellow);
+  transform: translateX(-1px);
+  transition: left 0.3s ease;
+  z-index: 2;
+  border-radius: 1px;
+}
+
+/* 最终阈值标签（跟随刻度线位置） */
+.threshold-bar-final-label {
+  position: absolute;
+  top: 12px;
+  font-size: 10px;
+  color: var(--tag-yellow);
+  white-space: nowrap;
+  transition: left 0.3s ease;
+  z-index: 2;
 }
 
 .threshold-bar-labels {
@@ -899,15 +920,11 @@ body {
 }
 
 .threshold-bar-labels span:nth-child(1) {
-  color: var(--txt-3);
+  color: var(--accent-blue);
 }
 
 .threshold-bar-labels span:nth-child(2) {
-  color: var(--tag-yellow);
-}
-
-.threshold-bar-labels span:nth-child(3) {
-  color: var(--accent-blue);
+  color: var(--txt-3);
 }
 
 .stoploss-notice {

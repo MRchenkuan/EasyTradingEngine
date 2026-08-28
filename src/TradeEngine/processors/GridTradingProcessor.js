@@ -84,6 +84,9 @@ export class GridTradingProcessor extends AbstractProcessor {
     // 从本地变量恢复状态
     this._loadState();
 
+    // 补偿确认：重启可能打断下单确认流程，恢复未确认订单的真实成交状态
+    this._recoverUnconfirmedOrders();
+
     this.position_controller = new PositionController(engine, this);
   }
 
@@ -113,6 +116,37 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 修改网格数据加载逻辑
     // this._grid_base_price = this.local_variables._grid_base_price;
+  }
+
+  /**
+   * 补偿确认：进程重启可能打断 PENDING→PLACED→CONFIRMED 流程，
+   * 导致订单实际已成交但 _resetKeyPrices 未执行（网格基准价滞后）。
+   * 启动时扫描未确认订单，查询实际成交结果并恢复基准价与订单状态。
+   */
+  _recoverUnconfirmedOrders() {
+    const pendingStatuses = [
+      OrderStatus.PLACED,
+      OrderStatus.CONFIRM_FAILED,
+      OrderStatus.CONFIRM_ERROR,
+    ];
+    const pendingRecords = getGridTradeOrders(this.asset_name)
+      .filter(order => pendingStatuses.includes(order.order_status) && order.ordId)
+      .slice(-5); // 只处理最近几笔，避免历史积压订单重复查询
+
+    if (pendingRecords.length === 0) return;
+
+    console.log(`[${this.asset_name}] 发现 ${pendingRecords.length} 笔未确认订单，开始补偿确认`);
+
+    // 异步串行执行，不阻塞启动；confirmOrder 内部完成状态更新与基准价恢复（自带异常捕获）
+    (async () => {
+      for (const record of pendingRecords) {
+        await this.confirmOrder({
+          instId: this.asset_name,
+          clOrdId: record.clOrdId,
+          ordId: record.ordId,
+        });
+      }
+    })();
   }
 
   _saveState() {

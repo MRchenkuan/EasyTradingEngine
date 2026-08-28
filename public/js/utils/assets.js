@@ -443,15 +443,23 @@ window.TradingApp.Assets = {
       const finalPercent = final >= initial ? 100 : (final / initial) * 100;
       const currentPercent = Math.min((current / initial) * 100, 100);
 
+      // 刻度线在两端时调整标签对齐，避免溢出卡片
+      const finalLabelTransform =
+        finalPercent > 85
+          ? 'translateX(-100%)'
+          : finalPercent < 15
+            ? 'translateX(0)'
+            : 'translateX(-50%)';
+
       html += '<div class="threshold-bar">';
       html += '<div class="threshold-bar-track">';
-      html += `<div class="threshold-bar-fill threshold-bar-final" style="width: ${finalPercent}%;" data-key="final-fill"></div>`;
       html += `<div class="threshold-bar-fill threshold-bar-current" style="width: ${currentPercent}%;" data-key="current-fill"></div>`;
       html += '</div>';
+      html += `<div class="threshold-bar-mark" style="left: ${finalPercent}%;" data-key="final-mark"></div>`;
+      html += `<div class="threshold-bar-final-label" style="left: ${finalPercent}%; transform: ${finalLabelTransform};" data-key="final-label">最终阈值 ${final.toFixed(2)}%</div>`;
       html += '<div class="threshold-bar-labels">';
-      html += `<span>初始阈值 ${initial.toFixed(2)}%</span>`;
-      html += `<span>最终阈值 ${final.toFixed(2)}%</span>`;
       html += `<span>当前回撤 ${current.toFixed(2)}%</span>`;
+      html += `<span>初始阈值 ${initial.toFixed(2)}%</span>`;
       html += '</div>';
       html += '</div>';
     }
@@ -560,20 +568,30 @@ window.TradingApp.Assets = {
       const finalPercent = final >= initial ? 100 : (final / initial) * 100;
       const currentPercent = Math.min((current / initial) * 100, 100);
 
-      // 更新进度条宽度
-      const finalFill = card.querySelector('[data-key="final-fill"]');
+      // 更新进度条宽度和刻度线位置
+      const finalMark = card.querySelector('[data-key="final-mark"]');
       const currentFill = card.querySelector('[data-key="current-fill"]');
 
-      if (finalFill) finalFill.style.width = finalPercent + '%';
+      if (finalMark) finalMark.style.left = finalPercent + '%';
       if (currentFill) currentFill.style.width = currentPercent + '%';
 
       // 更新标签值
       const labels = card.querySelector('.threshold-bar-labels');
       if (labels) {
         const spans = labels.querySelectorAll('span');
-        if (spans[0]) spans[0].textContent = `初始阈值 ${initial.toFixed(2)}%`;
-        if (spans[1]) spans[1].textContent = `最终阈值 ${final.toFixed(2)}%`;
-        if (spans[2]) spans[2].textContent = `当前回撤 ${current.toFixed(2)}%`;
+        if (spans[0]) spans[0].textContent = `当前回撤 ${current.toFixed(2)}%`;
+        if (spans[1]) spans[1].textContent = `初始阈值 ${initial.toFixed(2)}%`;
+      }
+      const finalLabel = card.querySelector('[data-key="final-label"]');
+      if (finalLabel) {
+        finalLabel.style.left = finalPercent + '%';
+        finalLabel.style.transform =
+          finalPercent > 85
+            ? 'translateX(-100%)'
+            : finalPercent < 15
+              ? 'translateX(0)'
+              : 'translateX(-50%)';
+        finalLabel.textContent = `最终阈值 ${final.toFixed(2)}%`;
       }
     }
   },

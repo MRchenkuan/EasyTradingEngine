@@ -36,9 +36,9 @@ export const MainGraph = {
   assets: [
     { id: 'BTC-USDT-SWAP', theme: '#f0b27a' }, // 主参照
     { id: 'SOL-USDT-SWAP', theme: '#ad85e9' },
-    { id: 'ETH-USDT-SWAP', theme: '#85c1e9' },
+    // { id: 'ETH-USDT-SWAP', theme: '#85c1e9' },
     { id: 'XRP-USDT-SWAP', theme: '#ffafde' },
-    // { id: 'TRUMP-USDT-SWAP', theme: '#03fe07' },
+    { id: 'TRUMP-USDT-SWAP', theme: '#03fe07' },
   ],
   order_his_show: [
     // 'BTC-USDT',
@@ -65,22 +65,22 @@ export const Strategies = [
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
-  {
-    name: StrategyType.GRID_TRADING,
-    params: {
-      assetId: 'ETH-USDT-SWAP',
-      _upper_drawdown: 0.0075,
-      _lower_drawdown: 0.0075,
-      _grid_width: 0.005,
-      _min_price: 1200,
-      _max_price: 6000,
-      _base_amount: 30,
-      _base_quantity: 10,
-      _suppress_lots: 15, // 持仓警戒线
-      _survival_lots: 20, // 持仓止损线
-      _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
-    },
-  },
+  // {
+  //   name: StrategyType.GRID_TRADING,
+  //   params: {
+  //     assetId: 'ETH-USDT-SWAP',
+  //     _upper_drawdown: 0.0075,
+  //     _lower_drawdown: 0.0075,
+  //     _grid_width: 0.005,
+  //     _min_price: 1200,
+  //     _max_price: 6000,
+  //     _base_amount: 30,
+  //     _base_quantity: 10,
+  //     _suppress_lots: 15, // 持仓警戒线
+  //     _survival_lots: 20, // 持仓止损线
+  //     _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
+  //   },
+  // },
   {
     name: StrategyType.GRID_TRADING,
     params: {
@@ -115,20 +115,20 @@ export const Strategies = [
       _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
     },
   },
-  // {
-  //   name: StrategyType.GRID_TRADING,
-  //   params: {
-  //     assetId: 'TRUMP-USDT-SWAP',
-  //     _upper_drawdown: 0.0075,
-  //     _lower_drawdown: 0.0075,
-  //     _grid_width: 0.01,
-  //     _min_price: 0.5,
-  //     _max_price: 8.0,
-  //     _base_amount: 10,
-  //     _base_quantity: 10,
-  //     _suppress_lots: 7, // 持仓警戒线
-  //     _survival_lots: 12, // 持仓止损线
-  //     _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
-  //   },
-  // },
+  {
+    name: StrategyType.GRID_TRADING,
+    params: {
+      assetId: 'TRUMP-USDT-SWAP',
+      _upper_drawdown: 0.0075,
+      _lower_drawdown: 0.0075,
+      _grid_width: 0.01,
+      _min_price: 0.5,
+      _max_price: 8.0,
+      _base_amount: 10,
+      _base_quantity: 10,
+      _suppress_lots: 7, // 持仓警戒线
+      _survival_lots: 12, // 持仓止损线
+      _settlement_type: SettlementType.VALUE, //交易单位 value 等金额，quantity 等数量
+    },
+  },
 ];
