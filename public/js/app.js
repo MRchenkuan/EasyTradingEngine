@@ -160,6 +160,19 @@ function onAccountBalanceUpdate(payload) {
     val.textContent = '$ ' + totalEq.toFixed(2);
   }
 
+  // ===== 收益率（盈亏/本金，本金 = 总权益 - 已实现 - 未实现） =====
+  const yEl = document.getElementById('totalEquityYield');
+  if (yEl) {
+    const yr = parseFloat(payload.yieldRate);
+    if (payload.yieldRate != null && isFinite(yr)) {
+      yEl.style.display = '';
+      yEl.textContent = (yr >= 0 ? '+' : '') + (yr * 100).toFixed(2) + '%';
+      yEl.className = 'balance-yield ' + (yr >= 0 ? 'pos' : 'neg');
+    } else {
+      yEl.style.display = 'none';
+    }
+  }
+
   // ===== 极值 =====
   const maxEq = payload.maxEq != null ? parseFloat(payload.maxEq) : NaN;
   const minEq = payload.minEq != null ? parseFloat(payload.minEq) : NaN;

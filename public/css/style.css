@@ -187,6 +187,23 @@ body {
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 7px rgba(0, 0, 0, 0.22);
 }
+/* 收益率胶囊：总权益旁，红涨绿跌与资产卡片一致 */
+.balance-yield {
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--card-border-soft);
+}
+.balance-yield.pos {
+  color: #ec7063;
+}
+.balance-yield.neg {
+  color: #52be80;
+}
 
 /* 中块：上方刻度标签行（谷/峰按刻度位置定位） */
 .eq-hl-row {

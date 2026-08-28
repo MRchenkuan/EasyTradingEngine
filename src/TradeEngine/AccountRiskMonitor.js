@@ -342,6 +342,27 @@ export class AccountRiskMonitor {
    * totalEq 始终用 confirmed（稳定值），不用 raw，避免前端显示跳变
    * @param {Object|null} rawBalance - 本次 API 原始返回（用于补充 upl/marginRatio 等非关键字段）；null 表示本次无新数据
    */
+  /**
+   * 汇总当前策略持仓的已实现/未实现收益
+   * 口径与资产卡片一致：仅统计有仓位的品种（pos≠0），空仓记录不计
+   * @returns {{realized: number, unrealized: number, total: number}}
+   */
+  calcTotalPnl() {
+    let realized = 0;
+    let unrealized = 0;
+    for (const name of Object.keys(this.engine._position_list)) {
+      const p = this.engine._position_list[name];
+      if (!p) continue;
+      const posSz = parseFloat(p.pos);
+      if (!isFinite(posSz) || posSz === 0) continue; // 空仓记录不计
+      const r = parseFloat(p.realizedPnl);
+      const u = parseFloat(p.upl);
+      if (isFinite(r)) realized += r;
+      if (isFinite(u)) unrealized += u;
+    }
+    return { realized, unrealized, total: realized + unrealized };
+  }
+
   pushBalance(rawBalance) {
     const stats = this._account_eq_stats;
     const mem = this._eq_mem;
@@ -367,6 +388,12 @@ export class AccountRiskMonitor {
       const bufferedMin = +(rangeMin - rangeSpan * 0.03).toFixed(4);
       if (bufferedMin < rangeMin) rangeMin = bufferedMin >= 0 ? bufferedMin : 0;
     }
+    // 收益率口径：分子=当前总权益，分母=总权益扣除已实现+未实现盈亏（即"本金"）
+    // yieldRate = totalEq / (totalEq - pnl) - 1 = pnl / 本金
+    // 本金 <= 0（盈亏亏损超过权益，理论上不应出现）时置 null，前端显示 '-'
+    const pnl = this.calcTotalPnl();
+    const principal = confirmed - pnl.total;
+    const yieldRate = principal > 0 ? pnl.total / principal : null;
     this._account_balance = {
       totalEq: confirmed,
       upl: rawBalance ? parseFloat(rawBalance.upl || 0) : (prev.upl ?? 0),
@@ -389,6 +416,11 @@ export class AccountRiskMonitor {
       leverLevel: lev.level ?? 0,
       leverNotional: lev.notional ?? 0,
       leverTs: lev.ts || null,
+      realizedPnl: +pnl.realized.toFixed(4),
+      unrealizedPnl: +pnl.unrealized.toFixed(4),
+      totalPnl: +pnl.total.toFixed(4),
+      principal: principal > 0 ? +principal.toFixed(4) : null,
+      yieldRate: yieldRate != null ? +yieldRate.toFixed(6) : null,
       lastUpdateTime: Date.now(),
     };
     monitorServer.updateAccountBalance(this._account_balance);
