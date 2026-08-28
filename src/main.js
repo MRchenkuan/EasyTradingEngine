@@ -195,17 +195,10 @@ function initBusinessWebSocket() {
     console.log(
       `监控服务器已启动，访问 http://154.9.24.206:${monitorServer.port}/${monitorServer.currentToken}`
     );
-    // 逐个订阅，确保每个订阅都发送成功
-    let subscribed = 0;
-    assets.forEach(it => {
-      try {
-        subscribeKlineChanel(ws, 'candle' + bar_type, it.id);
-        subscribed++;
-      } catch (e) {
-        console.error(`订阅 ${it.id} 失败:`, e.message);
-      }
-    });
-    console.log(`K线频道订阅完成: ${subscribed}/${assets.length}`);
+    // 批量订阅（OKX 推荐一条消息带多个 args，避免订阅速率限制）
+    const instIds = assets.map(it => it.id);
+    subscribeKlineChanel(ws, 'candle' + bar_type, instIds);
+    console.log(`K线频道订阅完成: ${instIds.length}/${instIds.length}`);
     lastMessageTime = Date.now();
     startHeartbeatMonitor();
   });

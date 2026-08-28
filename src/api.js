@@ -560,16 +560,18 @@ export async function getAccountBalance() {
   }
 }
 
-export async function subscribeKlineChanel(ws, channel, instId) {
+/**
+ * 批量订阅 K 线频道（OKX 推荐一条消息带多个 args，避免订阅速率限制）
+ * @param {WebSocket} ws
+ * @param {string} channel 频道类型（如 'candle5m'）
+ * @param {string[]} instIds 产品 ID 列表
+ */
+export async function subscribeKlineChanel(ws, channel, instIds) {
+  const args = instIds.map(instId => ({ channel, instId }));
   ws.send(
     JSON.stringify({
       op: 'subscribe',
-      args: [
-        {
-          channel: channel,
-          instId: instId,
-        },
-      ],
+      args,
     })
   );
 }
