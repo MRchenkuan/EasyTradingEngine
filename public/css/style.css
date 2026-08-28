@@ -76,6 +76,7 @@ body {
     0 4px 18px rgba(0, 0, 0, 0.28);
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 .h-balance::before {
   content: '';
@@ -567,6 +568,8 @@ body {
   overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--card-border-2) transparent;
+  position: relative;
+  z-index: 10;
 }
 
 .assets-container::-webkit-scrollbar {

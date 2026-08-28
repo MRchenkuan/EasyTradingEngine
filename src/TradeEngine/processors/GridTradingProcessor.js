@@ -636,7 +636,11 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     // 调整为 lotSize 的整数倍（向 0 取整，避免超量下单）
     const sign = Math.sign(amount);
-    let adjustedAmount = Math.floor(Math.abs(amount) / lotSize) * lotSize;
+    // 先除以 lotSize 取整再乘回去，最后用 toFixed 修正浮点精度
+    // 例：Math.floor(0.5700000000000001 / 0.01) * 0.01 = 0.5700000000000001 → toFixed(10) → 0.57
+    let adjustedAmount = parseFloat(
+      (Math.floor(Math.abs(amount) / lotSize) * lotSize).toFixed(10)
+    );
 
     // 调整后数量低于最小交易单位时跳过下单（避免 OKX 拒单与无效重试）
     if (adjustedAmount <= 0 || (minSize > 0 && adjustedAmount < minSize)) {
