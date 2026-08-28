@@ -407,11 +407,9 @@ export class GridTradingProcessor extends AbstractProcessor {
         : PositionAction.OPEN;
 
     // 计算本次实际买卖方向 (1=买, -1=卖)
-    // 开仓：跟随趋势方向（开多=买，开空=卖）；平仓：与持仓方向相反（平多=卖，平空=买）
-    const current_trade_side =
-      position_action === PositionAction.OPEN
-        ? Math.sign(this._tendency)
-        : -Math.sign(pos_contracts);
+    // _placeOrder 中 amount = -gridCount * swap_amount，所以实际方向 = -sign(gridCount)
+    // 这里用 -sign(gridCount) 直接计算，与 _refreshLastSerialTradeGridSpan 中 -Math.sign(tradeCount) 一致
+    const current_trade_side = -Math.sign(gridCount) || 0;
 
     try {
       this._stratage_locked = true;
