@@ -9,33 +9,89 @@ const base_url = 'https://www.okx.com';
 const MIMIC = Env === TradeEnv.MIMIC;
 
 // 设置全局默认超时，避免 Docker 环境中 API 调用无限挂起
-axios.defaults.timeout = 15000;
+axios.defaults.timeout = 6000; // 6s：云端被限流时快速失败，不等待 15s
+
+// ---------------------------------------------------------------------------
+// 调试开关：云端排查时设置环境变量 DEBUG=okx 开启
+// ---------------------------------------------------------------------------
+const _DEBUG = process.env.DEBUG?.includes('okx');
+const dbg = (...args) => _DEBUG && console.log('[DEBUG]', ...args);
+
+// ---------------------------------------------------------------------------
+// OKX REST API 统一限流 + 自适应退避
+// ---------------------------------------------------------------------------
+// 行情类 API（market/candles、history-candles、open-interest-history）限流
+// 正常 100ms 间隔；失败时指数退避至最多 2000ms；成功后逐步恢复
+let _marketQueue = Promise.resolve();
+let _marketLastCall = 0;
+let _marketCallSeq = 0; // 调用序号，用于串联单次请求的排队时间和执行时间
+let _marketFailStreak = 0; // 连续失败次数，控制退避强度
+let _marketDelay = 100; // 当前使用的间隔（ms），动态调整
+
+function enqueueMarketRequest(fn) {
+  // 自适应间隔：失败越多，间隔越大；成功则逐步恢复
+  const currentDelay =
+    _marketFailStreak > 0
+      ? Math.min(2000, 100 * Math.pow(2, Math.min(_marketFailStreak, 4))) // 200→400→800→1600→2000
+      : 100;
+  _marketDelay = currentDelay;
+
+  const now = Date.now();
+  const wait = Math.max(0, currentDelay - (now - _marketLastCall));
+  const seq = ++_marketCallSeq;
+  _marketLastCall = now + wait;
+
+  // 先 drain 上一次的 rejection，避免单次失败导致后续所有调用立即 reject
+  _marketQueue = _marketQueue.catch(() => undefined);
+  _marketQueue = _marketQueue
+    .then(() => new Promise(resolve => setTimeout(resolve, wait)))
+    .then(async () => {
+      const t0 = Date.now();
+      dbg(`[REST #${seq}] 开始执行（间隔 ${currentDelay}ms，排队 ${wait}ms）`);
+      try {
+        const result = await fn();
+        // 成功：重置失败计数，逐步恢复正常间隔
+        if (_marketFailStreak > 0) {
+          _marketFailStreak = Math.max(0, _marketFailStreak - 1);
+          if (_marketFailStreak === 0) {
+            console.log(`[REST #${seq}] ✅ 限流恢复正常（连续成功）`);
+          }
+        }
+        dbg(`[REST #${seq}] ✅ 完成，耗时 ${Date.now() - t0}ms`);
+        return result;
+      } catch (err) {
+        _marketFailStreak++;
+        const failMs = Date.now() - t0;
+        console.warn(
+          `[REST #${seq}] ❌ 失败，耗时 ${failMs}ms，连续失败 ${_marketFailStreak}，间隔将增加至 ${Math.min(2000, 100 * Math.pow(2, Math.min(_marketFailStreak, 4)))}ms · 错误: ${err.message?.slice(0, 80)}`
+        );
+        throw err;
+      }
+    });
+  return _marketQueue;
+}
+
+/** 返回当前 REST 限流队列累计调用次数，用于调试 */
+export function getMarketCallCount() {
+  return _marketCallSeq;
+}
+
 export async function marketCandles(instId, bar, after, before, limit) {
-  const { data } = await axios.get(base_url + '/api/v5/market/candles', {
-    params: {
-      instId,
-      bar,
-      after,
-      before,
-      limit,
-    },
-    timeout: 10000, // 设置5秒超时
+  return enqueueMarketRequest(async () => {
+    const { data } = await axios.get(base_url + '/api/v5/market/candles', {
+      params: { instId, bar, after, before, limit },
+    });
+    return data;
   });
-  return data;
 }
 
 export async function marketCandlesHistory(instId, bar, after, before, limit) {
-  const { data } = await axios.get(base_url + '/api/v5/market/history-candles', {
-    params: {
-      instId,
-      bar,
-      after,
-      before,
-      limit,
-    },
-    timeout: 10000, // 设置5秒超时
+  return enqueueMarketRequest(async () => {
+    const { data } = await axios.get(base_url + '/api/v5/market/history-candles', {
+      params: { instId, bar, after, before, limit },
+    });
+    return data;
   });
-  return data;
 }
 
 /**
@@ -272,43 +328,43 @@ export async function batchCancelOrders(orders) {
 }
 
 export async function getOpenInterestHistory(instId, period, begin, end, limit = 100) {
-  const security = MIMIC ? mimic : firm;
-  if (period === '1m') period = '5m';
-  const timestamp = new Date().toISOString();
-  const method = 'GET';
-  const requestPath = `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`;
-  const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
+  return enqueueMarketRequest(async () => {
+    const security = MIMIC ? mimic : firm;
+    if (period === '1m') period = '5m';
+    const timestamp = new Date().toISOString();
+    const method = 'GET';
+    const requestPath = `/api/v5/rubik/stat/contracts/open-interest-history?instId=${instId}&period=${period}&begin=${begin}&end=${end}&limit=${limit}`;
+    const sign = generateSignature(timestamp, method, requestPath, '', security.api_secret);
 
-  const headers = {
-    'OK-ACCESS-KEY': security.api_key,
-    'OK-ACCESS-SIGN': sign,
-    'OK-ACCESS-TIMESTAMP': timestamp,
-    'OK-ACCESS-PASSPHRASE': security.pass_phrase,
-    // 'x-simulated-trading': 1,
-  };
+    const headers = {
+      'OK-ACCESS-KEY': security.api_key,
+      'OK-ACCESS-SIGN': sign,
+      'OK-ACCESS-TIMESTAMP': timestamp,
+      'OK-ACCESS-PASSPHRASE': security.pass_phrase,
+    };
 
-  if (MIMIC) {
-    headers['x-simulated-trading'] = 1;
-  }
-
-  try {
-    const { data } = await axios.get(base_url + requestPath, { headers });
-    if (data.code != 0) {
-      throw new Error(data.msg);
+    if (MIMIC) {
+      headers['x-simulated-trading'] = 1;
     }
-    // 确保返回的数据格式正确
-    if (!data.data || !data.data.length) {
-      console.warn(`未获取到获取交易品种持仓历史信息: ${instId}`);
+
+    try {
+      const { data } = await axios.get(base_url + requestPath, { headers });
+      if (data.code != 0) {
+        throw new Error(data.msg);
+      }
+      if (!data.data || !data.data.length) {
+        console.warn(`未获取到获取交易品种持仓历史信息: ${instId}`);
+        return { data: [] };
+      }
+      return data;
+    } catch (error) {
+      console.error(
+        `获取交易品种持仓历史信息失败 [${instId}]:`,
+        error.response?.data || error.message
+      );
       return { data: [] };
     }
-    return data;
-  } catch (error) {
-    console.error(
-      `获取交易品种持仓历史信息失败 [${instId}]:`,
-      error.response?.data || error.message
-    );
-    return { data: [] };
-  }
+  });
 }
 
 /**
@@ -567,11 +623,14 @@ export async function getAccountBalance() {
  * @param {string[]} instIds 产品 ID 列表
  */
 export async function subscribeKlineChanel(ws, channel, instIds) {
-  const args = instIds.map(instId => ({ channel, instId }));
-  ws.send(
-    JSON.stringify({
-      op: 'subscribe',
-      args,
-    })
-  );
+  try {
+    const args = instIds.map(instId => ({ channel, instId }));
+    const payload = JSON.stringify({ op: 'subscribe', args });
+    dbg(`[WS SEND] subscribe: ${args.length} args → ${args.map(a => a.instId).join(',')}`);
+    ws.send(payload);
+    return true;
+  } catch (err) {
+    console.error(`[WS SEND] subscribe 失败: ${err.message}`);
+    return false;
+  }
 }

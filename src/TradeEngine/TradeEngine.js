@@ -25,7 +25,13 @@ export class TradeEngine {
   static _once_limit = 100;
   static _candle_limit = 300;
   static _asset_names = []; // 资产列表
-  static _status = 0; //1 启动中 2运行中 -1出错
+  static _status = 0; // 0 未启动 | 1 启动中 | 2 运行中 | -1 出错
+  static _lastLoggedStatus = -99; // 上次已打印日志的状态，用于避免重复刷屏
+
+  /** 返回引擎状态的可读标签，供日志前缀使用 */
+  static getStatusLabel() {
+    return { 0: 'IDLE', 1: 'BOOT', 2: 'RUN', [-1]: 'ERR' }[this._status] ?? '?';
+  }
   static _trade_fee_rate = 0.001;
   static _show_order_his = [];
   static _positionCost = new LocalVariable('TradeEngine/positionCost');
@@ -92,7 +98,9 @@ export class TradeEngine {
     return klines.map((it, id) => {
       const { prices, ts, id: assetId } = it;
       if (assetId == TradeEngine._main_asset) return { ...it };
-      const [a, b] = TradeEngine._beta_map[assetId] || [1, 0];
+      // LocalVariable 对不存在的 key 返回新代理（不可迭代），必须显式检查
+      const raw = TradeEngine._beta_map[assetId];
+      const [a, b] = Array.isArray(raw) ? raw : [1, 0];
       return {
         ...it,
         prices: prices.map(it => a * it + b),
@@ -595,35 +603,45 @@ export class TradeEngine {
 
   static start() {
     const status = this.checkEngine();
-    // const restore = this._rewriteConsole('交易引擎启动中...');
 
     // 启动账户余额定时拉取（幂等，仅首次生效；推送 totalEq 总权益用于回撤控制）
-    // 委托至 AccountRiskMonitor.start()
     this.#riskMonitor.start();
+
+    // 只在状态变化时打印，避免 500ms 轮询刷屏
+    if (status !== this._lastLoggedStatus) {
+      this._lastLoggedStatus = status;
+      const label = this.getStatusLabel();
+      if (status === 2) {
+        console.log(`引擎状态 RUN ✓ 已就绪，开始运行交易策略`);
+      } else if (status === 1) {
+        console.log(`引擎状态 BOOT → RUN 初始化中（${label}）`);
+      } else if (status === 0) {
+        console.log(`引擎初始化中（IDLE → BOOT）等待 K 线数据就绪...`);
+      }
+    }
 
     try {
       if (status == 2) {
-        // restore(); // 如果完全启动，先恢复console
         this.refreshBeta();
         this.refreshTransactions();
         this.runAllProcessors();
       } else if (status == 1) {
-        console.log('启动完成,进行初始化...');
         this.refreshBeta();
       } else if (status === 0) {
-        console.log('正在启动交易引擎...');
+        // 等待数据就绪，不做操作
       } else {
-        restore(); // 出错时恢复console
         throw new Error('启动失败...');
       }
     } finally {
-      // restore(); // 确保一定会恢复console
+      // 确保继续轮询直到 _status === 2
+      clearTimeout(this._timer.start);
+      this._timer.start = setTimeout(
+        () => {
+          this.start();
+        },
+        status === 2 ? 60000 : 500
+      ); // RUN 后降频到 60s
     }
-
-    clearTimeout(this._timer.start);
-    this._timer.start = setTimeout(() => {
-      this.start();
-    }, 500);
   }
 
   static stop() {
@@ -803,17 +821,21 @@ export class TradeEngine {
     if (!this._interest_cache[cacheKey]) {
       this._cleanCache(this._interest_cache);
       const _interest_history = this._interest_history[assetName]?.[bar_type];
-      // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
-      let last = _interest_history[0];
-      let minDiff = Math.abs(ts - last?.ts || 0);
-      for (let i = 1; i < _interest_history.length; i++) {
-        const diff = Math.abs(ts - _interest_history[i].ts);
-        if (diff < minDiff) {
-          minDiff = diff;
-          last = _interest_history[i];
+      // 数据为空时返回默认值（而非 undefined，避免 CD.js 读 .oi 崩溃）
+      if (!_interest_history || _interest_history.length === 0) {
+        this._interest_cache[cacheKey] = { ts, oi: 0 };
+      } else {
+        let last = _interest_history[0];
+        let minDiff = Math.abs(ts - last?.ts || 0);
+        for (let i = 1; i < _interest_history.length; i++) {
+          const diff = Math.abs(ts - _interest_history[i].ts);
+          if (diff < minDiff) {
+            minDiff = diff;
+            last = _interest_history[i];
+          }
         }
+        this._interest_cache[cacheKey] = last;
       }
-      this._interest_cache[cacheKey] = last;
     }
     return this._interest_cache[cacheKey];
   }
@@ -825,17 +847,21 @@ export class TradeEngine {
     if (!this._volume_cache[cacheKey]) {
       this._cleanCache(this._volume_cache);
       const candle_data = this.market_candle[bar_type]?.[assetName];
-      // 找到 data 中 data.ts 离 ts 最近的元素，data 非有序
-      let last = candle_data.at(-1);
-      let minDiff = Math.abs(ts - last.ts);
-      for (let i = 1; i < candle_data.length; i++) {
-        const diff = Math.abs(ts - candle_data[i].ts);
-        if (diff < minDiff) {
-          minDiff = diff;
-          last = candle_data[i];
+      // 数据为空时返回默认值
+      if (!candle_data || candle_data.length === 0) {
+        this._volume_cache[cacheKey] = { ts, vol: 0 };
+      } else {
+        let last = candle_data.at(-1);
+        let minDiff = Math.abs(ts - last.ts);
+        for (let i = 1; i < candle_data.length; i++) {
+          const diff = Math.abs(ts - candle_data[i].ts);
+          if (diff < minDiff) {
+            minDiff = diff;
+            last = candle_data[i];
+          }
         }
+        this._volume_cache[cacheKey] = last;
       }
-      this._volume_cache[cacheKey] = last;
     }
     return this._volume_cache[cacheKey];
   }

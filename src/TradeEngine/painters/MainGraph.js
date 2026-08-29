@@ -149,7 +149,8 @@ export class MainGraph extends AbstractPainter {
       const themes_map = this.engine.getThemes();
       // 只在有持仓时显示成本线
       if (position !== 0 && avgCost !== 0) {
-        const [a, b] = TradeEngine._beta_map[instId] || [1, 0];
+        const rawCoef = TradeEngine._beta_map[instId];
+        const [a, b] = Array.isArray(rawCoef) ? rawCoef : [1, 0];
         const scaledCost = avgCost * a + b;
 
         const ctx = chart.ctx;

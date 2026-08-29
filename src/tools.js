@@ -103,18 +103,22 @@ export async function getPrices(
     bar = bar_type,
     feild = price_type;
   try {
-    let times = Math.trunc(limit / once_limit);
+    let page = Math.trunc(limit / once_limit);
+    let times = page;
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
+      const cur = page - times;
       try {
+        // 前置日志：让云端 operator 知道"正在请求第 X 页"，卡住时能快速定位
+        process.stdout.write(`  ⏳ ${assetId} K线 ${cur}/${page} 请求中...\r`);
         const { data } = await marketCandles(assetId, bar, last_ts, to_when, once_limit);
-        console.log(assetId, formatTimestamp(last_ts), bar, data.length);
+        console.log(assetId, formatTimestamp(last_ts), bar, data.length, `(第 ${cur}/${page} 页)`);
         if (!(data && data.length > 0)) break;
         last_ts = parseCandleData(data[data.length - 1])['ts'];
         collections = collections.concat(data);
       } catch (pageErr) {
-        console.warn(`${assetId} K线第 ${times + 1} 页获取失败: ${pageErr.message}，跳过剩余页`);
+        console.warn(`${assetId} K线第 ${cur}/${page} 页获取失败: ${pageErr.message}，跳过剩余页`);
         break;
       }
     }
@@ -137,19 +141,22 @@ export async function getHistoryPrices(
     bar = bar_type,
     feild = price_type;
   try {
-    let times = Math.trunc(limit / once_limit);
+    let page = Math.trunc(limit / once_limit);
+    let times = page;
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
+      const cur = page - times;
       try {
+        process.stdout.write(`  ⏳ ${assetId}(HIS) 历史K线 ${cur}/${page} 请求中...\r`);
         const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
-        console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length);
+        console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length, `(第 ${cur}/${page} 页)`);
         if (!(data && data.length > 0)) break;
         last_ts = parseCandleData(data[data.length - 1])['ts'];
         collections = collections.concat(data);
       } catch (pageErr) {
         console.warn(
-          `${assetId}(HIS) 历史K线第 ${times + 1} 页获取失败: ${pageErr.message}，跳过剩余页`
+          `${assetId}(HIS) 历史K线第 ${cur}/${page} 页获取失败: ${pageErr.message}，跳过剩余页`
         );
         break;
       }
@@ -177,10 +184,12 @@ export async function getHistoryOpenInterest(
     let collections = [];
     let last_ts = from_when || Date.now();
     while (times-- > 0) {
+      const cur = page - times;
       try {
+        process.stdout.write(`  ⏳ ${assetId}(INTEREST-HIS) ${cur}/${page} 请求中...\r`);
         const { data } = await getOpenInterestHistory(assetId, bar, to_when, last_ts, once_limit);
         console.log(
-          assetId + `(INTEREST - HIS ${page - times}/${page})`,
+          assetId + `(INTEREST - HIS ${cur}/${page})`,
           formatTimestamp(last_ts),
           bar,
           data.length
@@ -188,11 +197,10 @@ export async function getHistoryOpenInterest(
         if (!(data && data.length > 1)) break;
         last_ts = parseCandleData(data[data.length - 1])['ts'];
         collections = collections.concat(data);
-        // 等待 300ms
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // 去掉硬编码 300ms 等待 —— 自适应限流队列本身已经控制好间隔
       } catch (pageErr) {
         console.warn(
-          `${assetId} 持仓量历史第 ${page - times}/${page} 页获取失败: ${pageErr.message}，跳过剩余页`
+          `${assetId} 持仓量历史第 ${cur}/${page} 页获取失败: ${pageErr.message}，跳过剩余页`
         );
         break;
       }

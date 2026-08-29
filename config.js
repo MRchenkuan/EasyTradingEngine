@@ -61,11 +61,8 @@ export const RiskControl = {
 export const KLine = {
   max_days: 3650,
   bar_type: BarType.MINUTE_5,
-  candle_limit: {
-    [TradeEnv.MIMIC]: 1000,
-    [TradeEnv.PRODUCTION]: trade_open ? 3000 : 1000,
-  }[Env],
-  open_inerest_limit: Env === TradeEnv.PRODUCTION && trade_open ? 3000 : 100,
+  candle_limit: _strategiesConfig.candle_limit ?? 1000,
+  open_inerest_limit: _strategiesConfig.open_inerest_limit ?? 100,
 };
 
 export const MainGraph = {

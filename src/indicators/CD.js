@@ -13,8 +13,26 @@ export function calculateChipDistribution(data, f_get_open_interest_by_time, f_g
   const getVolumeByTime = f_get_volume_by_time;
 
   const now = Date.now();
-  const now_volume = getVolumeByTime(now).vol;
-  const circulation = getOpenInterestByTime(now).oi;
+  const now_volume = getVolumeByTime(now)?.vol ?? 0;
+  const circulation = getOpenInterestByTime(now)?.oi ?? 0;
+
+  // 持仓量或成交量为 0，说明数据未就绪，返回空结构避免后续除零/空数组崩溃
+  if (!circulation || circulation <= 0 || !now_volume) {
+    return {
+      distribution: [],
+      allPeriods: [],
+      totalPeriods: 0,
+      max_price: 0,
+      min_price: 0,
+      min_volume: 0,
+      max_volume: 0,
+      turnover: 0,
+      volume: now_volume,
+      open_interest: circulation,
+      step: 0,
+      concentration: 1,
+    };
+  }
   const now_turnover = now_volume / circulation;
   // 1. 参数校验
   if (!data || data.length === 0) throw new Error('数据不能为空');

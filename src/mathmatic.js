@@ -12,17 +12,22 @@ export function calculateReturns(prices) {
 
 // 皮尔逊相关性
 export function pearsonCorrelation(arr1, arr2) {
+  // 空数组或长度不足无法计算相关性，返回 0（无相关）
+  if (!arr1 || !arr2 || arr1.length < 2 || arr2.length < 2) return 0;
   const mean1 = mean(arr1);
   const mean2 = mean(arr2);
   const covariance =
     sum(arr1.map((val, i) => (val - mean1) * (arr2[i] - mean2))) / (arr1.length - 1);
   const stdDev1 = std(arr1);
   const stdDev2 = std(arr2);
-  return covariance / (stdDev1 * stdDev2);
+  const denominator = stdDev1 * stdDev2;
+  if (!denominator) return 0; // 零方差，相关性无意义
+  return covariance / denominator;
 }
 
 export function calculateCorrelationMatrix(stocks) {
   const n = stocks.length;
+  if (n === 0) return [];
   const returns = stocks.map(stock => calculateReturns(stock));
 
   // 初始化相关性矩阵

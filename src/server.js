@@ -28,6 +28,8 @@ export class MonitorServer {
     this.port = port;
     this.app = express();
     this.server = null;
+    // 引擎状态 getter，由 main.js 在 TradeEngine 导入后注入
+    this._engineStatusGetter = () => '';
     // 三个 WebSocket 通道：
     // indicators - 轻量指标（position, gridParams, shouldTrade 等）
     // chart - 完整K线数据（连接时 + 新K线产生时）
@@ -271,15 +273,18 @@ export class MonitorServer {
       this.addLog(message, level);
     };
 
+    const buildPrefix = () => {
+      const time = `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`;
+      const status = this._engineStatusGetter();
+      return status ? `${time}[${status}]` : time;
+    };
+
     console.log = (...args) => {
       const message = args
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'info');
-      this.originalConsole.log(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
-        ...args
-      );
+      this.originalConsole.log(buildPrefix(), ...args);
     };
 
     console.error = (...args) => {
@@ -287,10 +292,7 @@ export class MonitorServer {
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'error');
-      this.originalConsole.error(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
-        ...args
-      );
+      this.originalConsole.error(buildPrefix(), ...args);
     };
 
     console.warn = (...args) => {
@@ -298,11 +300,13 @@ export class MonitorServer {
         .map(arg => (typeof arg === 'object' ? JSON.stringify(arg) : String(arg)))
         .join(' ');
       addToMonitor(message, 'warn');
-      this.originalConsole.warn(
-        `[${new Date().toLocaleString('zh-CN', { hour12: false })}]`,
-        ...args
-      );
+      this.originalConsole.warn(buildPrefix(), ...args);
     };
+  }
+
+  /** 注入引擎状态 getter，TradeEngine 导入后在 main.js 中调用 */
+  setEngineStatusGetter(fn) {
+    this._engineStatusGetter = fn;
   }
 
   updateAsset(name, data) {
