@@ -1,7 +1,6 @@
 import { getLastTransactions, updateTransaction } from '../../recordTools.js';
 import { AbstractProcessor } from './AbstractProcessor.js';
 import crypto from 'crypto';
-import { TradeEngine } from '../TradeEngine.js';
 import { formatTimestamp } from '../../tools.js';
 import { close_position, open_position } from '../../trading.js';
 import { LocalVariable } from '../../LocalVariable.js';
@@ -136,7 +135,7 @@ export class HedgeProcessor extends AbstractProcessor {
       const spx1_fixed = n(px1, betaMap_fixed[instId1]);
       const spx2_fixed = n(px2, betaMap_fixed[instId2]);
       // 固定价差比率
-      const diff_rate_fixed = TradeEngine._calcPriceGapProfit(
+      const diff_rate_fixed = this.engine._calcPriceGapProfit(
         spx1_fixed,
         spx2_fixed,
         (spx1_fixed + spx2_fixed) / 2
@@ -146,7 +145,7 @@ export class HedgeProcessor extends AbstractProcessor {
       const spx1_realtime = n(px1, betaMap_realtime[instId1]);
       const spx2_realtime = n(px2, betaMap_realtime[instId2]);
       // 动态价差比率
-      const diff_rate_realtime = TradeEngine._calcPriceGapProfit(
+      const diff_rate_realtime = this.engine._calcPriceGapProfit(
         spx1_realtime,
         spx2_realtime,
         (spx1_realtime + spx2_realtime) / 2
@@ -196,7 +195,7 @@ export class HedgeProcessor extends AbstractProcessor {
     const spx2 = px2 * betaMap[instId2][0] + betaMap[instId2][1];
 
     // 计算价差比率
-    const diff_rate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx1 + spx2) / 2);
+    const diff_rate = this.engine._calcPriceGapProfit(spx1, spx2, (spx1 + spx2) / 2);
 
     // 交易信号生成
     console.log(
@@ -268,7 +267,7 @@ export class HedgeProcessor extends AbstractProcessor {
         // 如果价格存在则表示开仓订单正常
         const [beta1, beta2] = prev_transactions.orders.map(it => it.beta);
         const [spt_px1, spt_px2] = [pt_px1 * beta1[0] + beta1[1], pt_px2 * beta2[0] + beta2[1]];
-        this._prev_transactions_diff_rate = TradeEngine._calcPriceGapProfit(
+        this._prev_transactions_diff_rate = this.engine._calcPriceGapProfit(
           spt_px1,
           spt_px2,
           (spt_px1 + spt_px2) / 2

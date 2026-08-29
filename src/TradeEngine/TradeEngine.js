@@ -3,13 +3,13 @@ import { LocalVariable } from '../LocalVariable.js';
 import { getLastTransactions, updateTransaction } from '../recordTools.js';
 import { findBestFitLine } from '../regression.js';
 import { formatTimestamp, parseCandleData } from '../tools.js';
-import { HedgeProcessor } from './processors/HedgeProcessor.js';
-import { MarketMakerProcessor } from './processors/MarketMakerProcessor.js';
 import { GridTradingProcessor } from './processors/GridTradingProcessor.js';
 import { calculateChipDistribution } from '../indicators/CD.js';
 import { logCandle, logCandles } from './KlineLogger.js';
 import { AccountRiskMonitor } from './AccountRiskMonitor.js';
 import * as ProfitCalculator from './ProfitCalculator.js';
+import { monitorServer } from '../server.js';
+import { calculateBOLL } from '../indicators/BOLL.js';
 
 export class TradeEngine {
   static processors = [];
@@ -17,6 +17,7 @@ export class TradeEngine {
   static market_candle = {};
   static realtime_price = new LocalVariable('TradeEngine/realtime_price');
   static realtime_price_ts = new LocalVariable('TradeEngine/realtime_price_ts');
+  static _boll_cache = new Map(); // BOLL 指标缓存（key=ts:instId）
   static _main_asset = ''; // 主资产
   static _timer = {};
   static _bar_type = '';
@@ -53,28 +54,39 @@ export class TradeEngine {
   // TradeEngine 通过静态门面方法（startAccountBalanceUpdate/getAccountBalance 等）委托调用，外部零改动
   static #riskMonitor = new AccountRiskMonitor(this);
 
+  // 延迟加载缓存：消除 TradeEngine → HedgeProcessor → TradeEngine 循环依赖
+  static #HedgeProcessor = null;
+  static #MarketMakerProcessor = null;
+
   /**
-   * 对冲监听器
+   * 对冲监听器（延迟加载 HedgeProcessor 以避免循环依赖）
    * @param {*} assetNames
    * @param {*} size
    * @param {*} gate
-   * @returns
+   * @returns {Promise<HedgeProcessor>}
    */
-  static createHedge(assetNames, size, gate) {
+  static async createHedge(assetNames, size, gate) {
     if (!assetNames || assetNames.length < 2) throw new Error(`${assetNames}未设置对冲资产`);
     if (!gate || gate <= 0) throw new Error(assetNames, `${assetNames}必须设置门限`);
+    const { HedgeProcessor } = (this.#HedgeProcessor ??= await import(
+      './processors/HedgeProcessor.js'
+    ));
     const hp = new HedgeProcessor(assetNames, size, gate, this);
     this.processors.push(hp);
     return hp;
   }
 
   /**
-   * 创建做市商
+   * 创建做市商（延迟加载 MarketMakerProcessor）
    * @param {*} assetName
    * @param {*} size
    * @param {*} distance
+   * @returns {Promise<MarketMakerProcessor>}
    */
-  static createMarketMaker(assetName, size, distance) {
+  static async createMarketMaker(assetName, size, distance) {
+    const { MarketMakerProcessor } = (this.#MarketMakerProcessor ??= await import(
+      './processors/MarketMakerProcessor.js'
+    ));
     const mp = new MarketMakerProcessor(assetName, size, distance, this);
     this.processors.push(mp);
     return mp;
@@ -323,6 +335,27 @@ export class TradeEngine {
   static getCandleData(assetId, bar_type) {
     const barType = bar_type ?? this._bar_type;
     return this.market_candle?.[barType]?.[assetId];
+  }
+
+  /** 获取 BOLL 指标，带缓存（key = 最新K线ts:instId） */
+  static getBOLL(instId) {
+    const candles = this.getCandleData(instId);
+    if (!candles || candles.length === 0) return null;
+
+    const cacheKey = `${candles.at(-1).ts}:${instId}`;
+    if (this._boll_cache.has(cacheKey)) {
+      return this._boll_cache.get(cacheKey);
+    }
+
+    // 限制缓存大小，防止内存泄漏
+    if (this._boll_cache.size > 20) {
+      const firstKey = this._boll_cache.keys().next().value;
+      this._boll_cache.delete(firstKey);
+    }
+
+    const result = calculateBOLL(candles, 20);
+    this._boll_cache.set(cacheKey, result);
+    return result;
   }
 
   static updateCandleData(assetId, bar_type, candle_data) {
@@ -594,6 +627,11 @@ export class TradeEngine {
       if (this._instrument_info[p.asset_name]) {
         setTimeout(() => {
           p.tick();
+          // 统一从 processor 读取要推送到监控面板的 payload，由 Engine 层直接推
+          if (p._statusPayload) {
+            monitorServer.updateAsset(p.asset_name, p._statusPayload);
+            delete p._statusPayload;
+          }
         });
       } else {
         console.warn(`未找到合约产品信息: ${p.asset_name}，暂不执行交易策略`);

@@ -77,6 +77,7 @@ Strategies.forEach(strategy => {
 /**
  * 启动图像引擎
  */
+VisualEngine.setTradeEngine(TradeEngine);
 VisualEngine.setMetaInfo({
   assets,
   show_order_his: MainGraph.order_his_show,

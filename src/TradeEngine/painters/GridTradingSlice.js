@@ -4,7 +4,6 @@ import { createCollisionAvoidance } from '../../paint.js';
 import { getGridTradeOrders } from '../../recordTools.js';
 import { formatTimestamp, getFormattedTimeString, shortDcm } from '../../tools.js';
 import { GridTradingProcessor } from '../processors/GridTradingProcessor.js';
-import { TradeEngine } from '../TradeEngine.js';
 import path from 'path';
 import { AbstractPainter } from './AbstractPainter.js';
 
@@ -51,7 +50,7 @@ export class GridTradingSlice extends AbstractPainter {
     const yAxias = chart.scales.y;
     const xAxias = chart.scales.x;
     const y = yAxias.getPixelForValue(price);
-    const x = xAxias.getPixelForValue(formatTimestamp(ts, TradeEngine._bar_type));
+    const x = xAxias.getPixelForValue(formatTimestamp(ts, this.engine.tradeEngine._bar_type));
     // 保存当前上下文状态
     ctx.save();
 
@@ -138,8 +137,8 @@ export class GridTradingSlice extends AbstractPainter {
       const group_orders = groupedOrders[instId];
       const color = engine.getThemes()[instId] || '#666666';
 
-      const { prices, id, ts } = TradeEngine.getMarketData(instId) || {};
-      const candle_data = (TradeEngine.getCandleData(instId) || [])
+      const { prices, id, ts } = this.engine.tradeEngine.getMarketData(instId) || {};
+      const candle_data = (this.engine.tradeEngine.getCandleData(instId) || [])
         .map(it => [
           parseFloat(it.open),
           parseFloat(it.close),
@@ -184,7 +183,7 @@ export class GridTradingSlice extends AbstractPainter {
         volume: period_volume,
         open_interest: market_open_interest,
         step: chip_step,
-      } = TradeEngine.getChipDistribution(instId);
+      } = this.engine.tradeEngine.getChipDistribution(instId);
 
       const chip_distribution_before = findDistribution(
         allPeriods,
@@ -199,7 +198,7 @@ export class GridTradingSlice extends AbstractPainter {
         _grid_width
       );
 
-      const labels = ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
+      const labels = ts.map(it => formatTimestamp(it, this.engine.tradeEngine._bar_type));
       const file_path = path.join('grid', `/${instId}.jpg`);
 
       const boll = engine.getBOLL(instId);
@@ -259,7 +258,7 @@ export class GridTradingSlice extends AbstractPainter {
               ...styles_2,
               type: 'line',
               data: allPeriods.slice(-MAX_CANDLE).map(it => ({
-                x: formatTimestamp(it.ts, TradeEngine._bar_type),
+                x: formatTimestamp(it.ts, this.engine.tradeEngine._bar_type),
                 y: (it.turnover - it.min_turnover) / (it.max_turnover - it.min_turnover),
               })),
               borderWidth: 1,
@@ -497,7 +496,7 @@ export class GridTradingSlice extends AbstractPainter {
 
               const current_point_y = yAxias.getPixelForValue(current_price);
               const current_point_x = xAxias.getPixelForValue(
-                formatTimestamp(current_price_ts, TradeEngine._bar_type)
+                formatTimestamp(current_price_ts, this.engine.tradeEngine._bar_type)
               );
               // 绘制趋势箭头
               engine._drawTrendArrow(
@@ -524,7 +523,7 @@ export class GridTradingSlice extends AbstractPainter {
               const collisionAvoidance = createCollisionAvoidance();
 
               // 绘制交易信息
-              TradeEngine.processors
+              this.engine.tradeEngine.processors
                 .find(it => it.type === 'GridTradingProcessor' && it.asset_name === instId)
                 ?.display(chart);
 
@@ -533,7 +532,7 @@ export class GridTradingSlice extends AbstractPainter {
                 group_orders.forEach(order => {
                   const { ts, avgPx, accFillSz, side, grid_count, order_status, target_price } =
                     order;
-                  const time = formatTimestamp(ts, TradeEngine._bar_type);
+                  const time = formatTimestamp(ts, this.engine.tradeEngine._bar_type);
                   // 超出时间范围的订单不绘制
                   const labels = chart.data.labels;
                   if (!labels.includes(time)) {
@@ -567,11 +566,11 @@ export class GridTradingSlice extends AbstractPainter {
                     ghost
                   );
                 });
-              const processor = TradeEngine.processors.find(
+              const processor = this.engine.tradeEngine.processors.find(
                 it => it.type === 'GridTradingProcessor' && it.asset_name === instId
               );
               const { notionalUsd, pos, mgnRatio, realizedPnl, uplLastPx, upl, bePx, avgPx } =
-                TradeEngine.getPositionList(instId) || {};
+                this.engine.tradeEngine.getPositionList(instId) || {};
 
               const posSign = Math.sign(pos);
 

@@ -4,7 +4,6 @@ import { createCollisionAvoidance } from '../../paint.js';
 import { getGridTradeOrders, getLastTransactions } from '../../recordTools.js';
 import { formatTimestamp, shortDcm } from '../../tools.js';
 import { GridTradingProcessor } from '../processors/GridTradingProcessor.js';
-import { TradeEngine } from '../TradeEngine.js';
 import path from 'path';
 import { AbstractPainter } from './AbstractPainter.js';
 
@@ -34,10 +33,12 @@ export class MainGraph extends AbstractPainter {
     const styles = this.constructor.styles;
 
     try {
-      const refer_kline = TradeEngine.getMainAsset();
+      const refer_kline = this.engine.tradeEngine.getMainAsset();
       if (!refer_kline) return;
-      const x_label = refer_kline.ts.map(it => formatTimestamp(it, TradeEngine._bar_type));
-      const scaled_prices = TradeEngine.getAllScaledPrices();
+      const x_label = refer_kline.ts.map(it =>
+        formatTimestamp(it, this.engine.tradeEngine._bar_type)
+      );
+      const scaled_prices = this.engine.tradeEngine.getAllScaledPrices();
       const file_path = path.join(`main.jpg`);
 
       // 计算差值并添加注释
@@ -104,7 +105,7 @@ export class MainGraph extends AbstractPainter {
               // 绘制实时利润空间表格
               this.engine._drawProfitTable(chart);
 
-              const beta_map = TradeEngine._beta_map;
+              const beta_map = this.engine.tradeEngine._beta_map;
               if (this.engine._config.show_transactions !== false) {
                 // 开平仓信息绘制, 在主图中过滤掉关闭的头寸
                 const transactions = [
@@ -121,7 +122,7 @@ export class MainGraph extends AbstractPainter {
               this.engine._config.show_orders !== false &&
                 this.engine._paintOrders(
                   chart,
-                  TradeEngine._asset_names,
+                  this.engine.tradeEngine._asset_names,
                   beta_map,
                   collisionAvoidance
                 );
@@ -145,11 +146,12 @@ export class MainGraph extends AbstractPainter {
    */
   _addCostLines(chart) {
     this.engine._show_order_his.forEach(it => {
-      const { position, totalCost, avgCost, updateTime, instId } = TradeEngine.getPositionCost(it);
+      const { position, totalCost, avgCost, updateTime, instId } =
+        this.engine.tradeEngine.getPositionCost(it);
       const themes_map = this.engine.getThemes();
       // 只在有持仓时显示成本线
       if (position !== 0 && avgCost !== 0) {
-        const rawCoef = TradeEngine._beta_map[instId];
+        const rawCoef = this.engine.tradeEngine._beta_map[instId];
         const [a, b] = Array.isArray(rawCoef) ? rawCoef : [1, 0];
         const scaledCost = avgCost * a + b;
 

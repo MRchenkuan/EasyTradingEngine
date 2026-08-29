@@ -1,10 +1,14 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
 import { LocalVariable } from '../../LocalVariable.js';
 import { createCollisionAvoidance } from '../../paint.js';
-import { getClosingTransaction, getGridTradeOrders, getLastTransactions, getOpeningTransaction } from '../../recordTools.js';
+import {
+  getClosingTransaction,
+  getGridTradeOrders,
+  getLastTransactions,
+  getOpeningTransaction,
+} from '../../recordTools.js';
 import { formatTimestamp, shortDcm } from '../../tools.js';
 import { GridTradingProcessor } from '../processors/GridTradingProcessor.js';
-import { TradeEngine } from '../TradeEngine.js';
 import path from 'path';
 import { AbstractPainter } from './AbstractPainter.js';
 
@@ -41,7 +45,7 @@ export class HedgeTransactionSlice extends AbstractPainter {
     const yAxias = chart.scales.y;
     const xAxias = chart.scales.x;
     const y = yAxias.getPixelForValue(price);
-    const x = xAxias.getPixelForValue(formatTimestamp(ts, TradeEngine._bar_type));
+    const x = xAxias.getPixelForValue(formatTimestamp(ts, this.engine.tradeEngine._bar_type));
     // 保存当前上下文状态
     ctx.save();
 
@@ -102,8 +106,8 @@ export class HedgeTransactionSlice extends AbstractPainter {
     const styles = this.constructor.styles;
     const open_transaction = getOpeningTransaction(tradeId);
     const close_transaction = getClosingTransaction(tradeId);
-    const klines = Object.values(TradeEngine.getAllMarketData());
-    const labels = TradeEngine.getMainAssetLabels();
+    const klines = Object.values(this.engine.tradeEngine.getAllMarketData());
+    const labels = this.engine.tradeEngine.getMainAssetLabels();
 
     const orders_open = open_transaction.orders;
     const orders_close = close_transaction ? close_transaction.orders : [];

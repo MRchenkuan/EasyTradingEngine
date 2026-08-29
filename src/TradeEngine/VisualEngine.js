@@ -3,10 +3,8 @@ import { blendColors, createMapFrom, formatTimestamp, hashString, shortDcm } fro
 import { calculateCorrelationMatrix } from '../mathmatic.js';
 import { getOpeningTransaction } from '../recordTools.js';
 import { createCollisionAvoidance, paintLine, simpAssetName } from '../paint.js';
-import { TradeEngine } from './TradeEngine.js';
 import path from 'path';
 import { LocalVariable } from '../LocalVariable.js';
-import { calculateBOLL } from '../indicators/BOLL.js';
 import { GridTradingSlice } from './painters/GridTradingSlice.js';
 import { MainGraph } from './painters/MainGraph.js';
 import { Env, disable_chart } from '../../config.js';
@@ -21,13 +19,23 @@ export class VisualEngine {
   static _asset_names = [];
   static _show_order_his = [];
   static _painting_interval = Env === TradeEnv.MIMIC ? 1000 : 10000; //
-  static _boll_cache = new Map(); // 每一个滑动窗口的布林带
   static _boll_timer = null;
   static font_style = 'Monaco, Menlo, Consolas, monospace';
 
   chart_id = hashString(`${Date.now()}${Math.random()}`);
   static _config = new LocalVariable('config');
   static modules = new Map();
+
+  /** TradeEngine 引用：由 main.js 注入（延迟绑定，避免循环依赖） */
+  static _tradeEngine = null;
+  static get tradeEngine() {
+    if (!this._tradeEngine)
+      throw new Error('VisualEngine.setTradeEngine() 必须在 start() 之前由 main.js 调用');
+    return this._tradeEngine;
+  }
+  static setTradeEngine(tradeEngine) {
+    this._tradeEngine = tradeEngine;
+  }
 
   static createChart(...args) {
     this.charts.push(new this(...args));
@@ -60,7 +68,7 @@ export class VisualEngine {
   }
 
   static start() {
-    const status = TradeEngine.checkEngine();
+    const status = this.tradeEngine.checkEngine();
     if (status == 2) {
       this.modules.forEach((mod, name) => {
         // disable_chart 只跳过 GridTradingSlice（chart/grid/*.jpg），保留 MainGraph（main.jpg）
@@ -78,25 +86,9 @@ export class VisualEngine {
     clearTimeout(this._timer.start);
   }
 
+  /** 代理到 this.tradeEngine.getBOLL（缓存统一在 TradeEngine 里） */
   static getBOLL(instId) {
-    const candles = TradeEngine.getCandleData(instId);
-    // const cacheKey = JSON.stringify(candles.at(-1));
-
-    const cacheKey = `${candles.at(-1).ts}:${instId}`;
-    if (this._boll_cache.has(cacheKey)) {
-      return this._boll_cache.get(cacheKey);
-    }
-
-    // 限制缓存大小
-    if (this._boll_cache.size > 20) {
-      const firstKey = this._boll_cache.keys().next().value;
-      this._boll_cache.delete(firstKey);
-    }
-
-    const result = calculateBOLL(candles, 20);
-    this._boll_cache.set(cacheKey, result);
-
-    return result;
+    return this.tradeEngine.getBOLL(instId);
   }
 
   static _drawTrendArrow(chart, x, y, trend, style = 'default') {
@@ -328,13 +320,13 @@ export class VisualEngine {
     const xScale = chart.scales.x;
     const yScale = chart.scales.y;
     const xCoordOrders = new Map();
-    const labels = TradeEngine.getMainAssetLabels();
+    const labels = this.tradeEngine.getMainAssetLabels();
 
     // 先收集所有资产的订单
     for (const asset_name of asset_names) {
       // 不在历史订单中显示的资产不处理
       if (!this._show_order_his.includes(asset_name)) continue;
-      const data = TradeEngine.getOrderHistory({
+      const data = this.tradeEngine.getOrderHistory({
         instType: 'SPOT',
         instId: asset_name,
         state: 'filled',
@@ -344,7 +336,7 @@ export class VisualEngine {
         // 直接处理订单数据
         data.forEach(order => {
           const { fillTime, instId } = order;
-          const formattedTime = formatTimestamp(fillTime, TradeEngine._bar_type);
+          const formattedTime = formatTimestamp(fillTime, this.tradeEngine._bar_type);
           // 检查时间戳是否在图表范围内
           if (!labels.includes(formattedTime)) {
             return;
@@ -407,7 +399,7 @@ export class VisualEngine {
 
     const SIDE_SYMBOL = { buy: '+', sell: '-' };
 
-    const labels = TradeEngine.getMainAssetLabels();
+    const labels = this.tradeEngine.getMainAssetLabels();
 
     const transaction = getOpeningTransaction(tradeId);
 
@@ -443,8 +435,8 @@ export class VisualEngine {
     let x2 = xScale.getPixelForValue(labels.at(-1));
 
     // 获取市价
-    const r_px1 = TradeEngine.getRealtimePrice(instId1);
-    const r_px2 = TradeEngine.getRealtimePrice(instId2);
+    const r_px1 = this.tradeEngine.getRealtimePrice(instId1);
+    const r_px2 = this.tradeEngine.getRealtimePrice(instId2);
 
     // 按开仓时标准化计算当前市价
     const sr_px1 = r_px1 * beta1[0] + beta1[1];
@@ -459,7 +451,7 @@ export class VisualEngine {
     let y2 = yScale.getPixelForValue(sr_px2);
 
     // 计算价差比率
-    const diffRate = TradeEngine._calcPriceGapProfit(sr_px1, sr_px2, (sr_px1 + sr_px2) / 2);
+    const diffRate = this.tradeEngine._calcPriceGapProfit(sr_px1, sr_px2, (sr_px1 + sr_px2) / 2);
 
     // 将价格单位都转为USDT
     const format2USDT = (sz, price, tgtCcy) => {
@@ -507,7 +499,7 @@ export class VisualEngine {
    * @param {*} collisionAvoidance
    */
   static _drawTransactions(chart, transactions, betaMap, collisionAvoidance, show_closed = false) {
-    const bar_type = TradeEngine._bar_type;
+    const bar_type = this.tradeEngine._bar_type;
     const ctx = chart.ctx;
     const xScale = chart.scales.x;
     const yScale = chart.scales.y;
@@ -515,7 +507,7 @@ export class VisualEngine {
     const OPEN_COLOR = '#d61c3c';
     const CLOSE_COLOR = 'green';
     const SIDE_SYMBOL = { buy: '+', sell: '-' };
-    const labels = TradeEngine.getMainAssetLabels();
+    const labels = this.tradeEngine.getMainAssetLabels();
 
     transactions.forEach(({ orders, profit, closed, side: transaction_side, tradeId }) => {
       const [order1, order2] = orders;
@@ -576,7 +568,7 @@ export class VisualEngine {
       let y2 = yScale.getPixelForValue(spx2);
 
       // 计算价差比率
-      const diffRate = TradeEngine._calcPriceGapProfit(spx1, spx2, (spx1 + spx2) / 2);
+      const diffRate = this.tradeEngine._calcPriceGapProfit(spx1, spx2, (spx1 + spx2) / 2);
 
       // 将价格单位都转为USDT
       const format2USDT = (sz, price, tgtCcy) => {
@@ -630,9 +622,9 @@ export class VisualEngine {
    */
   static _drawProfitTable(chart) {
     // 实时利润矩阵计算
-    let data = TradeEngine.getRealtimeProfits();
+    let data = this.tradeEngine.getRealtimeProfits();
     const themes = this._asset_themes;
-    const assetIds = TradeEngine._asset_names;
+    const assetIds = this.tradeEngine._asset_names;
 
     const ctx = chart.ctx;
     const headers = assetIds;
@@ -648,7 +640,7 @@ export class VisualEngine {
     });
 
     // 存在对冲的资产在矩阵中标出来
-    const all_exist_hedges = TradeEngine.processors
+    const all_exist_hedges = this.tradeEngine.processors
       .filter(p => p.type === 'HedgeProcessor')
       .map(it => it.asset_names);
 
@@ -720,13 +712,13 @@ export class VisualEngine {
     const ctx = chart.ctx;
     const headers = ['β(对冲比)', '价格', '涨跌幅'];
     const themes = this._asset_themes;
-    const assetIds = TradeEngine._asset_names;
-    const beta_map = TradeEngine._beta_map;
+    const assetIds = this.tradeEngine._asset_names;
+    const beta_map = this.tradeEngine._beta_map;
 
     const data = assetIds
       .map((assetId, i_info) => {
         // 价格（防御 getMarketData 返回 undefined / prices 空数组）
-        const { prices } = TradeEngine.getMarketData(assetId) || {};
+        const { prices } = this.tradeEngine.getMarketData(assetId) || {};
         if (!Array.isArray(prices) || prices.length === 0) return null;
         const start_price = prices[0];
         const price = prices.at(-1);
@@ -779,8 +771,8 @@ export class VisualEngine {
    */
   static _drawRhoTable(chart) {
     const ctx = chart.ctx;
-    const klines = Object.values(TradeEngine.getAllMarketData());
-    const headers = TradeEngine._asset_names;
+    const klines = Object.values(this.tradeEngine.getAllMarketData());
+    const headers = this.tradeEngine._asset_names;
     const themes = this._asset_themes;
     const data = calculateCorrelationMatrix(klines.map(it => it.prices));
 

@@ -12,10 +12,8 @@ import {
 } from '../../enum.js';
 import { PositionController } from './utils/PositionController.js';
 import { TradeFreqController } from './utils/TradeFreqController.js';
-import { monitorServer } from '../../server.js';
 import { getGridTradeOrders } from '../../recordTools.js';
 import { formatTimestamp } from '../../tools.js';
-import { VisualEngine } from '../VisualEngine.js';
 
 export class GridTradingProcessor extends AbstractProcessor {
   type = 'GridTradingProcessor';
@@ -474,8 +472,8 @@ export class GridTradingProcessor extends AbstractProcessor {
         last_trade_side: this._last_trade_side,
       });
 
-      // 立即更新监控显示（包含止损等级、阈值调整信息和交易状态）
-      monitorServer.updateAsset(this.asset_name, {
+      // 把要推送到监控面板的数据暂存到实例上，由 TradeEngine 层统一推送
+      this._statusPayload = {
         ...indicators,
         stopLossLevel: positionRiskLevel,
         thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
@@ -483,7 +481,7 @@ export class GridTradingProcessor extends AbstractProcessor {
         shouldTrade: shouldTrade,
         frq_rest: frq_rest,
         position: this.engine.getPositionList(this.asset_name),
-      });
+      };
 
       // 趋势和方向一致时不交易
       if (this._tendency == 0 || this._direction / this._tendency >= 0) {
@@ -638,9 +636,7 @@ export class GridTradingProcessor extends AbstractProcessor {
     const sign = Math.sign(amount);
     // 先除以 lotSize 取整再乘回去，最后用 toFixed 修正浮点精度
     // 例：Math.floor(0.5700000000000001 / 0.01) * 0.01 = 0.5700000000000001 → toFixed(10) → 0.57
-    let adjustedAmount = parseFloat(
-      (Math.floor(Math.abs(amount) / lotSize) * lotSize).toFixed(10)
-    );
+    let adjustedAmount = parseFloat((Math.floor(Math.abs(amount) / lotSize) * lotSize).toFixed(10));
 
     // 调整后数量低于最小交易单位时跳过下单（避免 OKX 拒单与无效重试）
     if (adjustedAmount <= 0 || (minSize > 0 && adjustedAmount < minSize)) {
@@ -812,7 +808,7 @@ export class GridTradingProcessor extends AbstractProcessor {
 
     let bollData = null;
     try {
-      const boll = VisualEngine.getBOLL(this.asset_name);
+      const boll = this.engine.getBOLL(this.asset_name);
       if (boll) {
         bollData = {
           upper: boll.upperArray.slice(-MAX_CANDLE),

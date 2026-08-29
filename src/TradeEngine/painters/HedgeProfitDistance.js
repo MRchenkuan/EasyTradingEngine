@@ -1,5 +1,4 @@
 import { ChartJSNodeCanvas } from 'chartjs-node-canvas';
-import { TradeEngine } from '../TradeEngine.js';
 import { AbstractPainter } from './AbstractPainter.js';
 import { blendColors } from '../../tools.js';
 import { simpAssetName } from '../../paint.js';
@@ -12,8 +11,8 @@ export class HedgeProfitDistance extends AbstractPainter {
   });
 
   draw() {
-    const labels = TradeEngine.getMainAssetLabels();
-    let profits = TradeEngine.getAllHistoryProfits();
+    const labels = this.engine.tradeEngine.getMainAssetLabels();
+    let profits = this.engine.tradeEngine.getAllHistoryProfits();
     const themes_map = this.engine.getThemes();
 
     // 计算差值并添加注释
