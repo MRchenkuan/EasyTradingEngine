@@ -20,7 +20,7 @@ import { base_url } from '../config.security.js';
 import { subscribeKlineChanel, getMarketCallCount } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
 import { VisualEngine } from './TradeEngine/VisualEngine.js';
-import { startAutoFlush, stopAutoFlush } from './TradeEngine/KlineLogger.js';
+import { startAutoFlush, stopAutoFlush, loadMarketData } from './TradeEngine/KlineLogger.js';
 import { KLine, MainGraph, Strategies } from '../config.js';
 
 const ws_connection_pool = {};
@@ -171,9 +171,43 @@ const getKlinesWithRetry = async (assetIds, params, maxRetries = 5) => {
   return results;
 };
 
+// ---------------------------------------------------------------------------
+// 行情数据加载：优先本地 jsonl，不够新才补 REST
+// ---------------------------------------------------------------------------
+async function loadMarketDataWithFallback(assetIds, params) {
+  const results = [];
+  const needREST = [];
+
+  // 第一轮：逐个查本地
+  for (const id of assetIds) {
+    const local = loadMarketData(id, params.bar_type, {
+      maxDays: Math.max(30, Math.ceil(params.candle_limit / 288)), // 5m K 每天 288 根
+      priceField: params.price_type,
+      stalenessMs: 2 * 60 * 60 * 1000, // 2h 内算"够新"
+    });
+    if (local.hit) {
+      results.push(local.data);
+    } else {
+      console.log(`[KLINE] ${id} 本地跳过: ${local.reason}`);
+      needREST.push(id);
+    }
+  }
+
+  // 第二轮：缺失的走 REST
+  if (needREST.length > 0) {
+    console.log(`[KLINE] 需 REST 补拉 ${needREST.length}/${assetIds.length} 个资产: ${needREST.join(', ')}`);
+    const restResults = await getKlinesWithRetry(needREST, params);
+    results.push(...restResults);
+  } else {
+    console.log(`[KLINE] ✅ 全部 ${assetIds.length} 资产命中本地缓存，跳过 REST`);
+  }
+
+  return results;
+}
+
 // 修改数据获取逻辑的错误处理
 try {
-  const klines = await getKlinesWithRetry(assetIds, params);
+  const klines = await loadMarketDataWithFallback(assetIds, params);
   if (klines && klines.length > 0) {
     klines.forEach(it => {
       const { id, prices, ts, orign_data } = it;
@@ -349,7 +383,6 @@ function initBusinessWebSocket() {
       subscribeAcks++;
       const match = raw.match(/"instId":"([^"]+)"/);
       dbg(`[WS] ACK ${subscribeAcks}/${expectedAcks} ${match?.[1] ?? ''}`);
-      console.log(`订阅成功: ${raw}`);
       if (subscribeAcks === expectedAcks) {
         console.log(`[WS] ✅ 全部 ${expectedAcks} 资产订阅完成，等待 K 线数据推送...`);
       }
@@ -386,11 +419,7 @@ function initBusinessWebSocket() {
           }
         }
         klineTickCounter++;
-        if (klineTickCounter % 100 === 0) {
-          console.log(
-            `[KLINE] 📈 累计 ${klineTickCounter} 条 K 线推送 · ${klineFirstAck.size} 资产活跃 · WS存活 ${Math.round((Date.now() - _wsOpenTime) / 1000)}s`
-          );
-        }
+        
       }
     }
   });

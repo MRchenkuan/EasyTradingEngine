@@ -40,6 +40,7 @@ export class AccountRiskMonitor {
     this._account_leverage = { lever: 0, level: 0, notional: 0, ts: null }; // 缓存（内存，每次持仓或余额刷新重算）
     this._lev_logged = new Set(); // notionalUsd fallback 日志按 assetName 节流
     this._peak_reset_pending = false; // 清仓后标记：等下一次余额刷新再用真实权益重置峰谷
+    this._balance_first_logged = false; // 余额首次拉取成功已打印
   }
 
   /**
@@ -133,6 +134,14 @@ export class AccountRiskMonitor {
         }
         // 极值 & 回撤率 只基于 confirmed 更新（待确认状态跳过，避免异常值污染）
         if (this._balance_pending_jump == null) {
+          // 首次 confirmed 落地 → 打一条就绪日志
+          if (!this._balance_first_logged) {
+            this._balance_first_logged = true;
+            const dd = this._calcDrawdown();
+            console.log(
+              `[Balance] ✅ 账户余额已就绪: totalEq=$${confirmed.toFixed(2)} 回撤=${dd.pct.toFixed(2)}% 杠杆=${this._account_leverage.lever.toFixed(2)}x`
+            );
+          }
           // 清仓后延迟重置峰谷：用清仓后的真实权益（而非清仓前含未实现盈亏的旧值）
           // 避免人造回撤导致反复清仓
           if (this._peak_reset_pending || stats.peakResetPending || mem.peakResetPending) {

@@ -12,6 +12,61 @@ const MIMIC = Env === TradeEnv.MIMIC;
 axios.defaults.timeout = 6000; // 6s：云端被限流时快速失败，不等待 15s
 
 // ---------------------------------------------------------------------------
+// Axios 全局自动重试：网络/TLS/5xx/超时 最多 retry 3 次，指数退避
+// 4xx（鉴权/参数错误）不 retry，重试也没用
+// ---------------------------------------------------------------------------
+const MAX_RETRIES = 3;
+const RETRY_BASE_DELAY = 200; // 200ms → 400ms → 800ms
+
+/** 判断是否为可重试的错误类型 */
+function isRetryable(error) {
+  // axios 取消 / 主动 abort 不 retry
+  if (axios.isCancel(error)) return false;
+  // 网络层错误：TLS 握手失败、ECONNRESET、ETIMEDOUT、ECONNREFUSED、socket hang up 等
+  if (!error.response) {
+    const code = error.code || '';
+    const msg = error.message || '';
+    return (
+      code === 'ECONNRESET' ||
+      code === 'ECONNREFUSED' ||
+      code === 'ETIMEDOUT' ||
+      code === 'EPIPE' ||
+      code === 'UND_ERR_CONNECT_TIMEOUT' ||
+      code === 'ERR_BAD_RESPONSE' ||
+      msg.includes('socket disconnected') ||
+      msg.includes('socket hang up') ||
+      msg.includes('TLS') ||
+      msg.includes('timeout') ||
+      msg.includes('network')
+    );
+  }
+  // 服务端错误 5xx 可重试；4xx（鉴权/参数）不重试
+  return error.response.status >= 500 && error.response.status < 600;
+}
+
+axios.interceptors.response.use(
+  response => response,
+  async error => {
+    const config = error.config;
+    if (!config) return Promise.reject(error);
+
+    const retries = config._retries ?? 0;
+    if (retries >= MAX_RETRIES || !isRetryable(error)) {
+      return Promise.reject(error);
+    }
+
+    config._retries = retries + 1;
+    const delay = RETRY_BASE_DELAY * Math.pow(2, retries) + Math.random() * 100;
+    const endpoint = `${config.method?.toUpperCase()} ${config.baseURL ?? ''}${config.url ?? ''}`;
+    console.warn(
+      `[REST Retry] (${config._retries}/${MAX_RETRIES}) ${endpoint} — ${error.response?.status ?? error.message}, 退避 ${delay.toFixed(0)}ms`
+    );
+    await new Promise(r => setTimeout(r, delay));
+    return axios(config);
+  }
+);
+
+// ---------------------------------------------------------------------------
 // 调试开关：云端排查时设置环境变量 DEBUG=okx 开启
 // ---------------------------------------------------------------------------
 const _DEBUG = process.env.DEBUG?.includes('okx');

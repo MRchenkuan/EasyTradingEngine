@@ -188,7 +188,7 @@ export class GridTradingSlice extends AbstractPainter {
       const chip_distribution_before = findDistribution(
         allPeriods,
         Date.now() - this.constructor.chip_distribution_compare_with
-      );
+      ) || { distribution: [] };
 
       if (!(_grid_base_price && _min_price && _max_price && _grid_width)) return;
       const grid_lines = GridTradingProcessor._initPriceGrid(
@@ -218,9 +218,9 @@ export class GridTradingSlice extends AbstractPainter {
               type: 'bar',
               data: candle_data,
               backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [open, close, low, hight] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
+                const d = ctx.dataset.data?.[ctx.dataIndex];
+                if (!d) return '#cccccc';
+                return d[1] < d[0] ? '#52be80' : '#ec7063'; // close < open
               },
               borderWidth: 0,
               barThickness: 3, // 默认宽度
@@ -232,10 +232,9 @@ export class GridTradingSlice extends AbstractPainter {
               data: candle_data.map(it => [Math.max(it[0], it[1]), it[3], it[0], it[1]]),
               borderWidth: 0,
               backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-                // return '#aeaeae';
+                const d = ctx.dataset.data?.[ctx.dataIndex];
+                if (!d) return '#cccccc';
+                return d[3] < d[2] ? '#52be80' : '#ec7063';
               },
               barThickness: 1,
             },
@@ -246,10 +245,9 @@ export class GridTradingSlice extends AbstractPainter {
               data: candle_data.map(it => [Math.min(it[0], it[1]), it[2], it[0], it[1]]),
               borderWidth: 0,
               backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-                // return '#aeaeae';
+                const d = ctx.dataset.data?.[ctx.dataIndex];
+                if (!d) return '#cccccc';
+                return d[3] < d[2] ? '#52be80' : '#ec7063';
               },
               barThickness: 1,
             },
@@ -277,10 +275,9 @@ export class GridTradingSlice extends AbstractPainter {
               ]),
               borderWidth: 0,
               backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const [start, end, open, close] = ctx.dataset.data[ctx.dataIndex];
-                return close < open ? '#52be80' : '#ec7063';
-                // return '#aeaeae';
+                const d = ctx.dataset.data?.[ctx.dataIndex];
+                if (!d) return '#cccccc';
+                return d[3] < d[2] ? '#52be80' : '#ec7063';
               },
               barThickness: 3,
               yAxisID: 'vol',
@@ -290,7 +287,7 @@ export class GridTradingSlice extends AbstractPainter {
               ...styles,
               type: 'bar',
               indexAxis: 'y', // 关键！仅此数据集横向显示
-              data: chip_distribution.map(it => {
+              data: (chip_distribution || []).map(it => {
                 return {
                   x: it.volume / max_volume, // X轴（横向长度）
                   y: it.price, // Y轴（价格位置）
@@ -299,8 +296,9 @@ export class GridTradingSlice extends AbstractPainter {
               borderWidth: 0,
               backgroundColor: ctx => {
                 // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                const { y } = ctx.dataset.data[ctx.dataIndex];
-                return y > current_price ? '#52be80' : '#ec7063';
+                const item = ctx.dataset.data?.[ctx.dataIndex];
+                if (!item) return '#cccccc';
+                return item.y > current_price ? '#52be80' : '#ec7063';
               },
               barThickness: 1,
               yAxisID: 'chipY', // 关联分类轴
@@ -311,19 +309,14 @@ export class GridTradingSlice extends AbstractPainter {
               ...styles,
               type: 'bar',
               indexAxis: 'y', // 关键！仅此数据集横向显示
-              data: chip_distribution_before.distribution.map(it => {
+              data: (chip_distribution_before.distribution || []).map(it => {
                 return {
                   x: it.volume / max_volume, // X轴（横向长度）
                   y: it.price, // Y轴（价格位置）
                 };
               }),
               borderWidth: 0,
-              backgroundColor: ctx => {
-                // 根据涨跌动态设置颜色（阳线绿色，阴线红色）
-                // const { y } = ctx.dataset.data[ctx.dataIndex];
-                return '#85C1E9';
-                // return '#85929E';
-              },
+              backgroundColor: '#85C1E9',
               barThickness: 1,
               yAxisID: 'chipY', // 关联分类轴
               xAxisID: 'chipX',

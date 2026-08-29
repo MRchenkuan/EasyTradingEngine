@@ -42,6 +42,8 @@ export class TradeEngine {
   static _position_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔（30秒）
   static _instrument_refresh_interval = 10000; // 存储每个品种的持仓刷新间隔
   static _instrument_info = {}; // 存储品种信息
+  static #warnedMissingInstrument = new Set(); // 已打过失误标记，避免刷屏
+  static #loggedFirstPosition = new Set(); // 持仓首次拉取成功已打印
   static _interest_history = {}; // 存储品种历史数据
   static _chip_distribution = {};
   static _chip_distribution_cache_duration = 1000 * 9;
@@ -605,12 +607,15 @@ export class TradeEngine {
     try {
       if (this._status !== 2) {
         // 启动中
-        if (Object.values(this.getAllMarketData() || {}).length === this._asset_names.length) {
+        const marketDataReady =
+          Object.values(this.getAllMarketData() || {}).length === this._asset_names.length;
+        if (marketDataReady) {
           // 初始化中
           this._status = 1;
           const isBetaMapReady = this._asset_names.every(a_n => this._beta_map[a_n]?.length == 2);
-          // 检查beta映射和instruments信息是否都准备就绪
-          if (isBetaMapReady) {
+          const isInstrumentReady = this._asset_names.every(a_n => this._instrument_info[a_n]);
+          // beta + instrument 都齐了才算 RUN
+          if (isBetaMapReady && isInstrumentReady) {
             this._status = 2;
           }
         }
@@ -633,8 +638,16 @@ export class TradeEngine {
             delete p._statusPayload;
           }
         });
-      } else {
-        console.warn(`未找到合约产品信息: ${p.asset_name}，暂不执行交易策略`);
+        // 之前缺失现在有了 → 重置失误标记
+        if (this.#warnedMissingInstrument.has(p.asset_name)) {
+          this.#warnedMissingInstrument.delete(p.asset_name);
+          console.log(`[Instrument] ✅ ${p.asset_name} 产品信息已就绪，交易策略恢复运行`);
+        }
+      } else if (!this.#warnedMissingInstrument.has(p.asset_name)) {
+        this.#warnedMissingInstrument.add(p.asset_name);
+        console.warn(
+          `[Instrument] ⚠️ ${p.asset_name} 产品信息未就绪，暂不执行交易（每 10s 自动重试获取）`
+        );
       }
     });
   }
@@ -762,9 +775,7 @@ export class TradeEngine {
   }
 
   /**
-   * 注册品种并定期更新信息
-   * @param {string} assetName - 品种名称
-   * @param {string} instType - 品种类型 (SPOT/SWAP等)
+   * 注册合约品种：基础属性只拉一次（静态），OI 持仓量每 60s 刷（动态低频）
    */
   static registerInstrument(assetName, instType) {
     // 清除已存在的定时器
@@ -774,38 +785,60 @@ export class TradeEngine {
     if (this._position_timers[assetName]) {
       clearTimeout(this._position_timers[assetName]);
     }
-    // 创建定时更新任务
-    const updateInstrument = async () => {
-      try {
-        // 从API获取品种信息
-        const { data: base } = await getInstruments(instType, assetName);
-        const { data: openInterest } = await getOpenInterest(instType, assetName);
-        const inst_base = base.find(it => it.instId === assetName);
-        const inst_open_interest = openInterest.find(it => it.instId === assetName);
 
+    // 1. 基础合约属性：只拉一次（ctVal/lotSz/tickSz/minSz 交易所上线后不变）
+    const fetchBaseInstrument = async () => {
+      try {
+        const { data: base } = await getInstruments(instType, assetName);
+        const inst_base = base.find(it => it.instId === assetName);
         if (inst_base) {
           this._instrument_info[assetName] = {
             ...inst_base,
+            ...this._instrument_info[assetName], // 保留可能已有的 oi
             lastUpdateTime: Date.now(),
           };
-        }
-
-        if (inst_open_interest) {
-          this._instrument_info[assetName] = {
-            ...this._instrument_info[assetName],
-            ...inst_open_interest,
-            lastUpdateTime: Date.now(),
-          };
+          // 紧接着拉一次 oi，合并后打一条完整就绪日志
+          try {
+            const { data: openInterest } = await getOpenInterest(instType, assetName);
+            const inst_oi = openInterest.find(it => it.instId === assetName);
+            if (inst_oi) {
+              this._instrument_info[assetName] = {
+                ...this._instrument_info[assetName],
+                ...inst_oi,
+                lastUpdateTime: Date.now(),
+              };
+            }
+          } catch (_) {
+            /* OI 拿不到不影响基础信息就绪 */
+          }
+          const info = this._instrument_info[assetName];
+          console.log(`[Instrument] ✅ ${assetName} 产品信息就绪`);
+        } else {
+          console.warn(`[Instrument] ⚠️ ${assetName} 合约基础信息未找到，5s 后重试`);
+          setTimeout(fetchBaseInstrument, 5000);
         }
       } catch (e) {
-        console.log(e);
-      } finally {
-        // 设置定时器
-        this._instrument_timers[assetName] = setTimeout(
-          updateInstrument,
-          this._instrument_refresh_interval
-        );
+        console.warn(`[Instrument] ⚠️ ${assetName} 基础信息拉取失败: ${e.message}，5s 后重试`);
+        setTimeout(fetchBaseInstrument, 5000);
       }
+    };
+
+    // 2. OI 持仓量：60s 刷一次（低频，够策略用）
+    const refreshOI = async () => {
+      try {
+        const { data: openInterest } = await getOpenInterest(instType, assetName);
+        const inst_oi = openInterest.find(it => it.instId === assetName);
+        if (inst_oi && this._instrument_info[assetName]) {
+          this._instrument_info[assetName] = {
+            ...this._instrument_info[assetName],
+            ...inst_oi,
+            lastUpdateTime: Date.now(),
+          };
+        }
+      } catch (_) {
+        /* OI 刷新失败静默，下次再来 */
+      }
+      this._instrument_timers[assetName] = setTimeout(refreshOI, 60000);
     };
 
     const updatePositions = async () => {
@@ -822,6 +855,18 @@ export class TradeEngine {
           } else {
             // API 调用成功但没有数据，表示确实没有持仓
             this._position_list[assetName] = null;
+          }
+          // 首次拉取成功 → 打一条，后续静默
+          if (!this.#loggedFirstPosition.has(assetName)) {
+            this.#loggedFirstPosition.add(assetName);
+            const p = this._position_list[assetName];
+            if (p) {
+              console.log(
+                `[Position] ✅ ${assetName} 持仓已就绪: ${p.pos}张 ${p.posSide} 均价=$${parseFloat(p.avgPx || 0).toFixed(2)} 盈利=$${parseFloat(p.upl || 0).toFixed(2)}`
+              );
+            } else {
+              console.log(`[Position] ✅ ${assetName} 持仓已就绪: 空仓`);
+            }
           }
           // 持仓名义（分子）可能变 → 重算实际账户杠杆（委托至 AccountRiskMonitor）
           this.#riskMonitor.calcLeverage();
@@ -844,8 +889,10 @@ export class TradeEngine {
       }
     };
 
-    // 立即执行一次
-    updateInstrument();
+    // 立即执行：先拉基础信息（含首次 OI），成功后再启动 60s OI 定时器
+    fetchBaseInstrument().then(() => {
+      refreshOI();
+    });
     updatePositions();
   }
 

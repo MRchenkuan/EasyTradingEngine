@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { parseCandleData, formatTimestamp } from '../tools.js';
+import { parseCandleData, formatTimestamp, safeParseFloat } from '../tools.js';
 
 const LOG_DIR = path.join(process.cwd(), 'kline_data');
 
@@ -194,4 +194,80 @@ export function loadCandles(assetId, barType, maxDays = 30) {
  */
 export function getLogDir() {
   return LOG_DIR;
+}
+
+/**
+ * 从本地 jsonl 加载完整行情数据，用于启动时跳过 REST
+ * @param {string} assetId
+ * @param {string|number} barType
+ * @param {object} [options]
+ * @param {number} [options.maxDays=30] - 加载最近多少天
+ * @param {string} [options.priceField='close'] - 价格字段
+ * @param {number} [options.stalenessMs=2*60*60*1000] - 允许的最大新鲜度（默认 2 小时）
+ * @returns {{
+ *   hit: boolean,              // 本地数据是否可用（够新 + 够量）
+ *   reason?: string,           // hit=false 时的原因
+ *   data?: {                   // hit=true 时返回完整数据
+ *     id: string,
+ *     prices: number[],
+ *     ts: number[],
+ *     orign_data: object[]     // candle 对象数组（非 REST 原始数组，但 TradeEngine.updateCandleDates 能处理）
+ *   },
+ *   lastTs?: number,           // 本地最后一根 K 线的 ts，供补 REST 时使用
+ *   candleCount?: number
+ * }}
+ */
+export function loadMarketData(assetId, barType, options = {}) {
+  const { maxDays = 30, priceField = 'close', stalenessMs = 2 * 60 * 60 * 1000 } = options;
+
+  const dir = path.join(LOG_DIR, assetId, String(barType));
+  if (!fs.existsSync(dir)) {
+    return { hit: false, reason: `本地目录不存在: ${dir}` };
+  }
+
+  const candles = loadCandles(assetId, barType, maxDays);
+  if (candles.length === 0) {
+    return { hit: false, reason: '本地无 K 线数据' };
+  }
+
+  const lastTs = Number(candles[candles.length - 1].ts);
+  const ageMs = Date.now() - lastTs;
+
+  if (ageMs > stalenessMs) {
+    return {
+      hit: false,
+      reason: `本地数据过旧: 最后一根 ${formatTimestamp(lastTs)}, 距今 ${(ageMs / 3600000).toFixed(1)}h > ${(stalenessMs / 3600000).toFixed(1)}h`,
+      lastTs,
+      candleCount: candles.length,
+    };
+  }
+
+  // 本地或ign_data 是 parse 后的对象 { ts, open, high, low, close, vol, ... }
+  // TradeEngine.updateCandleDates 会再 parseCandleData —— 但它期望 REST 原始数组格式
+  // 这里转成 REST 原始数组格式（跟 getPrices/getHistoryPrices 返回的 orign_data 一致）
+  const orign_data = candles.map(c => [
+    String(c.ts),
+    c.open,
+    c.high,
+    c.low,
+    c.close,
+    c.vol,
+    c.vol_ccy,
+    c.val_ccy_quote,
+    c.confirm,
+  ]);
+
+  const prices = candles.map(it => safeParseFloat(it[priceField] ?? it.close));
+  const ts = candles.map(it => Number(it.ts));
+
+  console.log(
+    `[KlineLogger] ✅ 本地命中 ${assetId}(${barType}): ${candles.length} 根, 最后 ${formatTimestamp(lastTs)}, 距今 ${(ageMs / 3600000).toFixed(2)}h`
+  );
+
+  return {
+    hit: true,
+    lastTs,
+    candleCount: candles.length,
+    data: { id: assetId, prices, ts, orign_data },
+  };
 }
