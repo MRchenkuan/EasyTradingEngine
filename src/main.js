@@ -48,6 +48,9 @@ const params = {
  */
 // 注入引擎状态 getter，让日志行首带上 [IDLE]/[BOOT]/[RUN]/[ERR]
 monitorServer.setEngineStatusGetter(() => TradeEngine.getStatusLabel());
+// 注入 TradeEngine / VisualEngine getter，让 tick 推送实时拉取最新数据（避免循环依赖）
+monitorServer.setTradeEngineGetter(() => TradeEngine);
+monitorServer.setVisualEngineGetter(() => VisualEngine);
 
 TradeEngine.setMetaInfo({
   main_asset: assets[0].id,
@@ -368,6 +371,17 @@ function initBusinessWebSocket() {
         const { open, close, ts } = parseCandleData(data[0]);
         TradeEngine.updateCandleData(instId, bar_type, data[0]);
         TradeEngine.updatePrice(instId, close, ts, bar_type);
+
+        // 实时 tick 推送（debounce 合并高频调用）
+        monitorServer.notifyTickUpdate();
+
+        // 实时 chart 推送（有新 K 线才发，payload 大需门控）
+        monitorServer.notifyChartUpdate();
+
+        // 实时跑 processor tick()：让 indicators 通道（shouldTrade/stopLossLevel/gridParams 等）也实时更新
+        if (TradeEngine._status === 2) {
+          TradeEngine.runAllProcessors();
+        }
 
         // 运行期活着日志：每资产首条 K 线 + 每 100 条汇总
         if (!klineFirstAck.has(instId)) {

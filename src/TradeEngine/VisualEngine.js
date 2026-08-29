@@ -723,14 +723,20 @@ export class VisualEngine {
     const assetIds = TradeEngine._asset_names;
     const beta_map = TradeEngine._beta_map;
 
-    const data = assetIds.map((assetId, i_info) => {
-      // 价格
-      const { prices, ts } = TradeEngine.getMarketData(assetId);
-      const start_price = prices[0];
-      const price = prices.at(-1);
-      const rate = (price - start_price) / start_price;
-      return [beta_map[assetId][0].toFixed(6), price, rate];
-    });
+    const data = assetIds
+      .map((assetId, i_info) => {
+        // 价格（防御 getMarketData 返回 undefined / prices 空数组）
+        const { prices } = TradeEngine.getMarketData(assetId) || {};
+        if (!Array.isArray(prices) || prices.length === 0) return null;
+        const start_price = prices[0];
+        const price = prices.at(-1);
+        const rate = (price - start_price) / start_price;
+        // 防御 LocalVariable proxy：beta_map[assetId] 可能是 non-array
+        const beta_raw = beta_map[assetId];
+        const beta = Array.isArray(beta_raw) ? beta_raw : [1, 0];
+        return [beta[0].toFixed(6), price, rate];
+      })
+      .filter(Boolean);
 
     const cellWidth = 90; // 单元格宽度
     const cellHeight = 20; // 单元格高度
