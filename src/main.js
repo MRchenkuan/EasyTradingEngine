@@ -48,9 +48,6 @@ const params = {
  */
 // 注入引擎状态 getter，让日志行首带上 [IDLE]/[BOOT]/[RUN]/[ERR]
 monitorServer.setEngineStatusGetter(() => TradeEngine.getStatusLabel());
-// 注入 TradeEngine / VisualEngine getter，让 tick 推送实时拉取最新数据（避免循环依赖）
-monitorServer.setTradeEngineGetter(() => TradeEngine);
-monitorServer.setVisualEngineGetter(() => VisualEngine);
 
 TradeEngine.setMetaInfo({
   main_asset: assets[0].id,
@@ -372,13 +369,7 @@ function initBusinessWebSocket() {
         TradeEngine.updateCandleData(instId, bar_type, data[0]);
         TradeEngine.updatePrice(instId, close, ts, bar_type);
 
-        // 实时 tick 推送（debounce 合并高频调用）
-        monitorServer.notifyTickUpdate();
-
-        // 实时 chart 推送（有新 K 线才发，payload 大需门控）
-        monitorServer.notifyChartUpdate();
-
-        // 实时跑 processor tick()：让 indicators 通道（shouldTrade/stopLossLevel/gridParams 等）也实时更新
+        // 实时跑 processor tick()：让交易信号计算和 indicators/tick/chart 三通道推送走秒级 cadence
         if (TradeEngine._status === 2) {
           TradeEngine.runAllProcessors();
         }

@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import os from 'os';
 import { config } from 'dotenv';
-import { formatTimestamp } from './tools.js';
 
 config();
 
@@ -31,16 +30,11 @@ export class MonitorServer {
     this.server = null;
     // 引擎状态 getter，由 main.js 在 TradeEngine 导入后注入
     this._engineStatusGetter = () => '';
-    // TradeEngine getter（实时拉取K线数据），由 main.js 注入
-    this._tradeEngineGetter = null;
-    // VisualEngine getter（实时拉取布林带数据），由 main.js 注入
-    this._visualEngineGetter = null;
-    // tick debounce 定时器：同一事件循环的多次调用合并为一次
+    // tick debounce：合并同一批次 runAllProcessors 里多资产重复推送
     this._tickDebounceTimer = null;
-    // chart debounce 定时器 + 每资产最后一次发送的 K 线时间戳（用于判断是否有新 K 线才推 chart）
+    // chart debounce（原始 candleCount 门控保留在 updateAsset 里，这里只管 debounce）
     this._chartDebounceTimer = null;
-    this._lastChartCandleTs = new Map();
-    // indicators debounce 定时器：runAllProcessors 里多个 processor 各触发一次 sendIndicators，合并为一次
+    // indicators debounce：合并多资产重复推送
     this._indicatorsDebounceTimer = null;
     // 三个 WebSocket 通道：
     // indicators - 轻量指标（position, gridParams, shouldTrade 等）
@@ -245,150 +239,33 @@ export class MonitorServer {
     return result;
   }
 
-  // 提取完整图表数据：candles/labels/boll 实时拉取 TradeEngine，其余（chip/orders/gridParams）从 assetData 快照取
   _extractChartData() {
     const result = {};
-    const TradeEngine = this._tradeEngineGetter?.();
-    const VisualEngine = this._visualEngineGetter?.();
-    const MAX_CANDLE = 800;
-
-    // 合并两个来源的资产名（启动早期 assetData 可能尚未填充）
-    const engineAssetNames = TradeEngine?.processors?.map(p => p.asset_name) || [];
-    const allAssetNames = new Set([...Object.keys(this.assetData), ...engineAssetNames]);
-
-    for (const name of allAssetNames) {
-      const snapshotChart = this.assetData[name]?.chartData;
-      const chartData = {};
-
-      if (TradeEngine) {
-        // 实时：candleData
-        const candles = TradeEngine.getCandleData(name);
-        if (candles && candles.length > 0) {
-          chartData.candleData = candles.slice(-MAX_CANDLE).map(it => ({
-            open: parseFloat(it.open),
-            close: parseFloat(it.close),
-            low: parseFloat(it.low),
-            high: parseFloat(it.high),
-            vol: parseFloat(it.vol),
-            ts: parseInt(it.ts),
-          }));
-          // 实时：labels
-          chartData.labels = chartData.candleData.map(c =>
-            formatTimestamp(c.ts, TradeEngine._bar_type)
-          );
-        } else if (snapshotChart?.candleData) {
-          chartData.candleData = snapshotChart.candleData;
-          chartData.labels = snapshotChart.labels;
-        }
-
-        // 实时：boll
-        if (VisualEngine) {
-          try {
-            const boll = VisualEngine.getBOLL(name);
-            if (boll) {
-              chartData.boll = {
-                upper: boll.upperArray.slice(-MAX_CANDLE),
-                middle: boll.middleArray.slice(-MAX_CANDLE),
-                lower: boll.lowerArray.slice(-MAX_CANDLE),
-              };
-            }
-          } catch (_) {
-            /* ignore */
-          }
-        }
-      }
-
-      // 以下字段变化频率低，继续用 assetData 快照
-      if (snapshotChart) {
-        for (const key of [
-          'chipDistribution',
-          'chipMaxVolume',
-          'chipStep',
-          'orders',
-          'position',
-          'gridParams',
-        ]) {
-          if (snapshotChart[key] != null) chartData[key] = snapshotChart[key];
-        }
-      }
-
-      // 至少有 candleData 才输出
-      if (chartData.candleData) {
-        result[name] = { chartData };
+    for (const [name, data] of Object.entries(this.assetData)) {
+      if (data.chartData) {
+        result[name] = { chartData: data.chartData };
       }
     }
     return result;
   }
 
-  // 提取最后一根K线的 tick 数据（优先实时拉取 TradeEngine/VisualEngine，fallback 到 assetData 快照）
   _extractTick() {
     const result = {};
-    const TradeEngine = this._tradeEngineGetter?.();
-    const VisualEngine = this._visualEngineGetter?.();
-
-    // 优先使用 TradeEngine 已知资产列表（覆盖启动早期 assetData 尚未填充的场景）
-    const engineAssetNames = TradeEngine?.processors?.map(p => p.asset_name) || [];
-    const allAssetNames = new Set([...Object.keys(this.assetData), ...engineAssetNames]);
-
-    for (const name of allAssetNames) {
-      let lastCandle = null;
-      let lastLabel = null;
-      let lastBoll = null;
-
-      if (TradeEngine) {
-        // 实时拉取：K 线
-        const candles = TradeEngine.getCandleData(name);
-        if (candles && candles.length > 0) {
-          const raw = candles[candles.length - 1];
-          lastCandle = {
-            open: parseFloat(raw.open),
-            close: parseFloat(raw.close),
-            low: parseFloat(raw.low),
-            high: parseFloat(raw.high),
-            vol: parseFloat(raw.vol),
-            ts: parseInt(raw.ts),
-          };
-          // 实时拉取：label（格式化时间戳）
-          lastLabel = formatTimestamp(lastCandle.ts, TradeEngine._bar_type);
-        }
-        // 实时拉取：BOLL
-        if (VisualEngine) {
-          try {
-            const boll = VisualEngine.getBOLL(name);
-            if (boll) {
-              lastBoll = {};
-              for (const band of ['upperArray', 'middleArray', 'lowerArray']) {
-                const arr = boll[band];
-                const key = band.replace('Array', '');
-                if (arr && arr.length > 0) {
-                  lastBoll[key] = arr[arr.length - 1];
-                }
-              }
-            }
-          } catch (_) {
-            /* BOLL 可能尚未就绪，忽略 */
-          }
-        }
-      } else {
-        // Fallback：早期 getter 未注入时，使用 assetData 快照
-        const chart = this.assetData[name]?.chartData;
-        if (chart && chart.candleData && chart.candleData.length > 0) {
-          lastCandle = chart.candleData[chart.candleData.length - 1];
-          lastLabel = chart.labels ? chart.labels[chart.labels.length - 1] : null;
-          if (chart.boll) {
-            lastBoll = {};
-            for (const band of ['upper', 'middle', 'lower']) {
-              if (chart.boll[band] && chart.boll[band].length > 0) {
-                lastBoll[band] = chart.boll[band][chart.boll[band].length - 1];
-              }
+    for (const [name, data] of Object.entries(this.assetData)) {
+      const chart = data.chartData;
+      if (chart && chart.candleData && chart.candleData.length > 0) {
+        const lastCandle = chart.candleData[chart.candleData.length - 1];
+        const lastLabel = chart.labels ? chart.labels[chart.labels.length - 1] : null;
+        const tick = { candle: lastCandle, label: lastLabel };
+        if (chart.boll) {
+          tick.boll = {};
+          for (const band of ['upper', 'middle', 'lower']) {
+            if (chart.boll[band] && chart.boll[band].length > 0) {
+              tick.boll[band] = chart.boll[band][chart.boll[band].length - 1];
             }
           }
         }
-      }
-
-      if (lastCandle) {
-        result[name] = { candle: lastCandle, label: lastLabel };
-        if (lastBoll) result[name].boll = lastBoll;
+        result[name] = tick;
       }
     }
     return result;
@@ -406,50 +283,16 @@ export class MonitorServer {
     }, 200);
   }
 
-  /** 公开的 tick 推送触发入口：供外部（如 main.js WS 消息处理）调用 */
-  notifyTickUpdate() {
-    this._scheduleSendTick();
-  }
-
   /**
-   * Debounced chart 推送：300ms 窗口合并 + 新 K 线 ts 门控。
-   * chart payload 较大（~1MB/资产），只有 K 线时间戳真正变化时才推送，避免每 5s tick 都推送。
+   * Debounced chart 推送：300ms 窗口合并多资产重复调用。
+   * 是否真的发送由 updateAsset() 里的 candleCount 门控决定（原始逻辑保留）。
    */
   _scheduleSendChart() {
     if (this._chartDebounceTimer) return;
     this._chartDebounceTimer = setTimeout(() => {
       this._chartDebounceTimer = null;
-      // 门控：至少有一个资产的最新 K 线 ts 比上次推送的更新，才发送 chart
-      const TradeEngine = this._tradeEngineGetter?.();
-      let anyNew = false;
-      if (TradeEngine) {
-        for (const p of TradeEngine.processors) {
-          const candles = TradeEngine.getCandleData(p.asset_name);
-          const lastTs = candles?.at(-1)?.ts;
-          if (lastTs && lastTs !== this._lastChartCandleTs.get(p.asset_name)) {
-            anyNew = true;
-            this._lastChartCandleTs.set(p.asset_name, lastTs);
-          }
-        }
-      } else {
-        // Fallback：getter 未注入时，走原有 candleCount 门控
-        for (const [name, data] of Object.entries(this.assetData)) {
-          const count = data.chartData?.candleData?.length || 0;
-          if (count !== this.lastCandleCount[name]) {
-            this.lastCandleCount[name] = count;
-            anyNew = true;
-          }
-        }
-      }
-      if (anyNew) {
-        this.sendChart();
-      }
+      this.sendChart();
     }, 300);
-  }
-
-  /** 公开的 chart 推送触发入口：供外部（如 main.js WS 收到新 K 线时）调用 */
-  notifyChartUpdate() {
-    this._scheduleSendChart();
   }
 
   redirectConsole() {
@@ -491,16 +334,6 @@ export class MonitorServer {
   /** 注入引擎状态 getter，TradeEngine 导入后在 main.js 中调用 */
   setEngineStatusGetter(fn) {
     this._engineStatusGetter = fn;
-  }
-
-  /** 注入 TradeEngine getter（避免循环依赖），用于实时拉取 K 线数据 */
-  setTradeEngineGetter(fn) {
-    this._tradeEngineGetter = fn;
-  }
-
-  /** 注入 VisualEngine getter（避免循环依赖），用于实时拉取 BOLL 数据 */
-  setVisualEngineGetter(fn) {
-    this._visualEngineGetter = fn;
   }
 
   updateAsset(name, data) {
