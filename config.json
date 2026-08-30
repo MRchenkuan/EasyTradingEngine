@@ -1,0 +1,93 @@
+{
+  "env": "PRODUCTION",
+  "trade_open": false,
+  "server_host": "localhost",
+  "drawdown_liquidation_threshold": 0.19,
+  "disable_chart": true,
+  "candle_limit": 1000,
+  "open_inerest_limit": 100,
+  "assets": [
+    {
+      "assetId": "BTC-USDT-SWAP",
+      "theme": "#f0b27a",
+      "params": {
+        "_upper_drawdown": 0.0075,
+        "_lower_drawdown": 0.0075,
+        "_grid_width": 0.005,
+        "_min_price": 40000,
+        "_max_price": 150000,
+        "_swap_value": 0.01,
+        "_base_amount": 60,
+        "_base_quantity": 10,
+        "_suppress_lots": 7,
+        "_survival_lots": 12,
+        "_settlement_type": "VALUE"
+      }
+    },
+    {
+      "assetId": "SOL-USDT-SWAP",
+      "theme": "#ad85e9",
+      "params": {
+        "_upper_drawdown": 0.0075,
+        "_lower_drawdown": 0.0075,
+        "_grid_width": 0.005,
+        "_min_price": 40,
+        "_max_price": 350,
+        "_base_amount": 30,
+        "_base_quantity": 10,
+        "_suppress_lots": 15,
+        "_survival_lots": 20,
+        "_settlement_type": "VALUE"
+      }
+    },
+    {
+      "assetId": "ETH-USDT-SWAP",
+      "theme": "#85c1e9",
+      "params": {
+        "_upper_drawdown": 0.0075,
+        "_lower_drawdown": 0.0075,
+        "_grid_width": 0.005,
+        "_min_price": 1200,
+        "_max_price": 6000,
+        "_base_amount": 30,
+        "_base_quantity": 10,
+        "_suppress_lots": 15,
+        "_survival_lots": 20,
+        "_settlement_type": "VALUE"
+      }
+    },
+    {
+      "assetId": "XRP-USDT-SWAP",
+      "theme": "#ffafde",
+      "params": {
+        "_upper_drawdown": 0.0075,
+        "_lower_drawdown": 0.0075,
+        "_grid_width": 0.005,
+        "_min_price": 0.5,
+        "_max_price": 5.0,
+        "_base_amount": 30,
+        "_base_quantity": 10,
+        "_suppress_lots": 15,
+        "_survival_lots": 20,
+        "_settlement_type": "VALUE"
+      }
+    },
+    {
+      "assetId": "TRUMP-USDT-SWAP",
+      "theme": "#03fe07",
+      "params": {
+        "_upper_drawdown": 0.0075,
+        "_lower_drawdown": 0.0075,
+        "_grid_width": 0.01,
+        "_min_price": 0.5,
+        "_max_price": 8.0,
+        "_base_amount": 10,
+        "_base_quantity": 10,
+        "_suppress_lots": 7,
+        "_survival_lots": 12,
+        "_settlement_type": "VALUE"
+      }
+    }
+  ],
+  "order_his_show": []
+}

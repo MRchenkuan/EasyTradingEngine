@@ -4,17 +4,17 @@ import { fileURLToPath } from 'url';
 import { BarType, SettlementType, StrategyType, TradeEnv } from './src/enum.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const strategiesPath = path.join(__dirname, 'records/strategies.json');
+const configPath = path.join(__dirname, 'config.json');
 
 // ==================== 策略配置（从 JSON 文件读取，支持运行时更新） ====================
 
 let _strategiesConfig = null;
 function loadStrategiesConfig() {
   try {
-    const raw = fs.readFileSync(strategiesPath, 'utf-8');
+    const raw = fs.readFileSync(configPath, 'utf-8');
     _strategiesConfig = JSON.parse(raw);
   } catch (e) {
-    console.error(`[config] 读取 ${strategiesPath} 失败，使用默认配置:`, e.message);
+    console.error(`[config] 读取 ${configPath} 失败，使用默认配置:`, e.message);
     _strategiesConfig = { assets: [], order_his_show: [] };
   }
 }

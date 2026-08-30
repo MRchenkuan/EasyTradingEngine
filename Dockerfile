@@ -53,6 +53,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/config.js ./
+COPY --from=builder /app/config.json ./
 COPY --from=builder /app/config.security.js ./
 COPY --from=builder /app/config.security.mimic.js ./
 COPY --from=builder /app/public ./public
