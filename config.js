@@ -39,6 +39,7 @@ export const Env = TradeEnv[_strategiesConfig.env] || TradeEnv.PRODUCTION;
 export const trade_open = _strategiesConfig.trade_open ?? false;
 export const disable_chart = _strategiesConfig.disable_chart ?? false;
 export const server_host = _strategiesConfig.server_host ?? 'localhost';
+export const initialEquity = _strategiesConfig.initial_equity ?? 0;
 
 // ==================== 风控配置 ====================
 // 清仓阈值从 JSON 读取，其余为代码默认值

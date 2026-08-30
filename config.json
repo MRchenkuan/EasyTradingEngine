@@ -2,6 +2,7 @@
   "env": "PRODUCTION",
   "trade_open": false,
   "server_host": "localhost",
+  "initial_equity": 100,
   "drawdown_liquidation_threshold": 0.19,
   "disable_chart": true,
   "candle_limit": 1000,

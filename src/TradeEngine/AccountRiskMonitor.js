@@ -1,7 +1,7 @@
 import { getAccountBalance } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import { monitorServer } from '../server.js';
-import { RiskControl } from '../../config.js';
+import { RiskControl, initialEquity } from '../../config.js';
 import { Liquidator } from './Liquidator.js';
 
 /**
@@ -412,12 +412,20 @@ export class AccountRiskMonitor {
       const bufferedMin = +(rangeMin - rangeSpan * 0.03).toFixed(4);
       if (bufferedMin < rangeMin) rangeMin = bufferedMin >= 0 ? bufferedMin : 0;
     }
-    // 收益率口径：分子=当前总权益，分母=总权益扣除已实现+未实现盈亏（即"本金"）
-    // yieldRate = totalEq / (totalEq - pnl) - 1 = pnl / 本金
-    // 本金 <= 0（盈亏亏损超过权益，理论上不应出现）时置 null，前端显示 '-'
+    // 收益率口径：优先使用 config.json 中的 initial_equity 作为固定基准（初始本金），
+    // totalReturn = confirmed - initialEquity，yieldRate = totalReturn / initialEquity
+    // 未配置（initial_equity <= 0）时 fallback 到原逻辑：本金 = 总权益 - 已实现 - 未实现
     const pnl = this.calcTotalPnl();
-    const principal = confirmed - pnl.total;
-    const yieldRate = principal > 0 ? pnl.total / principal : null;
+    let principal, totalReturn, yieldRate;
+    if (initialEquity > 0) {
+      principal = initialEquity;
+      totalReturn = confirmed - initialEquity;
+      yieldRate = totalReturn / initialEquity;
+    } else {
+      principal = confirmed - pnl.total;
+      totalReturn = pnl.total;
+      yieldRate = principal > 0 ? pnl.total / principal : null;
+    }
     this._account_balance = {
       totalEq: confirmed,
       upl: rawBalance ? parseFloat(rawBalance.upl || 0) : (prev.upl ?? 0),
