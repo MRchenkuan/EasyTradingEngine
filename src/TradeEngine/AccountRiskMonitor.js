@@ -288,17 +288,24 @@ export class AccountRiskMonitor {
   calcLeverage() {
     const confirmed = this._account_eq_stats.lastConfirmedEq;
     let notional = 0;
+    let netDirectionUsd = 0; // ΣnotionalUsd 带符号：正=净多，负=净空，0=对冲
+    let longNotional = 0;
+    let shortNotional = 0;
     for (const name of Object.keys(this.engine._position_list)) {
       const p = this.engine._position_list[name];
       if (!p) continue;
-      // 优先用 OKX positions 接口返回的 notionalUsd（标准字段，带符号；取绝对值累加）
+      const posSz = parseFloat(p.pos); // 持仓张数（带符号：正=多/负=空）
+      // 优先用 OKX positions 接口返回的 notionalUsd（绝对值），方向从 pos 符号获取
       let n = parseFloat(p.notionalUsd);
-      if (isFinite(n) && n !== 0) {
-        notional += Math.abs(n);
+      if (isFinite(n) && n !== 0 && isFinite(posSz) && posSz !== 0) {
+        const signedN = posSz > 0 ? n : -n; // 用 pos 符号决定方向
+        notional += n;
+        netDirectionUsd += signedN;
+        if (signedN > 0) longNotional += signedN;
+        else shortNotional += Math.abs(signedN);
         continue;
       }
       // Fallback：如果 notionalUsd 缺失/为 0/为 NaN，自己从 pos × ctVal × ctMult × 价格 计算
-      const posSz = parseFloat(p.pos); // 持仓张数（带符号：正=多/负=空）
       if (!isFinite(posSz) || posSz === 0) continue; // 没仓位 → 无名义
       const inst = this.engine._instrument_info[name]; // instrument info 缓存（含 ctVal/ctMult）
       const ctVal = inst ? parseFloat(inst.ctVal) : NaN;
@@ -317,7 +324,11 @@ export class AccountRiskMonitor {
       if (isFinite(ctVal) && isFinite(ctMult) && isFinite(price)) {
         const perContractValueUsd = ctVal * ctMult * price; // 每张合约的 USD 名义
         const n2 = Math.abs(posSz) * perContractValueUsd;
+        const signedN2 = posSz * perContractValueUsd; // 带符号
         notional += n2;
+        netDirectionUsd += signedN2;
+        if (signedN2 > 0) longNotional += signedN2;
+        else shortNotional += Math.abs(signedN2);
         // 仅在 notionalUsd 缺失时打印一次，方便后续定位字段缺失原因（按 assetName 节流）
         if (!this._lev_logged.has(name)) {
           this._lev_logged.add(name);
@@ -342,6 +353,10 @@ export class AccountRiskMonitor {
       level,
       notional: +notional.toFixed(2),
       ts: Date.now(),
+      // 多空方向聚合：ΣnotionalUsd 带符号
+      netDirectionUsd: +netDirectionUsd.toFixed(2), // 正=净多，负=净空，0=对冲
+      longNotional: +longNotional.toFixed(2),
+      shortNotional: +shortNotional.toFixed(2),
     };
     return this._account_leverage;
   }
@@ -425,6 +440,9 @@ export class AccountRiskMonitor {
       leverLevel: lev.level ?? 0,
       leverNotional: lev.notional ?? 0,
       leverTs: lev.ts || null,
+      netDirectionUsd: lev.netDirectionUsd ?? 0, // 净方向：正=净多，负=净空
+      longNotional: lev.longNotional ?? 0,
+      shortNotional: lev.shortNotional ?? 0,
       realizedPnl: +pnl.realized.toFixed(4),
       unrealizedPnl: +pnl.unrealized.toFixed(4),
       totalPnl: +pnl.total.toFixed(4),

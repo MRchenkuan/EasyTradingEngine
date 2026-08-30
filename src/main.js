@@ -21,7 +21,7 @@ import { subscribeKlineChanel, getMarketCallCount } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
 import { VisualEngine } from './TradeEngine/VisualEngine.js';
 import { startAutoFlush, stopAutoFlush, loadMarketData } from './TradeEngine/KlineLogger.js';
-import { KLine, MainGraph, Strategies } from '../config.js';
+import { KLine, MainGraph, Strategies, server_host } from '../config.js';
 
 const ws_connection_pool = {};
 
@@ -195,7 +195,9 @@ async function loadMarketDataWithFallback(assetIds, params) {
 
   // 第二轮：缺失的走 REST
   if (needREST.length > 0) {
-    console.log(`[KLINE] 需 REST 补拉 ${needREST.length}/${assetIds.length} 个资产: ${needREST.join(', ')}`);
+    console.log(
+      `[KLINE] 需 REST 补拉 ${needREST.length}/${assetIds.length} 个资产: ${needREST.join(', ')}`
+    );
     const restResults = await getKlinesWithRetry(needREST, params);
     results.push(...restResults);
   } else {
@@ -290,7 +292,7 @@ function startHeartbeatMonitor() {
         // 30s × 2 = 60s
         const assetsOn = assets.length;
         console.log(
-          `[WS] ✅ 心跳正常 · 距上次消息 ${Math.round(elapsed / 1000)}s · 订阅 ${assetsOn} 资产 · 连接存活 ${Math.round((Date.now() - _wsOpenTime) / 1000)}s`
+          `[WS] ✅ 心跳正常 · 距上次消息 ${Math.round(elapsed / 1000)}s · 订阅 ${assetsOn} 资产 · 连接存活 ${Math.round((Date.now() - _wsOpenTime) / 1000)}s · http://${server_host}:${monitorServer.port}/${monitorServer.currentToken}`
         );
       }
     }
@@ -331,7 +333,7 @@ function initBusinessWebSocket() {
     klineTickCounter = 0;
     console.log('ws_business已连接到服务器');
     console.log(
-      `监控服务器已启动，访问 http://154.9.24.206:${monitorServer.port}/${monitorServer.currentToken}`
+      `监控服务器已启动，访问 http://${server_host}:${monitorServer.port}/${monitorServer.currentToken}`
     );
     // 批量订阅（OKX 推荐一条消息带多个 args，避免订阅速率限制）
     const instIds = assets.map(it => it.id);
@@ -419,7 +421,6 @@ function initBusinessWebSocket() {
           }
         }
         klineTickCounter++;
-        
       }
     }
   });
@@ -474,7 +475,7 @@ async function handleWebSocketClose(code, reason) {
     console.warn(`将每 ${MAX_BACKOFF / 1000} 秒尝试一次重新连接`);
   }
 
-  // 等待后重新初始化
+  // 等待后重新连接
   await new Promise(resolve => setTimeout(resolve, backoffTime));
 
   const attemptInfo =
@@ -484,33 +485,20 @@ async function handleWebSocketClose(code, reason) {
   console.log(`正在尝试重新连接... ${attemptInfo}`);
 
   try {
-    // 重新获取数据
-    const klines = await getKlinesWithRetry(assetIds, {
-      ...params,
-      from_when: getLastWholeMinute(new Date()),
-      to_when: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).getTime(),
-    });
+    // 重连不需要重新拉 REST K 线 — 我们已有本地缓存，WS 重连后会自动推最新 K 线
+    // 只需要重新启动引擎 + 重建 WS 连接
+    console.log('[WS] 使用本地已有数据，跳过 REST 拉取，直接重连...');
 
-    if (klines && klines.length > 0) {
-      // 更新数据
-      klines.forEach(it => {
-        const { id, prices, ts, orign_data } = it;
-        TradeEngine.updateCandleDates(id, bar_type, orign_data);
-        TradeEngine.updatePrices(id, prices, ts, bar_type);
-      });
+    // 重启引擎（状态机从 IDLE 重新走 BOOT → RUN）
+    TradeEngine.start();
+    VisualEngine.start();
 
-      // 重新启动引擎
-      TradeEngine.start();
-      VisualEngine.start();
+    // 重置重连尝试计数器
+    reconnectAttempts = 0;
+    isReconnecting = false;
 
-      // 重置重连尝试计数器
-      reconnectAttempts = 0;
-      isReconnecting = false;
-      // 重新建立连接
-      initBusinessWebSocket();
-    } else {
-      throw new Error('获取K线数据失败');
-    }
+    // 重新建立 WS 连接（on open 里会自动订阅 candle 频道）
+    initBusinessWebSocket();
   } catch (error) {
     console.error('重连失败:', error.message);
     isReconnecting = false;

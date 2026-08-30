@@ -169,6 +169,30 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pos-direction {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: none;
+  line-height: 1.4;
+}
+.pos-direction.net-long {
+  background: rgba(236, 112, 99, 0.15);
+  color: #ec7063;
+}
+.pos-direction.net-short {
+  background: rgba(82, 190, 128, 0.15);
+  color: #52be80;
+}
+.pos-direction.net-hedge {
+  background: rgba(133, 146, 158, 0.15);
+  color: #85929e;
 }
 /* 主数值 + 收益率 pill：对齐 baseline，pill 底部和数字下沿齐平 */
 .balance-main-row {

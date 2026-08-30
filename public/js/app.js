@@ -173,6 +173,31 @@ function onAccountBalanceUpdate(payload) {
     }
   }
 
+  // ===== 多空方向聚合：净多 / 净空 / 对冲 =====
+  const dirEl = document.getElementById('posDirection');
+  if (dirEl) {
+    const netDir = parseFloat(payload.netDirectionUsd);
+    const totalNotional =
+      parseFloat(payload.longNotional || 0) + parseFloat(payload.shortNotional || 0);
+    if (totalNotional > 0 && isFinite(netDir)) {
+      const longPct = ((payload.longNotional || 0) / totalNotional) * 100;
+      const shortPct = ((payload.shortNotional || 0) / totalNotional) * 100;
+      if (netDir > 0) {
+        dirEl.textContent = `多 ${longPct.toFixed(0)}%`;
+        dirEl.className = 'pos-direction net-long';
+      } else if (netDir < 0) {
+        dirEl.textContent = `空 ${shortPct.toFixed(0)}%`;
+        dirEl.className = 'pos-direction net-short';
+      } else {
+        dirEl.textContent = '对冲';
+        dirEl.className = 'pos-direction net-hedge';
+      }
+      dirEl.style.display = '';
+    } else {
+      dirEl.style.display = 'none';
+    }
+  }
+
   // ===== 极值 =====
   const maxEq = payload.maxEq != null ? parseFloat(payload.maxEq) : NaN;
   const minEq = payload.minEq != null ? parseFloat(payload.minEq) : NaN;
