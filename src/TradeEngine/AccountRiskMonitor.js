@@ -227,17 +227,26 @@ export class AccountRiskMonitor {
   _updateExtremes(confirmed) {
     const stats = this._account_eq_stats;
     const mem = this._eq_mem;
+    const now = Date.now();
+    let peakUpdated = false;
     if (stats.maxEq == null || confirmed > stats.maxEq) {
       stats.maxEq = confirmed;
-      stats.maxEqTs = Date.now();
+      stats.maxEqTs = now;
       mem.maxEq = confirmed;
-      mem.maxEqTs = stats.maxEqTs;
+      mem.maxEqTs = now;
+      peakUpdated = true;
     }
-    if (stats.minEq == null || confirmed < stats.minEq) {
+    if (peakUpdated) {
+      // 峰值被刷新 → 谷值重置为当前值（新的统计周期起点）
       stats.minEq = confirmed;
-      stats.minEqTs = Date.now();
+      stats.minEqTs = now;
       mem.minEq = confirmed;
-      mem.minEqTs = stats.minEqTs;
+      mem.minEqTs = now;
+    } else if (stats.minEq == null || confirmed < stats.minEq) {
+      stats.minEq = confirmed;
+      stats.minEqTs = now;
+      mem.minEq = confirmed;
+      mem.minEqTs = now;
     }
   }
 

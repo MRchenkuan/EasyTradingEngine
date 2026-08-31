@@ -1,11 +1,67 @@
 window.TradingApp = window.TradingApp || {};
 window.TradingApp.ChartInteraction = {
+  // document 级 click 监听：点击 canvas 外区域 → unpin 所有 tooltip
+  // 只注册一次，setupInteractions 各 asset 共用
+  _docClickBound: false,
+  _lastTouchEndTs: 0, // 追踪最近一次 touchend，用于过滤移动端 synthetic click
+  _bindDocClick: function (self) {
+    if (this._docClickBound) return;
+    this._docClickBound = true;
+    const selfRef = this;
+
+    const isOutsideAllCharts = target => {
+      const canvasEls = document.querySelectorAll('canvas[id^="chart-"]');
+      for (const c of canvasEls) {
+        if (c.contains(target)) return false;
+      }
+      return true;
+    };
+
+    // ===== PC 端：click 事件 =====
+    document.addEventListener(
+      'click',
+      function (e) {
+        // 过滤移动端 synthetic click（touchend 后 ~300ms 触发的 click 不是真实 PC 点击）
+        if (Date.now() - selfRef._lastTouchEndTs < 500) return;
+        if (isOutsideAllCharts(e.target) && self.pinnedTooltip) {
+          for (const name of Object.keys(self.pinnedTooltip)) delete self.pinnedTooltip[name];
+          const el = document.getElementById('chartjs-tooltip');
+          if (el) el.style.opacity = '0';
+        }
+      },
+      true
+    ); // capture 阶段尽早捕获
+
+    // ===== 移动端：touchend 事件（原生 touch 事件，不走 synthetic click）=====
+    // 移动端没有真正的 click — 全部通过 touchend 处理"点击空白关闭"
+    document.addEventListener(
+      'touchend',
+      function (e) {
+        selfRef._lastTouchEndTs = Date.now();
+        const touch = e.changedTouches[0];
+        if (!touch) return;
+        // 用 elementFromPoint 拿到 touch 位置的 DOM 元素，判断是否在 canvas 外
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (el && isOutsideAllCharts(el) && self.pinnedTooltip) {
+          for (const name of Object.keys(self.pinnedTooltip)) delete self.pinnedTooltip[name];
+          const tip = document.getElementById('chartjs-tooltip');
+          if (tip) tip.style.opacity = '0';
+        }
+      },
+      true
+    );
+  },
+
   setupInteractions: function (self, assetName, chartInstance, canvasEl) {
+    // 确保全局 document click 监听已注册（只注册一次）
+    this._bindDocClick(self);
+
     // 初始化该资产的独立拖拽状态
     self.dragStates[assetName] = {
       isDragging: false,
       startX: 0,
       startOffset: 0,
+      mouseDownPos: null, // 记录 mousedown 坐标，排除拖动后的 click
     };
 
     // 计算每根K线占用的像素宽度
@@ -15,11 +71,81 @@ window.TradingApp.ChartInteraction = {
       return visibleCount > 0 ? xScale.width / visibleCount : 10;
     };
 
+    // 清除 pinned tooltip 并隐藏
+    const clearPinnedTooltip = () => {
+      if (self.pinnedTooltip?.[assetName]) {
+        delete self.pinnedTooltip[assetName];
+        const el = document.getElementById('chartjs-tooltip');
+        if (el) el.style.opacity = '0';
+        chartInstance.update('none');
+      }
+    };
+
+    // ===== 点击事件：pin / unpin tooltip（PC 端）=====
+    // candlestick body/成交量柱/BS文字标签由自定义 plugin 直接画 canvas，不注册为 dataset 元素，
+    // 所以用 intersect:false + mode 'index'：取最近 index（覆盖所有可视区域）
+    const interaction = window.TradingApp.ChartInteraction;
+    canvasEl.addEventListener('click', function (e) {
+      // 过滤移动端 synthetic click（touchend 后 300ms 内触发的 click 不是真实 PC 点击）
+      if (Date.now() - interaction._lastTouchEndTs < 500) return;
+
+      const ds = self.dragStates[assetName];
+      // 排除拖动后的 click：移动距离超过 5px 视为拖动
+      if (ds?.mouseDownPos) {
+        const dx = e.clientX - ds.mouseDownPos.x;
+        const dy = e.clientY - ds.mouseDownPos.y;
+        if (Math.sqrt(dx * dx + dy * dy) > 5) {
+          ds.mouseDownPos = null;
+          return;
+        }
+        ds.mouseDownPos = null;
+      }
+
+      const elements = chartInstance.getElementsAtEventForMode(
+        e,
+        'index',
+        { intersect: false },
+        false
+      );
+
+      if (elements.length === 0) {
+        clearPinnedTooltip();
+        return;
+      }
+
+      const idx = elements[0].index;
+      self.pinnedTooltip = self.pinnedTooltip || {};
+
+      // toggle：同一个 index 再次点击 → unpin，不同 index → 切换
+      if (self.pinnedTooltip[assetName]?.visibleIndex === idx) {
+        clearPinnedTooltip();
+      } else {
+        const rect = canvasEl.getBoundingClientRect();
+        const caretX = e.clientX - rect.left;
+        const caretY = e.clientY - rect.top;
+        self.pinnedTooltip[assetName] = {
+          visibleIndex: idx,
+          caretX,
+          caretY,
+        };
+        try {
+          chartInstance.tooltip.setActiveElements([{ datasetIndex: 0, index: idx }], {
+            x: caretX,
+            y: caretY,
+          });
+        } catch (_) {
+          // Chart.js v4 tooltip.setActiveElements 可能不存在，忽略
+        }
+        chartInstance.update('none');
+      }
+    });
+
     // ===== 鼠标拖动（仅平移，不缩放）=====
     canvasEl.addEventListener('mousedown', function (e) {
       self.dragStates[assetName].isDragging = true;
       self.dragStates[assetName].startX = e.clientX;
       self.dragStates[assetName].startOffset = self.viewports[assetName] || 0;
+      self.dragStates[assetName].mouseDownPos = { x: e.clientX, y: e.clientY };
       canvasEl.style.cursor = 'grabbing';
       e.preventDefault();
     });
@@ -39,6 +165,7 @@ window.TradingApp.ChartInteraction = {
       if (newOffset !== self.viewports[assetName]) {
         self.viewports[assetName] = newOffset;
         self.refreshViewport(assetName);
+        clearPinnedTooltip();
       }
     });
 
@@ -75,6 +202,7 @@ window.TradingApp.ChartInteraction = {
         if (newCount !== currentCount) {
           self.visibleCounts[assetName] = newCount;
           self.refreshViewport(assetName);
+          clearPinnedTooltip();
         }
       },
       { passive: false }
@@ -87,6 +215,7 @@ window.TradingApp.ChartInteraction = {
     let pinchStartCount = 0;
     let longPressTimer = null;
     let isLongPress = false;
+    let lastTouchPos = null; // 记录最近一次触摸坐标，用于 touchend 时 pin 定位
     const LONG_PRESS_DURATION = 400;
 
     // 将触摸 x 坐标转换为数据索引
@@ -123,6 +252,7 @@ window.TradingApp.ChartInteraction = {
         if (e.touches.length === 1) {
           touchStartX = e.touches[0].clientX;
           touchStartOffset = self.viewports[assetName] || 0;
+          lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
 
           // 启动长按计时器
           clearTimeout(longPressTimer);
@@ -159,6 +289,7 @@ window.TradingApp.ChartInteraction = {
           // 长按模式：滑动查看每根K线的 tooltip，禁止拖拽
           e.preventDefault();
           updateLongPressCrosshair(e.touches[0].clientX);
+          lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
           const touch = e.touches[0];
           const rect = canvasEl.getBoundingClientRect();
           const chartArea = chartInstance.chartArea;
@@ -189,6 +320,7 @@ window.TradingApp.ChartInteraction = {
           if (newOffset !== self.viewports[assetName]) {
             self.viewports[assetName] = newOffset;
             self.refreshViewport(assetName);
+            clearPinnedTooltip();
           }
         } else if (e.touches.length === 2) {
           // 双指缩放
@@ -202,6 +334,7 @@ window.TradingApp.ChartInteraction = {
             if (newCount !== self.visibleCounts[assetName]) {
               self.visibleCounts[assetName] = newCount;
               self.refreshViewport(assetName);
+              clearPinnedTooltip();
             }
           }
         }
@@ -213,14 +346,40 @@ window.TradingApp.ChartInteraction = {
       'touchend',
       function () {
         clearTimeout(longPressTimer);
+        // 在重置前捕获状态
+        const wasLongPress = isLongPress;
+        const lastIdx = self.longPressIndex?.[assetName];
+        const lastPos = lastTouchPos;
         isLongPress = false;
         if (self.longPressActive) delete self.longPressActive[assetName];
         canvasEl.style.cursor = 'grab';
         clearLongPressCrosshair();
-        // 松开时隐藏tooltip
-        const el = document.getElementById('chartjs-tooltip');
-        if (el) el.style.opacity = '0';
-        chartInstance._eventHandler({ type: 'mouseout', x: 0, y: 0, native: null });
+
+        if (wasLongPress && lastIdx !== undefined) {
+          // ===== 移动端长按释放：pin 住 tooltip，不隐藏 =====
+          const rect = canvasEl.getBoundingClientRect();
+          const caretX = lastPos ? lastPos.x - rect.left : 0;
+          const caretY = lastPos ? lastPos.y - rect.top : 0;
+          self.pinnedTooltip = self.pinnedTooltip || {};
+          self.pinnedTooltip[assetName] = {
+            visibleIndex: lastIdx,
+            caretX,
+            caretY,
+          };
+          try {
+            chartInstance.tooltip.setActiveElements([{ datasetIndex: 0, index: lastIdx }], {
+              x: caretX,
+              y: caretY,
+            });
+          } catch (_) {
+            /* ignore */
+          }
+          chartInstance.update('none');
+        } else {
+          // 非长按的短按：如果已有 pinned 则取消（"tap blank to close" on mobile canvas）
+          clearPinnedTooltip();
+          chartInstance._eventHandler({ type: 'mouseout', x: 0, y: 0, native: null });
+        }
       },
       { passive: true }
     );

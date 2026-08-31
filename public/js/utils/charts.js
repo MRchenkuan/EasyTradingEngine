@@ -162,6 +162,7 @@ window.TradingApp.Charts = {
     this.chartDataCache = {};
     this.viewports = {};
     this.visibleCounts = {};
+    this.pinnedTooltip = {};
   },
 
   renderChart: function (assetName, chartData) {

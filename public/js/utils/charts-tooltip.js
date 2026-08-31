@@ -11,6 +11,123 @@ window.TradingApp.ChartTooltip = {
         document.body.appendChild(tooltipEl);
       }
 
+      const cached = self.chartDataCache[assetName];
+      if (!cached) return;
+
+      // ===== pinned 模式：点击后固定显示，忽略 hover 状态 =====
+      const pinned = self.pinnedTooltip?.[assetName];
+      if (pinned != null) {
+        const visibleIndex = pinned.visibleIndex;
+        // 越界检查：viewport 变化后 index 可能不再有效 → 自动清除 stale pin
+        if (visibleIndex < 0 || visibleIndex >= cached.candleData.length) {
+          delete self.pinnedTooltip[assetName];
+          tooltipEl.style.opacity = '0';
+          return;
+        }
+        const candle = cached.candleData[visibleIndex];
+        if (!candle) {
+          delete self.pinnedTooltip[assetName];
+          tooltipEl.style.opacity = '0';
+          return;
+        }
+
+        const label = cached.labels[visibleIndex] || '';
+
+        // 构建tooltip内容
+        let innerHtml = '<thead>';
+        innerHtml += `<tr><th style="text-align:left; padding:4px 0; font-size:12px; color:#a5d6ff;">${label}</th></tr>`;
+        innerHtml += '</thead><tbody>';
+
+        // K线价格信息
+        innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">开: <span style="color:#c9d1d9;">${self.formatPrice(candle.open)}</span> 高: <span style="color:#ec7063;">${self.formatPrice(candle.high)}</span></td></tr>`;
+        innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">低: <span style="color:#52be80;">${self.formatPrice(candle.low)}</span> 收: <span style="color:${candle.close >= candle.open ? '#ec7063' : '#52be80'};">${self.formatPrice(candle.close)}</span></td></tr>`;
+
+        // 成交额
+        const vol = cached.volData ? cached.volData[visibleIndex] : null;
+        if (vol != null) {
+          const volStr =
+            vol >= 1000000
+              ? (vol / 1000000).toFixed(2) + 'M'
+              : vol >= 1000
+                ? (vol / 1000).toFixed(1) + 'K'
+                : vol.toFixed(0);
+          innerHtml += `<tr><td style="padding:2px 0; font-size:11px; color:#8b949e;">额: <span style="color:#c9d1d9;">$${volStr}</span></td></tr>`;
+        }
+
+        // 计算全局索引查找买卖点
+        const { start: viewStart } = self.getVisibleRange(assetName);
+        const globalIndex = viewStart + visibleIndex;
+        const orders = cached.orderInfoMap[globalIndex];
+        if (orders && orders.length > 0) {
+          innerHtml += `<tr><td style="padding:6px 0 2px 0; border-top:1px solid #30363d;"></td></tr>`;
+          orders.forEach(order => {
+            const isBuy = order.side === 'buy';
+            const color = isBuy ? '#ec7063' : '#52be80';
+            const orderLabel = isBuy ? '买入' : '卖出';
+            innerHtml += `<tr><td style="padding:3px 0; font-size:11px;">`;
+            innerHtml += `<span style="color:${color}; font-weight:bold;">${orderLabel}</span>`;
+            innerHtml += ` <span style="color:#c9d1d9;">${self.formatPrice(order.price)}</span>`;
+            innerHtml += ` <span style="color:#8b949e;">×${order.amount}</span>`;
+            innerHtml += ` <span style="color:#8b949e;">(${order.gridCount > 0 ? '+' : ''}${order.gridCount}格)</span>`;
+            innerHtml += `</td></tr>`;
+          });
+        }
+
+        innerHtml += '</tbody>';
+
+        const tableRoot = tooltipEl.querySelector('table');
+        tableRoot.innerHTML = innerHtml;
+
+        tooltipEl.style.opacity = '1';
+        tooltipEl.style.position = 'absolute';
+        tooltipEl.style.backgroundColor = 'rgba(22, 27, 34, 0.95)';
+        tooltipEl.style.border = '1px solid #ec7063';
+        tooltipEl.style.borderRadius = '6px';
+        tooltipEl.style.padding = '8px 12px';
+        tooltipEl.style.pointerEvents = 'none';
+        tooltipEl.style.zIndex = '1000';
+        tooltipEl.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+
+        // 定位：用 chart 的 scales 把 visibleIndex 换算成像素坐标
+        const chart = context.chart;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        const bodyData = chart.data.datasets[0]?.data || [];
+        const closeVal = bodyData[visibleIndex];
+        let caretX, caretY;
+        try {
+          caretX = xScale.getPixelForValue(visibleIndex);
+          caretY = yScale.getPixelForValue(closeVal) - 10;
+        } catch (e) {
+          // fallback 到 pinned 原始坐标
+          caretX = pinned.caretX ?? 0;
+          caretY = pinned.caretY ?? 0;
+        }
+        const position = chart.canvas.getBoundingClientRect();
+        let tooltipX = position.left + window.pageXOffset + caretX;
+        let tooltipY = position.top + window.pageYOffset + caretY;
+
+        tooltipEl.style.left = tooltipX + 'px';
+        tooltipEl.style.top = tooltipY + 'px';
+        tooltipEl.style.minWidth = '160px';
+
+        // 确保tooltip不超出屏幕
+        const tooltipRect = tooltipEl.getBoundingClientRect();
+        if (tooltipRect.right > window.innerWidth) {
+          tooltipX = position.left + window.pageXOffset + caretX - tooltipRect.width - 10;
+          tooltipEl.style.left = tooltipX + 'px';
+        }
+        if (tooltipRect.bottom > window.innerHeight) {
+          tooltipY = position.top + window.pageYOffset + caretY - tooltipRect.height - 20;
+          tooltipEl.style.top = tooltipY + 'px';
+        }
+        if (tooltipRect.left < 0) {
+          tooltipEl.style.left = position.left + window.pageXOffset + 10 + 'px';
+        }
+        return;
+      }
+
+      // ===== 非 pinned 模式：hover 逻辑 =====
       // PC端（可悬停设备）：非拖动状态下允许tooltip显示
       // 移动端：仅长按模式下显示tooltip（避免拖拽时误触发）
       const isHoverable = window.matchMedia('(hover: hover)').matches;
@@ -37,7 +154,6 @@ window.TradingApp.ChartTooltip = {
       }
 
       const visibleIndex = dataPoint.dataIndex;
-      const cached = self.chartDataCache[assetName];
       const candle = cached.candleData[visibleIndex];
       if (!candle) {
         tooltipEl.style.opacity = '0';
