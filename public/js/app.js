@@ -59,6 +59,36 @@ function _formatPoint(h) {
   return { label, equity: h.equity, ts: h.ts };
 }
 
+/**
+ * 根据当前 granularity 对应的窗口，计算从窗口起点到当前的收益率
+ * @param {Array} history [{ ts, equity }, ...] 升序
+ * @param {'day'|'week'|'month'|'year'|'all'} gran
+ * @param {number} currentEq 当前总权益
+ * @returns {number|null} yield 小数形式，不够数据返回 null
+ */
+function _calcWindowYield(history, gran, currentEq) {
+  if (!history || history.length < 2 || !isFinite(currentEq)) return null;
+  const points = _filterHistoryByWindow(history, gran);
+  if (points.length < 2) return null;
+  const startEq = points[0].equity;
+  if (!isFinite(startEq) || startEq <= 0) return null;
+  return (currentEq - startEq) / startEq;
+}
+
+/** 渲染收益率 pill（按当前 miniGran 窗口） */
+function _renderYield(currentEq) {
+  const yEl = document.getElementById('totalEquityYield');
+  if (!yEl) return;
+  const yr = _calcWindowYield(equityHistory, miniGran, currentEq);
+  if (yr != null && isFinite(yr)) {
+    yEl.style.display = '';
+    yEl.textContent = (yr >= 0 ? '+' : '') + (yr * 100).toFixed(2) + '%';
+    yEl.className = 'balance-yield ' + (yr >= 0 ? 'pos' : 'neg');
+  } else {
+    yEl.style.display = 'none';
+  }
+}
+
 /** 销毁并重建迷你 Chart.js 线图 */
 function _renderMiniEqChart(gran) {
   const canvas = document.getElementById('equityMiniCanvas');
@@ -175,6 +205,10 @@ function _bindMiniEqToggles() {
         b.classList.toggle('active', b === btn);
       });
       _renderMiniEqChart(miniGran);
+      // 同步：按新窗口重算收益率
+      const valEl = document.getElementById('totalEquityValue');
+      const v = valEl ? parseFloat(valEl.textContent.replace(/[^\d.-]/g, '')) : NaN;
+      if (isFinite(v)) _renderYield(v);
     });
   });
 }
@@ -328,6 +362,79 @@ function _setLabelPos(el, pct) {
   else el.style.transform = 'translateX(-50%)';
 }
 
+/**
+ * 标签碰撞避让：把同一行的多个绝对定位标签从左到右挤开，
+ * 保持最小间距且不溢出容器两端。
+ * 统一使用 translateX(-50%) 中心对齐，算法简单。
+ *
+ * @param {HTMLElement} rowEl 标签行容器（relative 定位）
+ * @param {Array<{el:HTMLElement, targetPct:number}>} entries 目标位置（任意顺序）
+ * @param {number} [gapPx=8] 标签间最小间隔（像素）
+ * @param {number} [sidePadPx=4] 距容器两侧最小边界（像素）
+ */
+function _resolveLabelCollisions(rowEl, entries, gapPx = 8, sidePadPx = 4) {
+  if (!rowEl || !entries || entries.length === 0) return;
+
+  // 按 targetPct 升序
+  entries.sort((a, b) => a.targetPct - b.targetPct);
+  const visible = entries.filter(e => e.el && e.el.style.display !== 'none');
+
+  if (visible.length === 0) return;
+  if (visible.length === 1) {
+    const e = visible[0];
+    e.el.style.left = e.targetPct + '%';
+    e.el.style.transform = 'translateX(-50%)';
+    return;
+  }
+
+  const containerW = rowEl.getBoundingClientRect().width;
+  if (containerW <= 0) return;
+
+  // 临时应用期望位置（清 transform）→ 强制 layout → 读真实宽度
+  for (const e of visible) {
+    e.el.style.transform = '';
+    e.el.style.left = e.targetPct + '%';
+  }
+  void rowEl.offsetWidth; // 强制 layout
+
+  // 读真实宽度并换算成半宽百分比
+  for (const e of visible) {
+    e.width = e.el.getBoundingClientRect().width;
+    e.halfPct = (e.width / 2 / containerW) * 100;
+  }
+  const gapPct = (gapPx / containerW) * 100;
+  const padPct = (sidePadPx / containerW) * 100;
+
+  const MIN_CENTER = padPct + visible[0].halfPct;
+  const MAX_CENTER = 100 - padPct - visible[visible.length - 1].halfPct;
+
+  // 第一遍：左→右推挤
+  visible[0].finalPct = Math.max(MIN_CENTER, visible[0].targetPct);
+  for (let i = 1; i < visible.length; i++) {
+    const prev = visible[i - 1];
+    const cur = visible[i];
+    const minP = prev.finalPct + prev.halfPct + gapPct + cur.halfPct;
+    cur.finalPct = Math.max(cur.targetPct, minP);
+  }
+  // 最后一个钳制上限
+  visible[visible.length - 1].finalPct = Math.min(visible[visible.length - 1].finalPct, MAX_CENTER);
+
+  // 第二遍：右→左回溯，解决"右邻居被钳死但左邻居还顶着"的情况
+  for (let i = visible.length - 2; i >= 0; i--) {
+    const cur = visible[i];
+    const next = visible[i + 1];
+    const maxP = next.finalPct - next.halfPct - gapPct - cur.halfPct;
+    if (cur.finalPct > maxP) cur.finalPct = maxP;
+    if (cur.finalPct < MIN_CENTER) cur.finalPct = MIN_CENTER;
+  }
+
+  // 应用最终位置
+  for (const e of visible) {
+    e.el.style.left = e.finalPct + '%';
+    e.el.style.transform = 'translateX(-50%)';
+  }
+}
+
 function onAccountBalanceUpdate(payload) {
   if (!payload) return;
   const el = document.getElementById('totalEquity');
@@ -338,18 +445,8 @@ function onAccountBalanceUpdate(payload) {
     val.textContent = '$ ' + totalEq.toFixed(2);
   }
 
-  // ===== 收益率（盈亏/本金，本金 = 总权益 - 已实现 - 未实现） =====
-  const yEl = document.getElementById('totalEquityYield');
-  if (yEl) {
-    const yr = parseFloat(payload.yieldRate);
-    if (payload.yieldRate != null && isFinite(yr)) {
-      yEl.style.display = '';
-      yEl.textContent = (yr >= 0 ? '+' : '') + (yr * 100).toFixed(2) + '%';
-      yEl.className = 'balance-yield ' + (yr >= 0 ? 'pos' : 'neg');
-    } else {
-      yEl.style.display = 'none';
-    }
-  }
+  // ===== 收益率：按当前迷你图窗口起点 → 当前总权益算 =====
+  _renderYield(totalEq);
 
   // ===== 迷你每日权益走势图 =====
   // equityHistory: null = 后端无新快照，保留前端缓存；array = 有新快照，更新缓存并重建
@@ -446,7 +543,7 @@ function onAccountBalanceUpdate(payload) {
   const rMin = payload.rangeMin != null ? parseFloat(payload.rangeMin) : NaN;
   const rMax = payload.rangeMax != null ? parseFloat(payload.rangeMax) : NaN;
 
-  // 上方刻度标签：谷/峰（峰恒在 100% 右端，谷按刻度定位到 minEq 位置）
+  // 上方刻度标签：谷/峰
   const hLabel = document.getElementById('eqHLabel');
   const lLabel = document.getElementById('eqLLabel');
   const hlRow = hLabel && hLabel.parentElement;
@@ -455,19 +552,19 @@ function onAccountBalanceUpdate(payload) {
   // 轴用后端 rangeMin/rangeMax（保证清仓线/谷值永远落在可视区内）
   const haveRange = isFinite(rMin) && isFinite(rMax);
 
+  // 先统一设 display + text，位置稍后统一挤开
+  let hPct = null;
+  let lPct = null;
   if (lLabel) {
     if (isFinite(minEq)) {
       lLabel.textContent = '$ ' + minEq.toFixed(0);
       lLabel.style.display = '';
-      if (haveRange) {
-        const pct = _posPct(minEq, rMin, rMax);
-        _setLabelPos(lLabel, pct);
-      }
+      if (haveRange) lPct = _posPct(minEq, rMin, rMax);
     } else {
       lLabel.style.display = 'none';
     }
   }
-  // 谷值刻度线
+  // 谷值刻度线（仍按原始数值定位——刻度线不避碰，只有标签避碰）
   if (minEl && haveRange && isFinite(minEq)) {
     const pct = _posPct(minEq, rMin, rMax);
     if (pct != null) minEl.style.left = pct + '%';
@@ -479,6 +576,7 @@ function onAccountBalanceUpdate(payload) {
     if (isFinite(maxEq)) {
       hLabel.textContent = '$ ' + maxEq.toFixed(0);
       hLabel.style.display = '';
+      hPct = 100; // 峰恒在右端
     } else {
       hLabel.style.display = 'none';
     }
@@ -488,6 +586,16 @@ function onAccountBalanceUpdate(payload) {
       (hLabel && hLabel.style.display !== 'none') || (lLabel && lLabel.style.display !== 'none')
         ? ''
         : 'none';
+  }
+
+  // 【挤开】上方谷/峰标签碰撞避让
+  if (hlRow && hlRow.style.display !== 'none') {
+    const entries = [];
+    if (lLabel && lLabel.style.display !== 'none' && lPct != null)
+      entries.push({ el: lLabel, targetPct: lPct });
+    if (hLabel && hLabel.style.display !== 'none' && hPct != null)
+      entries.push({ el: hLabel, targetPct: hPct });
+    _resolveLabelCollisions(hlRow, entries, 8, 4);
   }
 
   // ===== 区间条图：填充层 + 当前标记 =====
@@ -508,14 +616,12 @@ function onAccountBalanceUpdate(payload) {
     }
   }
 
-  // 再平衡线刻度线 + 标签（按刻度定位到 rebalEq 位置）
+  // 再平衡线刻度线 + 标签（先只设 display/text，位置等统一挤开）
   let hasRebal = false;
+  let rebalPct = null;
   if (rebalEl && haveRange && isFinite(rebalEq)) {
-    const pct = _posPct(rebalEq, rMin, rMax);
-    if (pct != null) {
-      rebalEl.style.left = pct + '%';
-      _setLabelPos(rebalLabel, pct);
-    }
+    rebalPct = _posPct(rebalEq, rMin, rMax);
+    if (rebalPct != null) rebalEl.style.left = rebalPct + '%';
     rebalEl.style.display = '';
     _setTextIfChanged(rebalLabel, '再平衡 $ ' + rebalEq.toFixed(0));
     if (rebalLabel) rebalLabel.style.display = '';
@@ -525,14 +631,12 @@ function onAccountBalanceUpdate(payload) {
     if (rebalLabel) rebalLabel.style.display = 'none';
   }
 
-  // 清仓线刻度线 + 标签（按刻度定位到 liqEq 位置）
+  // 清仓线刻度线 + 标签（同上）
   let hasLiq = false;
+  let liqPct = null;
   if (liqEl && haveRange && isFinite(liqEq)) {
-    const pct = _posPct(liqEq, rMin, rMax);
-    if (pct != null) {
-      liqEl.style.left = pct + '%';
-      _setLabelPos(liqLabel, pct);
-    }
+    liqPct = _posPct(liqEq, rMin, rMax);
+    if (liqPct != null) liqEl.style.left = liqPct + '%';
     liqEl.style.display = '';
     _setTextIfChanged(liqLabel, '止损线 $ ' + liqEq.toFixed(0));
     if (liqLabel) liqLabel.style.display = '';
@@ -545,6 +649,15 @@ function onAccountBalanceUpdate(payload) {
   // sublegend 整行：无任何刻度标签时隐藏避免占行
   if (subLegend) {
     subLegend.style.display = hasRebal || hasLiq ? '' : 'none';
+  }
+
+  // 【挤开】下方刻度标签碰撞避让（止损 / 再平衡）
+  if (subLegend && (hasRebal || hasLiq)) {
+    const entries = [];
+    if (hasRebal && rebalLabel && rebalPct != null)
+      entries.push({ el: rebalLabel, targetPct: rebalPct });
+    if (hasLiq && liqLabel && liqPct != null) entries.push({ el: liqLabel, targetPct: liqPct });
+    _resolveLabelCollisions(subLegend, entries, 8, 4);
   }
 
   // ===== 回撤率 =====

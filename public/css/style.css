@@ -397,7 +397,6 @@ body {
 }
 .eq-hl-l {
   color: var(--tag-red);
-  left: 0;
 }
 .eq-hl-l::before {
   content: '谷';
@@ -405,8 +404,6 @@ body {
 }
 .eq-hl-h {
   color: var(--tag-green);
-  left: 100%;
-  transform: translateX(-100%);
 }
 .eq-hl-h::before {
   content: '峰';

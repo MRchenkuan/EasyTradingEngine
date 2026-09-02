@@ -3,7 +3,7 @@
   "trade_open": false,
   "server_host": "localhost",
   "initial_equity": 100,
-  "drawdown_liquidation_threshold": 0.20,
+  "drawdown_liquidation_threshold": 0.2,
   "rebalance_threshold": 0.15,
   "disable_chart": true,
   "candle_limit": 1000,
