@@ -44,11 +44,14 @@ export const initialEquity = _strategiesConfig.initial_equity ?? 0;
 // ==================== 风控配置 ====================
 // 清仓阈值从 JSON 读取，其余为代码默认值
 const _liquidationThreshold = _strategiesConfig.drawdown_liquidation_threshold ?? 0.19;
+const _rebalanceThreshold = _strategiesConfig.rebalance_threshold ?? 0.1;
 
 export const RiskControl = {
   // 回撤控制（口径见 docs/drawdown-liquidation-design.md）
   drawdown_liquidation_threshold: _liquidationThreshold,
   drawdown_warn_threshold: 0.1, // 纯展示用，无业务行为
+  // 再平衡线：回撤至此触发再平衡（纯展示刻度，实际再平衡逻辑后续实现）
+  rebalance_threshold: _rebalanceThreshold,
   // 余额跳变防护：raw 与 confirmed 偏差超此阈值视为可疑，需连续两次相近才采纳
   // 阈值 0.3 > 回撤清仓线 0.2，保证真实 20% 回撤能即时反映，仅 >30% 的跳变需确认
   balance_jump_threshold: 0.3,

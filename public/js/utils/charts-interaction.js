@@ -81,9 +81,10 @@ window.TradingApp.ChartInteraction = {
       }
     };
 
-    // ===== 点击事件：pin / unpin tooltip（PC 端）=====
+    // ===== 点击事件：仅点击到"有订单的 K 线 / BS 标记"才 pin tooltip（PC 端）=====
     // candlestick body/成交量柱/BS文字标签由自定义 plugin 直接画 canvas，不注册为 dataset 元素，
     // 所以用 intersect:false + mode 'index'：取最近 index（覆盖所有可视区域）
+    // 但只有该 K 线（全局索引）有订单记录时才 pin，否则取消已有的 pin
     const interaction = window.TradingApp.ChartInteraction;
     canvasEl.addEventListener('click', function (e) {
       // 过滤移动端 synthetic click（touchend 后 300ms 内触发的 click 不是真实 PC 点击）
@@ -114,9 +115,25 @@ window.TradingApp.ChartInteraction = {
       }
 
       const idx = elements[0].index;
-      self.pinnedTooltip = self.pinnedTooltip || {};
 
-      // toggle：同一个 index 再次点击 → unpin，不同 index → 切换
+      // ===== 检查该 index 对应的 K 线是否有订单 =====
+      const cached = self.chartDataCache[assetName];
+      let hasOrders = false;
+      if (cached && cached.orderInfoMap) {
+        const { start: viewStart } = self.getVisibleRange(assetName);
+        const globalIndex = viewStart + idx;
+        const orders = cached.orderInfoMap[globalIndex];
+        hasOrders = !!(orders && orders.length > 0);
+      }
+
+      if (!hasOrders) {
+        // 没有订单的 K 线 → 不 pin，且清除已有 pin（如果之前 pin 的是别的有订单的 K 线）
+        clearPinnedTooltip();
+        return;
+      }
+
+      // 有订单 → toggle pin（同一个 index 再次点击 → unpin，不同 index → 切换）
+      self.pinnedTooltip = self.pinnedTooltip || {};
       if (self.pinnedTooltip[assetName]?.visibleIndex === idx) {
         clearPinnedTooltip();
       } else {

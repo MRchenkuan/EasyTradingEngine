@@ -15,7 +15,7 @@
 <body>
   <!-- ================= 账户概览主卡（一层结构，顶部内嵌 META） ================= -->
   <div class="h-balance" id="totalEquity" style="display:none;">
-    <!-- 顶部：META 内嵌（只有时间 + WS，品牌整行删除，避免两层） -->
+    <!-- 顶部：META 内嵌（左=时间；右=WS） -->
     <div class="h-meta-row">
       <span class="h-meta-time">🕒 <span id="currentTime">-</span></span>
       <div class="h-meta-ws">
@@ -24,12 +24,25 @@
       </div>
     </div>
 
-    <!-- ▓▓ 左块：上=标签；下=数字 ▓▓ -->
+    <!-- ▓▓ 左块：左侧=标签+数值（纵向）；右侧=迷你走势图（窄版） ▓▓ -->
     <section class="balance-left">
-      <div class="balance-k">总权益 <span class="pos-direction" id="posDirection" style="display:none;"></span></div>
-      <div class="balance-main-row">
-        <div class="balance-v" id="totalEquityValue">$ 0.00</div>
-        <span class="balance-yield" id="totalEquityYield" style="display:none;"></span>
+      <div class="balance-left-main">
+        <div class="balance-k">总权益</div>
+        <div class="balance-main-row">
+          <div class="balance-v" id="totalEquityValue">$ 0.00</div>
+          <span class="balance-yield" id="totalEquityYield" style="display:none;"></span>
+        </div>
+      </div>
+      <!-- 迷你权益走势图：窄版，和数值并排 -->
+      <div class="mini-eq-chart" id="miniEqChart" style="display:none;">
+        <canvas id="equityMiniCanvas" width="160" height="48"></canvas>
+        <div class="mini-eq-toggles">
+          <button class="mini-toggle active" data-gran="day">日</button>
+          <button class="mini-toggle" data-gran="week">周</button>
+          <button class="mini-toggle" data-gran="month">月</button>
+          <button class="mini-toggle" data-gran="year">年</button>
+          <button class="mini-toggle" data-gran="all">全部</button>
+        </div>
       </div>
     </section>
 
@@ -46,12 +59,14 @@
       <div class="eq-range-bar">
         <div class="eq-range-fill" id="eqRangeFill"></div>
         <div class="eq-range-marker eq-range-marker-min" id="eqMarkerMin"></div>
+        <div class="eq-range-marker eq-range-marker-rebalance" id="eqMarkerRebal"></div>
         <div class="eq-range-marker eq-range-marker-liquidation" id="eqMarkerLiq"></div>
         <div class="eq-range-marker eq-range-marker-current" id="eqRangeMarker"></div>
       </div>
 
-      <!-- 下方刻度标签：清仓线，按刻度位置定位 -->
+      <!-- 下方刻度标签：再平衡线 / 清仓线，按刻度位置定位 -->
       <div class="eq-range-sublegend" id="eqSublegend">
+        <span id="eqRebalLabel" style="display:none;">再平衡 $ -</span>
         <span id="eqLiqLabel" style="display:none;">止损线 $ -</span>
       </div>
     </section>
@@ -59,7 +74,7 @@
     <!-- ▓▓ 分隔竖线（视觉） ▓▓ -->
     <div class="balance-divider" aria-hidden="true"></div>
 
-    <!-- ▓▓ 右块：风险指标 4 格横排（回撤/杠杆/总头寸/资产数） ▓▓ -->
+    <!-- ▓▓ 右块：顶部=4格风险指标；底部=多空堆叠条 ▓▓ -->
     <section class="balance-right">
       <div class="metric-box">
         <div class="metric-box-k">当前回撤</div>
@@ -75,7 +90,18 @@
       </div>
       <div class="metric-box metric-box-asset">
         <div class="metric-box-k">持仓资产</div>
-        <div class="metric-box-v metric-asset-count" id="assetCountBig">0</div>
+        <div class="metric-box-v metric-asset-count">
+          <span id="assetCountBig">0</span>
+          <span class="metric-dir-badge" id="assetDirBadge" style="display:none;"></span>
+        </div>
+      </div>
+      <!-- 头寸方向堆叠条：底部，左=空(绿)、右=多(红)，白色 50% 中线=再平衡参考 -->
+      <div class="pos-split-bar" id="posSplitBar" style="display:none;">
+        <div class="pos-split-track">
+          <div class="pos-split-shorts" id="posSplitShorts"></div>
+          <div class="pos-split-center" title="50% 再平衡中线"></div>
+          <div class="pos-split-longs" id="posSplitLongs"></div>
+        </div>
       </div>
     </section>
   </div>

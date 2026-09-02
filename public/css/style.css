@@ -53,14 +53,15 @@ body {
 }
 
 /* 一张主卡：顶层外框 + 两行 grid（行1=META横跨全宽；行2=3段2分隔 5 列） */
+/* 主卡行 2：左块自适应（内部 space-between），剩余空间给中块+右块 */
 .h-balance {
   display: grid;
   grid-template-columns:
-    1.2fr
-    min-content
-    1.8fr
-    min-content
-    1fr;
+    auto /* balance-left: 内部 space-between */
+    min-content /* divider */
+    1.4fr /* balance-chart: 进度条 */
+    min-content /* divider */
+    1fr; /* balance-right: 指标区 */
   grid-template-rows: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 10px;
@@ -153,14 +154,23 @@ body {
   );
 }
 
-/* ---- 左块：上=标签；下=总权益数字 + 收益率 pill 同一行 baseline 对齐 ---- */
+/* ---- 左块：横向 flex，左组贴左端、走势图贴右端，中间 gap 固定 ---- */
 .balance-left {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-width: 0;
+}
+/* 左组：标签 + 主数值行（纵向） */
+.balance-left-main {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: 2px; /* 标签 与 主数值行之间 距离压到最小 */
+  gap: 2px;
   min-width: 0;
+  flex-shrink: 0; /* 不被走势图挤压 */
 }
 .balance-k {
   font-size: 10px;
@@ -173,27 +183,6 @@ body {
   align-items: center;
   gap: 6px;
 }
-.pos-direction {
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-  text-transform: none;
-  line-height: 1.4;
-}
-.pos-direction.net-long {
-  background: rgba(236, 112, 99, 0.15);
-  color: #ec7063;
-}
-.pos-direction.net-short {
-  background: rgba(82, 190, 128, 0.15);
-  color: #52be80;
-}
-.pos-direction.net-hedge {
-  background: rgba(133, 146, 158, 0.15);
-  color: #85929e;
-}
 /* 主数值 + 收益率 pill：对齐 baseline，pill 底部和数字下沿齐平 */
 .balance-main-row {
   display: inline-flex;
@@ -204,15 +193,15 @@ body {
   min-width: 0;
 }
 .balance-v {
-  font-size: 23px; /* 数字放大一档，之前 19→23 */
-  line-height: 1; /* baseline 对齐时 line-height 越小越准 */
+  font-size: 23px;
+  line-height: 1;
   color: var(--txt-1);
   font-weight: 800;
   letter-spacing: 0.2px;
   font-variant-numeric: tabular-nums;
   text-shadow: 0 2px 7px rgba(0, 0, 0, 0.22);
 }
-/* 收益率胶囊：总权益旁，红涨绿跌与资产卡片一致 */
+/* 收益率胶囊 */
 .balance-yield {
   font-size: 13px;
   line-height: 1;
@@ -228,6 +217,154 @@ body {
 }
 .balance-yield.neg {
   color: #52be80;
+}
+
+/* ---- 右块内的头寸方向堆叠条（底部，横条） ---- */
+.balance-right > .pos-split-bar {
+  width: 100%;
+  margin-top: 4px;
+  grid-column: 1 / -1; /* span 全部 metric 列 */
+}
+.balance-right > .pos-split-bar > .pos-split-track {
+  width: 100%;
+  height: 10px;
+}
+/* 段内默认不显示文字（8-10px 太挤），hover 用原生 tooltip */
+.balance-right > .pos-split-bar .pos-split-seg {
+  font-size: 0;
+  letter-spacing: 0;
+  color: transparent;
+  text-shadow: none;
+  padding: 0;
+}
+/* 宽段（≥ 12%）才显示缩写文字 */
+.balance-right > .pos-split-bar .pos-split-seg.pos-split-label-visible {
+  font-size: 8px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- 堆叠条基础结构样式（track 是定位锚点，内部段用 absolute） ---- */
+.pos-split-track {
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  overflow: hidden;
+  height: 10px; /* 默认高度，被 META 行覆盖为 6px */
+}
+.pos-split-shorts {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row-reverse; /* 最大空头靠右（靠近中线），最小靠左 */
+  justify-content: flex-end;
+}
+.pos-split-longs {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: row; /* 最大多头靠左（靠近中线），最小靠右 */
+  justify-content: flex-start;
+}
+/* 单段：每个资产一段，hover 高亮显示资产名 */
+.pos-split-seg {
+  height: 100%;
+  position: relative;
+  cursor: pointer;
+  min-width: 1px;
+  transition: filter 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0 1px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+.pos-split-shorts > .pos-split-seg:first-child,
+.pos-split-longs > .pos-split-seg:last-child {
+  border-right: none;
+}
+.pos-split-seg.long {
+  background: #ec7063;
+}
+.pos-split-seg.short {
+  background: #52be80;
+}
+.pos-split-seg:hover {
+  filter: brightness(1.25);
+  z-index: 2;
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: -1px;
+}
+/* 50% 垂直中线：固定在 track 正中间，再平衡参考 */
+.pos-split-center {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  left: 50%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---- 迷你权益走势图（横向：canvas 左、toggle 竖排右） ---- */
+.mini-eq-chart {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 4px;
+  flex-shrink: 0; /* 不被压缩，保持固定尺寸 */
+}
+.mini-eq-chart canvas {
+  display: block;
+  width: 160px !important;
+  height: 48px !important;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+/* toggle 按钮：2 列网格，贴在 canvas 右侧 */
+.mini-eq-toggles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  align-content: start;
+}
+.mini-toggle {
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--card-border-soft);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--txt-3);
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+}
+.mini-toggle:hover {
+  color: var(--txt-1);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.mini-toggle.active {
+  color: var(--txt-1);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.22);
+  font-weight: 600;
 }
 
 /* 中块：上方刻度标签行（谷/峰按刻度位置定位） */
@@ -347,7 +484,23 @@ body {
   opacity: 0.85;
 }
 
-/* 清仓线：缩高度（20px），不要超得太高 */
+/* 再平衡线：比清仓线短（14px），蓝色虚线，提醒但不紧急 */
+.eq-range-marker-rebalance {
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--accent-blue) 0,
+    var(--accent-blue) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  opacity: 0.85;
+}
+
+/* 清仓线：缩高度（18px），不要超得太高 */
 .eq-range-marker-liquidation {
   width: 3px;
   height: 18px;
@@ -441,6 +594,33 @@ body {
 }
 .metric-asset-count {
   color: var(--accent-blue);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* 多空方向小徽章：跟在资产数后面 */
+.metric-dir-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+.metric-dir-badge.long {
+  color: #ec7063;
+  background: rgba(236, 112, 99, 0.12);
+  border: 1px solid rgba(236, 112, 99, 0.3);
+}
+.metric-dir-badge.short {
+  color: #52be80;
+  background: rgba(82, 190, 128, 0.12);
+  border: 1px solid rgba(82, 190, 128, 0.3);
+}
+.metric-dir-badge.hedge {
+  color: #aab;
+  background: rgba(170, 170, 187, 0.1);
+  border: 1px solid rgba(170, 170, 187, 0.25);
 }
 .metric-box-notional::before {
   background: var(--tag-yellow);
@@ -567,15 +747,31 @@ body {
     font-size: 20px;
   }
   .balance-left {
-    gap: 2px;
+    gap: 10px;
   }
   .balance-main-row {
     gap: 6px;
   }
-  /* 右块风险 4 格：2×2 */
+  .balance-right > .pos-split-bar > .pos-split-track {
+    height: 12px;
+  }
+  .balance-right > .pos-split-bar .pos-split-seg.pos-split-label-visible {
+    font-size: 8px;
+  }
+  .mini-eq-chart canvas {
+    width: 120px !important;
+    height: 36px !important;
+  }
+  .mini-eq-chart .mini-toggle {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+  /* 右块：堆叠条 span 2 列，metric 2×2 */
   .balance-right {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+  }
+  .balance-right > .pos-split-bar {
+    grid-column: 1 / -1;
   }
   /* H/L 胶囊收小一档 */
   .eq-hl-item {

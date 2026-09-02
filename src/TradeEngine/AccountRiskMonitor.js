@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { getAccountBalance } from '../api.js';
 import { LocalVariable } from '../LocalVariable.js';
 import { monitorServer } from '../server.js';
@@ -34,6 +37,8 @@ export class AccountRiskMonitor {
     // 回撤控制阈值（从 config.js RiskControl 读取）
     this._drawdown_liquidation_threshold = RiskControl.drawdown_liquidation_threshold;
     this._drawdown_warn_threshold = RiskControl.drawdown_warn_threshold;
+    // 再平衡线阈值（纯展示刻度，实际再平衡逻辑后续实现）
+    this._rebalance_threshold = RiskControl.rebalance_threshold ?? 0.1;
     // 实际账户杠杆等级阈值（从 config.js RiskControl 读取）
     this._leverage_warn_threshold = RiskControl.leverage_warn_threshold;
     this._leverage_danger_threshold = RiskControl.leverage_danger_threshold;
@@ -41,6 +46,63 @@ export class AccountRiskMonitor {
     this._lev_logged = new Set(); // notionalUsd fallback 日志按 assetName 节流
     this._peak_reset_pending = false; // 清仓后标记：等下一次余额刷新再用真实权益重置峰谷
     this._balance_first_logged = false; // 余额首次拉取成功已打印
+    // 小时级权益历史（独立 JSON 文件，避免撑大 local-variables.json）
+    // 格式：[{ ts: number（整点毫秒戳）, equity: number }, ...] 按 ts 升序
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    this._history_file = path.join(__dirname, '../../records/equity-history.json');
+    this._hourly_history = this._loadHourlyHistory();
+    // 启动时已有 history 必须先置 dirty → 第一次 pushBalance 推给前端初始化走势图
+    this._history_dirty = this._hourly_history.length > 0;
+    // 一次性清理：旧的每日快照 LocalVariable key（已迁移到独立文件）
+    this._cleanupOrphanedDailySnapshots();
+  }
+
+  /** 从 LocalVariable 删除已迁移的 TradeEngine/dailyEqSnapshots key（幂等） */
+  _cleanupOrphanedDailySnapshots() {
+    try {
+      const root = new LocalVariable('TradeEngine');
+      if (root && root.dailyEqSnapshots != null && Object.keys(root.dailyEqSnapshots).length > 0) {
+        console.log('[Balance] 清理已迁移的旧每日快照 LocalVariable key');
+        delete root.dailyEqSnapshots; // 触发 deleteProperty handler
+      }
+    } catch (_) {
+      // 清理失败不影响主流程
+    }
+  }
+
+  /** 从独立 JSON 文件加载小时级权益历史；文件不存在/损坏则返回空数组 */
+  _loadHourlyHistory() {
+    try {
+      const dir = path.dirname(this._history_file);
+      fs.mkdirSync(dir, { recursive: true });
+      if (!fs.existsSync(this._history_file)) return [];
+      const raw = fs.readFileSync(this._history_file, 'utf8');
+      if (!raw.trim()) return [];
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        // 校验并清洗：只保留合法条目
+        return arr
+          .filter(
+            e => e && typeof e.ts === 'number' && typeof e.equity === 'number' && e.equity > 0
+          )
+          .sort((a, b) => a.ts - b.ts);
+      }
+      return [];
+    } catch (e) {
+      console.warn(`[Balance] 加载权益历史文件失败（将重置为空）: ${e.message}`);
+      return [];
+    }
+  }
+
+  /** 将小时级权益历史写回独立 JSON 文件（同步写入，fs-extra 风格） */
+  _saveHourlyHistory() {
+    try {
+      const dir = path.dirname(this._history_file);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this._history_file, JSON.stringify(this._hourly_history, null, 2), 'utf8');
+    } catch (e) {
+      console.error(`[Balance] 保存权益历史文件失败: ${e.message}`);
+    }
   }
 
   /**
@@ -208,6 +270,10 @@ export class AccountRiskMonitor {
           // 这里轻量补一次，避免等到下一轮持仓刷新才反映
           this.calcLeverage();
         }
+        // 小时级权益历史记录（独立 JSON 文件）
+        // 移到 confirmed 分支外：每 10s 都会调用一次，但内部有保护——
+        // 同小时戳已存在就跳过，新整点才追加 + 置 dirty
+        this._tryRecordHourlySnapshot(mem.lastConfirmedEq ?? stats.lastConfirmedEq);
         this.pushBalance(balance);
       } catch (e) {
         this.pushBalance(null);
@@ -248,6 +314,105 @@ export class AccountRiskMonitor {
       mem.minEq = confirmed;
       mem.minEqTs = now;
     }
+  }
+
+  /**
+   * 每小时整点（或首次启动时）记录一次 confirmed 权益到独立 JSON 文件。
+   * - 取当前小时的整点戳 `Math.floor(now / 3600000) * 3600000`
+   * - 如果该小时已有记录 → 更新为最新 confirmed（不重复追加）
+   * - 首次启动（history 为空）也会记录一条锚点，保证走势图有起点
+   * - 限制最多 24 个月 ≈ 17520 条，防止文件无限增长
+   */
+  _tryRecordHourlySnapshot(confirmed) {
+    const now = Date.now();
+    const hourTs = Math.floor(now / 3600000) * 3600000;
+    const history = this._hourly_history;
+
+    // 首次启动空 history → 记录整点锚点 + 当前实时点（2 条保证走势图可画）
+    if (history.length === 0) {
+      history.push({ ts: hourTs, equity: +confirmed.toFixed(4) });
+      // 再追加一条当前时间戳（非整点）作为实时端点，让 history ≥ 2 条 → 走势图立即可见
+      history.push({ ts: now, equity: +confirmed.toFixed(4) });
+      this._history_dirty = true;
+      this._saveHourlyHistory();
+      console.log(
+        `[Balance] Equity history anchor (first boot): hour=$${confirmed.toFixed(
+          2
+        )} now=$${confirmed.toFixed(2)}`
+      );
+      return;
+    }
+
+    // 检查最后一条记录的小时桶（按小时取整，允许锚点第二条用 now 时间戳）
+    const last = history[history.length - 1];
+    const lastHourTs = Math.floor(last.ts / 3600000) * 3600000;
+    if (lastHourTs === hourTs) {
+      // 同一小时桶：更新为最新 confirmed（更准确的值），但不置 dirty
+      const newEq = +confirmed.toFixed(4);
+      if (Math.abs(newEq - last.equity) > 0.001) {
+        last.equity = newEq;
+      }
+      // 如果只有 1 条记录（旧锚点场景），补一条当前 hourTs 让 history 有 2 条
+      if (history.length === 1) {
+        history.push({ ts: hourTs, equity: newEq });
+        this._history_dirty = true;
+      }
+      return;
+    }
+    if (lastHourTs > hourTs) {
+      // 时间倒退（NTP 校时/手动改系统时间）→ 跳过，不破坏时序
+      return;
+    }
+
+    // 新小时 → 追加
+    history.push({ ts: hourTs, equity: +confirmed.toFixed(4) });
+    this._history_dirty = true;
+
+    // 限制最多 24 个月（~17520 条），超出则截断最早的
+    const MAX_HOURS = 24 * 30 * 24; // 24 个月
+    if (history.length > MAX_HOURS) {
+      history.splice(0, history.length - MAX_HOURS);
+    }
+
+    this._saveHourlyHistory();
+  }
+
+  /**
+   * 取今日收益率基准权益（今天 8:00 那个小时的快照）。
+   * 扫描 history：找到今天 8 点（本地时区）对应的整点小时戳，返回该条 equity。
+   * 若今天 8 点快照还没记录到（服务在 8 点后刚启动），则回退到"今天第一条小时快照"。
+   * @returns {number|null} 今日基准权益；history 为空时返回 null
+   */
+  _getTodayBaseline() {
+    if (!this._hourly_history || this._hourly_history.length === 0) return null;
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    // 今天 8:00 本地时区 → UTC 毫秒戳
+    const today8 = new Date(year, month, day, 8, 0, 0, 0).getTime();
+    // 今天 0:00 本地时区
+    const today0 = new Date(year, month, day, 0, 0, 0, 0).getTime();
+
+    // 先尝试精确匹配 8 点那条
+    const h8 = this._hourly_history.find(e => e.ts === today8);
+    if (h8) return +h8.equity;
+
+    // 回退：取今天 0:00 之后的第一条小时快照
+    const firstToday = this._hourly_history.find(e => e.ts >= today0);
+    if (firstToday) return +firstToday.equity;
+
+    return null;
+  }
+
+  /**
+   * 构建完整小时级权益历史数组（按 ts 升序）。
+   * 每次都返回 history 数组（如果 ≥2 条）——前端收到即渲染，无缓存等待。
+   * hourly 粒度增长慢（24 条/天），每 10s 推一次几 KB 完全可接受。
+   */
+  _buildEquityHistoryIfDirty() {
+    if (this._hourly_history.length < 2) return null;
+    return this._hourly_history.slice();
   }
 
   /**
@@ -300,6 +465,7 @@ export class AccountRiskMonitor {
     let netDirectionUsd = 0; // ΣnotionalUsd 带符号：正=净多，负=净空，0=对冲
     let longNotional = 0;
     let shortNotional = 0;
+    const positionBreakdown = []; // [{ name, notionalUsd, isLong }] 按金额降序
     for (const name of Object.keys(this.engine._position_list)) {
       const p = this.engine._position_list[name];
       if (!p) continue;
@@ -307,48 +473,48 @@ export class AccountRiskMonitor {
       // 优先用 OKX positions 接口返回的 notionalUsd（绝对值），方向从 pos 符号获取
       let n = parseFloat(p.notionalUsd);
       if (isFinite(n) && n !== 0 && isFinite(posSz) && posSz !== 0) {
-        const signedN = posSz > 0 ? n : -n; // 用 pos 符号决定方向
-        notional += n;
-        netDirectionUsd += signedN;
-        if (signedN > 0) longNotional += signedN;
-        else shortNotional += Math.abs(signedN);
-        continue;
-      }
-      // Fallback：如果 notionalUsd 缺失/为 0/为 NaN，自己从 pos × ctVal × ctMult × 价格 计算
-      if (!isFinite(posSz) || posSz === 0) continue; // 没仓位 → 无名义
-      const inst = this.engine._instrument_info[name]; // instrument info 缓存（含 ctVal/ctMult）
-      const ctVal = inst ? parseFloat(inst.ctVal) : NaN;
-      const ctMult = inst ? parseFloat(inst.ctMult) : NaN;
-      // 价格优先级：position 的 markPx > 实时价格缓存 > 持仓均价
-      const markPx = parseFloat(p.markPx);
-      const lastPx = parseFloat(this.engine.getRealtimePrice(name) || NaN);
-      const avgPx = parseFloat(p.avgPx);
-      const price = isFinite(markPx)
-        ? markPx
-        : isFinite(lastPx)
-          ? lastPx
-          : isFinite(avgPx)
-            ? avgPx
-            : NaN;
-      if (isFinite(ctVal) && isFinite(ctMult) && isFinite(price)) {
-        const perContractValueUsd = ctVal * ctMult * price; // 每张合约的 USD 名义
-        const n2 = Math.abs(posSz) * perContractValueUsd;
-        const signedN2 = posSz * perContractValueUsd; // 带符号
-        notional += n2;
-        netDirectionUsd += signedN2;
-        if (signedN2 > 0) longNotional += signedN2;
-        else shortNotional += Math.abs(signedN2);
-        // 仅在 notionalUsd 缺失时打印一次，方便后续定位字段缺失原因（按 assetName 节流）
+        // 直接用 OKX 的 notionalUsd
+      } else {
+        // Fallback：自己从 pos × ctVal × ctMult × 价格 计算
+        n = NaN;
+        if (!isFinite(posSz) || posSz === 0) continue; // 没仓位 → 跳过
+        const inst = this.engine._instrument_info[name];
+        const ctVal = inst ? parseFloat(inst.ctVal) : NaN;
+        const ctMult = inst ? parseFloat(inst.ctMult) : NaN;
+        const markPx = parseFloat(p.markPx);
+        const lastPx = parseFloat(this.engine.getRealtimePrice(name) || NaN);
+        const avgPx = parseFloat(p.avgPx);
+        const price = isFinite(markPx)
+          ? markPx
+          : isFinite(lastPx)
+            ? lastPx
+            : isFinite(avgPx)
+              ? avgPx
+              : NaN;
+        if (!isFinite(ctVal) || !isFinite(ctMult) || !isFinite(price)) continue;
+        n = Math.abs(posSz) * ctVal * ctMult * price;
         if (!this._lev_logged.has(name)) {
           this._lev_logged.add(name);
           console.warn(
             `[Leverage] ${name}: notionalUsd 字段无效(${p.notionalUsd})，已 fallback 用 pos×ctVal×ctMult×price 计算：|${posSz}| × ${ctVal}×${ctMult} × $${price.toFixed(
               4
-            )} = $${n2.toFixed(2)}`
+            )} = $${n.toFixed(2)}`
           );
         }
       }
+      const signedN = posSz > 0 ? n : -n; // 用 pos 符号决定方向
+      notional += n;
+      netDirectionUsd += signedN;
+      if (signedN > 0) longNotional += signedN;
+      else shortNotional += Math.abs(signedN);
+      positionBreakdown.push({
+        name,
+        notionalUsd: +Math.abs(n).toFixed(2),
+        isLong: posSz > 0,
+      });
     }
+    // 按金额降序，前端渲染更有序
+    positionBreakdown.sort((a, b) => b.notionalUsd - a.notionalUsd);
     let lever = 0;
     if (confirmed && confirmed > 0) {
       lever = notional / confirmed;
@@ -366,6 +532,7 @@ export class AccountRiskMonitor {
       netDirectionUsd: +netDirectionUsd.toFixed(2), // 正=净多，负=净空，0=对冲
       longNotional: +longNotional.toFixed(2),
       shortNotional: +shortNotional.toFixed(2),
+      positionBreakdown, // [{ name, notionalUsd, isLong }] 按金额降序
     };
     return this._account_leverage;
   }
@@ -408,25 +575,38 @@ export class AccountRiskMonitor {
     // 极值也优先从 mem 读
     const maxEq = mem.maxEq ?? (stats.maxEq != null ? stats.maxEq : null);
     const minEq = mem.minEq ?? (stats.minEq != null ? stats.minEq : null);
-    // 清仓线对应的权益值 = 历史峰值 × (1 - 20%清仓线)
+    // 清仓线对应的权益值 = 历史峰值 × (1 - 清仓阈值)
     const liquidationEq =
       maxEq != null ? +(maxEq * (1 - this._drawdown_liquidation_threshold)).toFixed(4) : null;
-    // 条图可视范围下限：取 min(minEq, liquidationEq)
+    // 再平衡线对应的权益值 = 历史峰值 × (1 - 再平衡阈值)
+    const rebalanceEq =
+      maxEq != null ? +(maxEq * (1 - this._rebalance_threshold)).toFixed(4) : null;
+    // 条图可视范围下限：取 min(minEq, rebalanceEq, liquidationEq)
     let rangeMin = minEq;
-    if (liquidationEq != null && (rangeMin == null || liquidationEq < rangeMin)) {
-      rangeMin = liquidationEq;
+    for (const v of [rebalanceEq, liquidationEq]) {
+      if (v != null && (rangeMin == null || v < rangeMin)) rangeMin = v;
     }
     if (maxEq != null && rangeMin != null) {
       const rangeSpan = maxEq - rangeMin;
       const bufferedMin = +(rangeMin - rangeSpan * 0.03).toFixed(4);
       if (bufferedMin < rangeMin) rangeMin = bufferedMin >= 0 ? bufferedMin : 0;
     }
-    // 收益率口径：优先使用 config.json 中的 initial_equity 作为固定基准（初始本金），
-    // totalReturn = confirmed - initialEquity，yieldRate = totalReturn / initialEquity
-    // 未配置（initial_equity <= 0）时 fallback 到原逻辑：本金 = 总权益 - 已实现 - 未实现
+    // 收益率口径优先级：
+    //   1. 今日 8 点快照基准（每日重置收益率）
+    //   2. config.json initial_equity（固定初始本金）
+    //   3. 原逻辑 fallback：本金 = 总权益 - 已实现 - 未实现
     const pnl = this.calcTotalPnl();
-    let principal, totalReturn, yieldRate;
-    if (initialEquity > 0) {
+    let principal,
+      totalReturn,
+      yieldRate,
+      dailyBaseline = null;
+    const todaySnap = this._getTodayBaseline();
+    if (todaySnap != null) {
+      dailyBaseline = todaySnap;
+      principal = todaySnap;
+      totalReturn = confirmed - todaySnap;
+      yieldRate = totalReturn / todaySnap;
+    } else if (initialEquity > 0) {
       principal = initialEquity;
       totalReturn = confirmed - initialEquity;
       yieldRate = totalReturn / initialEquity;
@@ -435,6 +615,8 @@ export class AccountRiskMonitor {
       totalReturn = pnl.total;
       yieldRate = principal > 0 ? pnl.total / principal : null;
     }
+    // equityHistory：仅在有新快照时携带（避免每 10s 推一次），前端收到 null 保持原缓存
+    const equityHistory = this._buildEquityHistoryIfDirty();
     this._account_balance = {
       totalEq: confirmed,
       upl: rawBalance ? parseFloat(rawBalance.upl || 0) : (prev.upl ?? 0),
@@ -449,6 +631,7 @@ export class AccountRiskMonitor {
       drawdownLevel: mem.drawdownLevel ?? 0,
       drawdownTs: mem.drawdownTs || null,
       liquidationEq,
+      rebalanceEq,
       rangeMin: rangeMin != null ? +rangeMin : null,
       rangeMax: maxEq,
       liquidationTriggered: mem.liquidationTriggered ?? stats.liquidationTriggered ?? false,
@@ -460,11 +643,14 @@ export class AccountRiskMonitor {
       netDirectionUsd: lev.netDirectionUsd ?? 0, // 净方向：正=净多，负=净空
       longNotional: lev.longNotional ?? 0,
       shortNotional: lev.shortNotional ?? 0,
+      positionBreakdown: lev.positionBreakdown ?? [], // 每资产 notional 分解
       realizedPnl: +pnl.realized.toFixed(4),
       unrealizedPnl: +pnl.unrealized.toFixed(4),
       totalPnl: +pnl.total.toFixed(4),
       principal: principal > 0 ? +principal.toFixed(4) : null,
       yieldRate: yieldRate != null ? +yieldRate.toFixed(6) : null,
+      dailyBaseline: dailyBaseline != null ? +dailyBaseline.toFixed(4) : null,
+      equityHistory, // null=无变化，array=有新快照
       lastUpdateTime: Date.now(),
     };
     monitorServer.updateAccountBalance(this._account_balance);
