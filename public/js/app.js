@@ -1,5 +1,6 @@
 let assets = {};
 let lastChartData = {};
+window.assets = assets; // 暴露给 balance update 刷新各卡片杠杆贡献
 
 /* ===== 迷你权益走势图：状态 ===== */
 let equityHistory = []; // 每日快照缓存：[{ date, equity, ts }, ...] 按 ts 升序
@@ -458,6 +459,8 @@ function onAccountBalanceUpdate(payload) {
   if (payload.totalEq !== undefined && isFinite(totalEq)) {
     el.style.display = '';
     val.textContent = '$ ' + totalEq.toFixed(2);
+    // 缓存到 window 供子组件（如资产卡片杠杆率）使用
+    window.__totalEquity = totalEq;
   }
 
   // ===== 收益率：按当前迷你图窗口起点 → 当前总权益算 =====
@@ -697,6 +700,34 @@ function onAccountBalanceUpdate(payload) {
     if (level >= 2) levEl.classList.add('lever-danger');
     else if (level === 1) levEl.classList.add('lever-warn');
     else levEl.classList.add('lever-normal');
+  }
+
+  // ===== 各资产卡片标题中的杠杆率需要同步刷新 =====
+  // 因为分子(notionalUsd: 持仓变化才变) 和 分母(totalEq: 10s 变一次) 更新不同步
+  if (isFinite(totalEq) && totalEq > 0) {
+    document.querySelectorAll('.asset-card .asset-leverage').forEach(levEl => {
+      const card = levEl.closest('.asset-card');
+      const assetName = card?.dataset.asset;
+      const assetData = window.assets && window.assets[assetName];
+      if (!assetData) return;
+      const pos = assetData.indicators?.position || assetData.position || {};
+      const n = parseFloat(pos.notionalUsd);
+      const posSz = parseFloat(pos.pos);
+      levEl.classList.remove(
+        'asset-leverage-empty',
+        'asset-leverage-warn',
+        'asset-leverage-danger'
+      );
+      if (posSz === 0 || !isFinite(n) || n === 0) {
+        levEl.textContent = '空仓';
+        levEl.classList.add('asset-leverage-empty');
+      } else {
+        const lev = n / totalEq;
+        levEl.textContent = lev.toFixed(2) + 'x';
+        if (lev >= 2) levEl.classList.add('asset-leverage-danger');
+        else if (lev >= 1) levEl.classList.add('asset-leverage-warn');
+      }
+    });
   }
 
   // ===== 总头寸规模（Σ|持仓名义 USD|） =====

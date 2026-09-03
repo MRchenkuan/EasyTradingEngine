@@ -476,6 +476,8 @@ export class GridTradingProcessor extends AbstractProcessor {
       this._statusPayload = {
         ...indicators,
         stopLossLevel: positionRiskLevel,
+        isolateRiskLevel: this.position_controller.getIsolateRiskLevel(),
+        crossRiskLevel: this.position_controller.getCrossRiskLevel(),
         thresholdAdjustment: `${(100 * threshold).toFixed(2)}% -> ${(100 * adjustedThreshold).toFixed(2)}%`,
         chartData: this._getChartData(),
         shouldTrade: shouldTrade,

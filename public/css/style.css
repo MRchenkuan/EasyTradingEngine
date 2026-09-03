@@ -841,6 +841,15 @@ body {
   margin-bottom: 10px;
   padding-bottom: 7px;
   border-bottom: 1px dashed rgba(48, 54, 61, 0.5);
+  gap: 8px;
+}
+
+.asset-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .asset-name {
@@ -854,6 +863,33 @@ body {
   font-size: 16px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+.asset-leverage {
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(88, 166, 255, 0.12);
+  color: var(--accent-blue);
+  border: 1px solid rgba(88, 166, 255, 0.35);
+  flex-shrink: 0;
+}
+.asset-leverage-warn {
+  background: rgba(208, 164, 60, 0.15);
+  color: #d0a43c;
+  border-color: rgba(208, 164, 60, 0.4);
+}
+.asset-leverage-danger {
+  background: rgba(222, 94, 94, 0.15);
+  color: #de5e5e;
+  border-color: rgba(222, 94, 94, 0.4);
+}
+.asset-leverage-empty {
+  background: transparent;
+  color: var(--txt-3);
+  border-color: transparent;
 }
 
 .metrics-grid {
@@ -1408,6 +1444,11 @@ body {
 
   .asset-price {
     font-size: 14px;
+  }
+
+  .asset-leverage {
+    font-size: 10px;
+    padding: 1px 4px;
   }
 
   .metrics-grid {
