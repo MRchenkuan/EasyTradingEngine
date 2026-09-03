@@ -29,8 +29,6 @@ export class GridTradingProcessor extends AbstractProcessor {
   _base_quantity = 10; // 每次交易数量
   _base_amount = 10; // 每次交易的金额
   _instrument_info = {}; // 每次交易数量
-  _suppress_lots = 8; // 持仓警告线
-  _survival_lots = 12; // 持仓严重警告线
   _settlement_type = SettlementType.VALUE; //交易单位 value 等金额，quantity 等数量
   _min_price = 0.1; // 最低触发价格
   _max_price = 100; // 最高触发价格

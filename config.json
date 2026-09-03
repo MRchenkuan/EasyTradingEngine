@@ -21,8 +21,6 @@
         "_swap_value": 0.01,
         "_base_amount": 60,
         "_base_quantity": 10,
-        "_suppress_lots": 7,
-        "_survival_lots": 12,
         "_settlement_type": "VALUE"
       }
     },
@@ -37,8 +35,6 @@
         "_max_price": 350,
         "_base_amount": 30,
         "_base_quantity": 10,
-        "_suppress_lots": 15,
-        "_survival_lots": 20,
         "_settlement_type": "VALUE"
       }
     },
@@ -53,8 +49,6 @@
         "_max_price": 6000,
         "_base_amount": 30,
         "_base_quantity": 10,
-        "_suppress_lots": 15,
-        "_survival_lots": 20,
         "_settlement_type": "VALUE"
       }
     },
@@ -69,8 +63,6 @@
         "_max_price": 5.0,
         "_base_amount": 30,
         "_base_quantity": 10,
-        "_suppress_lots": 15,
-        "_survival_lots": 20,
         "_settlement_type": "VALUE"
       }
     },
@@ -85,8 +77,6 @@
         "_max_price": 8.0,
         "_base_amount": 10,
         "_base_quantity": 10,
-        "_suppress_lots": 7,
-        "_survival_lots": 12,
         "_settlement_type": "VALUE"
       }
     }

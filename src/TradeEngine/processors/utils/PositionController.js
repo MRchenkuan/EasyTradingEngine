@@ -13,8 +13,6 @@ import {
 export class PositionController {
   engine = null;
   processor = null;
-  _suppress_lots = 12;
-  _survival_lots = 20;
   _min_mgn_ratio_notice = 10000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_supress = 6000; // 抑制状态最小保证金率 4000%
   _min_mgn_ratio_survival = 4000; // 止损状态最小保证金率 1000%
@@ -23,8 +21,6 @@ export class PositionController {
   constructor(engine, processor) {
     this.engine = engine;
     this.processor = processor;
-    this._suppress_lots = processor._suppress_lots;
-    this._survival_lots = processor._survival_lots; // 基础配置
   }
 
   // ==================== 持仓数据获取 ====================
