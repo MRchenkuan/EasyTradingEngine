@@ -471,12 +471,18 @@ window.TradingApp.Assets = {
 
       html += '<div class="threshold-bar">';
       html += '<div class="threshold-bar-track">';
+      // 修正线到基线的半透明填充（修正色）
+      html += `<div class="threshold-bar-fill threshold-bar-rebalance" style="left: ${finalPercent}%; width: ${100 - finalPercent}%;"></div>`;
+      // 回撤刻度线到左边的半透明渐变（蓝色，从刻度线处实到左边透明）
       html += `<div class="threshold-bar-fill threshold-bar-current" style="width: ${currentPercent}%;" data-key="current-fill"></div>`;
       html += '</div>';
+      // 回撤刻度线（和修正刻度线同级，放在 track 外面避免被 overflow:hidden 裁剪）
+      html += `<div class="threshold-bar-mark threshold-bar-mark-current" style="left: ${currentPercent}%;" data-key="current-mark"></div>`;
+      // 修正刻度线
       html += `<div class="threshold-bar-mark" style="left: ${finalPercent}%;" data-key="final-mark"></div>`;
       // 三个 label 都放进 labels 容器，JS 挤开
       html += '<div class="threshold-bar-labels">';
-      html += `<span class="threshold-bar-labels-left" data-key="labels-current" style="left:0;">回撤 ${current.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-labels-current" data-key="labels-current" style="left:${currentPercent}%; transform:translateX(-50%);">回撤 ${current.toFixed(2)}%</span>`;
       html += `<span class="threshold-bar-final-label" data-key="final-label" style="left:${finalPercent}%;">修正 ${final.toFixed(2)}%</span>`;
       html += `<span class="threshold-bar-labels-right" data-key="labels-initial" style="left:100%; transform:translateX(-100%);">基线 ${initial.toFixed(2)}%</span>`;
       html += '</div>';
@@ -617,15 +623,26 @@ window.TradingApp.Assets = {
       // 更新进度条宽度和刻度线位置
       const finalMark = card.querySelector('[data-key="final-mark"]');
       const currentFill = card.querySelector('[data-key="current-fill"]');
+      const currentMark = card.querySelector('[data-key="current-mark"]');
+      const rebalanceFill = card.querySelector('.threshold-bar-rebalance');
 
       if (finalMark) finalMark.style.left = finalPercent + '%';
       if (currentFill) currentFill.style.width = currentPercent + '%';
+      if (currentMark) currentMark.style.left = currentPercent + '%';
+      if (rebalanceFill) {
+        rebalanceFill.style.left = finalPercent + '%';
+        rebalanceFill.style.width = 100 - finalPercent + '%';
+      }
 
       // 更新三个 label 的文本 + 目标位置
       const currentLabel = card.querySelector('[data-key="labels-current"]');
       const finalLabel = card.querySelector('[data-key="final-label"]');
       const initialLabel = card.querySelector('[data-key="labels-initial"]');
-      if (currentLabel) currentLabel.textContent = `回撤 ${current.toFixed(2)}%`;
+      if (currentLabel) {
+        currentLabel.textContent = `回撤 ${current.toFixed(2)}%`;
+        currentLabel.style.left = currentPercent + '%';
+        currentLabel.style.transform = '';
+      }
       if (finalLabel) {
         finalLabel.textContent = `修正 ${final.toFixed(2)}%`;
         finalLabel.style.left = finalPercent + '%';
@@ -636,9 +653,8 @@ window.TradingApp.Assets = {
       // 统一挤开（复用 app.js 的 _resolveLabelCollisions）
       const labelsRow = card.querySelector('.threshold-bar-labels');
       if (labelsRow && window._resolveLabelCollisions) {
-        // 先给固定端设置目标 % （current 目标 0，initial 目标 100）
         const entries = [];
-        if (currentLabel) entries.push({ el: currentLabel, targetPct: 0 });
+        if (currentLabel) entries.push({ el: currentLabel, targetPct: currentPercent });
         if (finalLabel) entries.push({ el: finalLabel, targetPct: finalPercent });
         if (initialLabel) entries.push({ el: initialLabel, targetPct: 100 });
         window._resolveLabelCollisions(labelsRow, entries, 6, 3);

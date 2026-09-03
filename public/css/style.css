@@ -1140,15 +1140,35 @@ body {
   top: 0;
   left: 0;
   height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
+  border-radius: 2px;
+  transition:
+    width 0.3s ease,
+    left 0.3s ease;
 }
 
+/* 回撤刻度线到左边的蓝色半透明渐变（刻度线处最实 → 向左渐隐） */
 .threshold-bar-current {
-  background: var(--accent-blue);
+  background: linear-gradient(270deg, rgba(88, 166, 255, 0.6) 0%, rgba(88, 166, 255, 0.2) 100%);
 }
 
-/* 最终阈值刻度线（贯穿 track 的竖线，略凸出上下） */
+/* 修正线到基线的半透明填充（修正色） */
+.threshold-bar-rebalance {
+  left: auto;
+  background: linear-gradient(90deg, rgba(208, 164, 60, 0.35) 0%, rgba(208, 164, 60, 0.15) 100%);
+  transition:
+    width 0.3s ease,
+    left 0.3s ease;
+}
+
+/* 回撤 label：跟随刻度线定位，蓝色 */
+.threshold-bar-labels-current {
+  color: var(--accent-blue);
+}
+.threshold-bar-labels .threshold-bar-labels-right {
+  color: var(--txt-3);
+}
+
+/* 所有刻度线共用基础样式 */
 .threshold-bar-mark {
   position: absolute;
   top: -2px;
@@ -1159,6 +1179,12 @@ body {
   transition: left 0.3s ease;
   z-index: 2;
   border-radius: 1px;
+}
+
+/* 回撤刻度线——覆盖黄色为蓝色 */
+.threshold-bar-mark-current {
+  background: var(--accent-blue);
+  z-index: 3;
 }
 
 /* 最终阈值标签（原来 absolute 悬浮在 bar 上，现在挪进 labels 容器统一挤开） */
@@ -1180,13 +1206,6 @@ body {
   position: absolute;
   top: 0;
   white-space: nowrap;
-}
-
-.threshold-bar-labels .threshold-bar-labels-left {
-  color: var(--accent-blue);
-}
-.threshold-bar-labels .threshold-bar-labels-right {
-  color: var(--txt-3);
 }
 
 .stoploss-notice {
