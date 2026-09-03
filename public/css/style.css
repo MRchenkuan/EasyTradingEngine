@@ -865,7 +865,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.asset-leverage {
+.asset-impact {
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -876,17 +876,22 @@ body {
   border: 1px solid rgba(88, 166, 255, 0.35);
   flex-shrink: 0;
 }
-.asset-leverage-warn {
+.asset-impact-notice {
   background: rgba(208, 164, 60, 0.15);
   color: #d0a43c;
   border-color: rgba(208, 164, 60, 0.4);
 }
-.asset-leverage-danger {
+.asset-impact-warn {
+  background: rgba(230, 120, 50, 0.15);
+  color: #e67832;
+  border-color: rgba(230, 120, 50, 0.4);
+}
+.asset-impact-danger {
   background: rgba(222, 94, 94, 0.15);
   color: #de5e5e;
   border-color: rgba(222, 94, 94, 0.4);
 }
-.asset-leverage-empty {
+.asset-impact-empty {
   background: transparent;
   color: var(--txt-3);
   border-color: transparent;
@@ -1446,7 +1451,7 @@ body {
     font-size: 14px;
   }
 
-  .asset-leverage {
+  .asset-impact {
     font-size: 10px;
     padding: 1px 4px;
   }

@@ -702,30 +702,32 @@ function onAccountBalanceUpdate(payload) {
     else levEl.classList.add('lever-normal');
   }
 
-  // ===== 各资产卡片标题中的杠杆率需要同步刷新 =====
+  // ===== 各资产卡片标题中的冲击系数需要同步刷新 =====
   // 因为分子(notionalUsd: 持仓变化才变) 和 分母(totalEq: 10s 变一次) 更新不同步
   if (isFinite(totalEq) && totalEq > 0) {
-    document.querySelectorAll('.asset-card .asset-leverage').forEach(levEl => {
-      const card = levEl.closest('.asset-card');
+    document.querySelectorAll('.asset-card .asset-impact').forEach(impactEl => {
+      const card = impactEl.closest('.asset-card');
       const assetName = card?.dataset.asset;
       const assetData = window.assets && window.assets[assetName];
       if (!assetData) return;
       const pos = assetData.indicators?.position || assetData.position || {};
       const n = parseFloat(pos.notionalUsd);
       const posSz = parseFloat(pos.pos);
-      levEl.classList.remove(
-        'asset-leverage-empty',
-        'asset-leverage-warn',
-        'asset-leverage-danger'
+      impactEl.classList.remove(
+        'asset-impact-empty',
+        'asset-impact-notice',
+        'asset-impact-warn',
+        'asset-impact-danger'
       );
       if (posSz === 0 || !isFinite(n) || n === 0) {
-        levEl.textContent = '空仓';
-        levEl.classList.add('asset-leverage-empty');
+        impactEl.textContent = '空仓';
+        impactEl.classList.add('asset-impact-empty');
       } else {
-        const lev = n / totalEq;
-        levEl.textContent = lev.toFixed(2) + 'x';
-        if (lev >= 2) levEl.classList.add('asset-leverage-danger');
-        else if (lev >= 1) levEl.classList.add('asset-leverage-warn');
+        const impact = Math.abs(n) / totalEq;
+        impactEl.textContent = impact.toFixed(2) + 'x';
+        if (impact >= 8) impactEl.classList.add('asset-impact-danger');
+        else if (impact >= 3) impactEl.classList.add('asset-impact-warn');
+        else if (impact >= 1) impactEl.classList.add('asset-impact-notice');
       }
     });
   }

@@ -85,26 +85,33 @@ window.TradingApp.Assets = {
 
   renderAssetCard: function (assetName, assetData) {
     if (!assetData) {
-      return `<div class="asset-card" data-asset="${assetName}"><div class="asset-title"><span class="asset-name">${assetName}</span><span class="asset-price">-</span><span class="asset-leverage">-</span></div><div class="no-data">暂无数据</div></div>`;
+      return `<div class="asset-card" data-asset="${assetName}"><div class="asset-title"><div class="asset-title-left"><span class="asset-name">${assetName}</span><span class="asset-impact asset-impact-empty">-</span></div><span class="asset-price">-</span></div><div class="no-data">暂无数据</div></div>`;
     }
 
     const indicators = assetData.indicators || assetData;
     const price = indicators.price !== undefined ? parseFloat(indicators.price.toFixed(3)) : '-';
 
-    // 杠杆率 = 该资产 notionalUsd / 账户总权益
+    // 冲击系数 = |notionalUsd| / 账户总权益
     const pos = indicators.position || {};
     const posSz = parseFloat(pos.pos);
     const nUsd = parseFloat(pos.notionalUsd);
     const totalEq = window.__totalEquity;
-    let levHtml = '-';
-    let levCls = '';
+    let impactHtml = '-';
+    let impactCls = '';
     if (posSz === 0) {
-      levHtml = '空仓';
-      levCls = 'asset-leverage-empty';
+      impactHtml = '空仓';
+      impactCls = 'asset-impact-empty';
     } else if (isFinite(nUsd) && isFinite(totalEq) && totalEq > 0) {
-      const lev = nUsd / totalEq;
-      levHtml = lev.toFixed(2) + 'x';
-      levCls = lev >= 2 ? 'asset-leverage-danger' : lev >= 1 ? 'asset-leverage-warn' : '';
+      const impact = Math.abs(nUsd) / totalEq;
+      impactHtml = impact.toFixed(2) + 'x';
+      impactCls =
+        impact >= 8
+          ? 'asset-impact-danger'
+          : impact >= 3
+            ? 'asset-impact-warn'
+            : impact >= 1
+              ? 'asset-impact-notice'
+              : '';
     }
 
     let html = `
@@ -112,7 +119,7 @@ window.TradingApp.Assets = {
         <div class="asset-title">
           <div class="asset-title-left">
             <span class="asset-name">${assetName}</span>
-            <span class="asset-leverage ${levCls}" data-leverage>${levHtml}</span>
+            <span class="asset-impact ${impactCls}" data-impact title="冲击系数 = |notionalUsd| / 总权益">${impactHtml}</span>
           </div>
           <span class="asset-price" data-price="${price}">${price}</span>
         </div>
@@ -257,7 +264,7 @@ window.TradingApp.Assets = {
           indicators.price_span !== undefined ? this._formatPriceSpan(indicators.price_span) : '-',
       },
       {
-        label: '⚡瞬时波动',
+        label: '🌊瞬时波动',
         value:
           indicators.volatility !== undefined
             ? (indicators.volatility * 100).toFixed(2) + '%'
@@ -318,38 +325,6 @@ window.TradingApp.Assets = {
             ? { type: 'dots', ...this._stopLossSeverity(indicators.stopLossLevel) }
             : null,
         title: indicators.stopLossLevel !== undefined ? indicators.stopLossLevel : '',
-      },
-      {
-        label: '�逐仓风险',
-        value:
-          indicators.isolateRiskLevel !== undefined
-            ? this._stopLossLabel(indicators.isolateRiskLevel)
-            : '-',
-        className:
-          indicators.isolateRiskLevel !== undefined
-            ? `metric-stop-loss metric-stop-loss-${indicators.isolateRiskLevel.toLowerCase()}`
-            : 'metric-stop-loss',
-        viz:
-          indicators.isolateRiskLevel !== undefined
-            ? { type: 'dots', ...this._stopLossSeverity(indicators.isolateRiskLevel) }
-            : null,
-        title: '逐仓风险：基于单仓持仓规模判断，阈值 抑制=12 lot / 紧急=20 lot',
-      },
-      {
-        label: '🌐全仓风险',
-        value:
-          indicators.crossRiskLevel !== undefined
-            ? this._stopLossLabel(indicators.crossRiskLevel)
-            : '-',
-        className:
-          indicators.crossRiskLevel !== undefined
-            ? `metric-stop-loss metric-stop-loss-${indicators.crossRiskLevel.toLowerCase()}`
-            : 'metric-stop-loss',
-        viz:
-          indicators.crossRiskLevel !== undefined
-            ? { type: 'dots', ...this._stopLossSeverity(indicators.crossRiskLevel) }
-            : null,
-        title: '全仓风险：基于维持保证金率（mgnRatio），阈值 关注≥10000% / 抑制≥6000% / 紧急<4000%',
       },
       {
         label: '🔔交易状态',
@@ -528,28 +503,30 @@ window.TradingApp.Assets = {
         priceEl.dataset.price = price;
       }
 
-      // 更新标题中的杠杆率
+      // 更新标题中的冲击系数
       const pos = indicators.position || {};
       const posSz = parseFloat(pos.pos);
       const nUsd = parseFloat(pos.notionalUsd);
       const totalEq = window.__totalEquity;
-      const levEl = card.querySelector('.asset-leverage');
-      if (levEl) {
-        levEl.classList.remove(
-          'asset-leverage-empty',
-          'asset-leverage-warn',
-          'asset-leverage-danger'
+      const impactEl = card.querySelector('.asset-impact');
+      if (impactEl) {
+        impactEl.classList.remove(
+          'asset-impact-empty',
+          'asset-impact-notice',
+          'asset-impact-warn',
+          'asset-impact-danger'
         );
         if (posSz === 0) {
-          levEl.textContent = '空仓';
-          levEl.classList.add('asset-leverage-empty');
+          impactEl.textContent = '空仓';
+          impactEl.classList.add('asset-impact-empty');
         } else if (isFinite(nUsd) && isFinite(totalEq) && totalEq > 0) {
-          const lev = nUsd / totalEq;
-          levEl.textContent = lev.toFixed(2) + 'x';
-          if (lev >= 2) levEl.classList.add('asset-leverage-danger');
-          else if (lev >= 1) levEl.classList.add('asset-leverage-warn');
+          const impact = Math.abs(nUsd) / totalEq;
+          impactEl.textContent = impact.toFixed(2) + 'x';
+          if (impact >= 8) impactEl.classList.add('asset-impact-danger');
+          else if (impact >= 3) impactEl.classList.add('asset-impact-warn');
+          else if (impact >= 1) impactEl.classList.add('asset-impact-notice');
         } else {
-          levEl.textContent = '-';
+          impactEl.textContent = '-';
         }
       }
     }

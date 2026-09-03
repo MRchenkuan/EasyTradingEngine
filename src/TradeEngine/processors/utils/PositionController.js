@@ -80,26 +80,38 @@ export class PositionController {
 
   /**
    * 获取逐仓风险等级
-   * @returns {PositionRiskLevel} 隔离风险等级
+   *
+   * 反映该资产价格波动对**总权益的冲击敏感度**：
+   *   impact = |notionalUsd| / 账户总权益
+   *   → 该资产价格每涨 1%，总权益约变动 impact%
+   *
+   * 阈值含义（固定、有明确冲击比例）：
+   *   - impact < 1x          → NORMAL   影响不到 1:1，相对可控
+   *   - 1x ≤ impact < 3x     → NOTICE   每涨 1% 权益 ±1~3%，敏感
+   *   - 3x ≤ impact < 8x     → HIGHT    每涨 1% 权益 ±3~8%，很敏感
+   *   - impact ≥ 8x          → EMERGENCY 每涨 1% 权益 ±8%+，极端敏感
+   *
+   * @returns {PositionRiskLevel}
    */
   getIsolateRiskLevel() {
     const pos_contracts = this.getPositionContracts();
-    const position_count = this.getPositionLots();
+    if (pos_contracts === 0) return PositionRiskLevel.NORMAL;
 
-    if (pos_contracts === 0) {
-      return PositionRiskLevel.NORMAL;
+    const notional = Math.abs(this.getPositionValue());
+    let totalEq = 0;
+    try {
+      const bal = this.engine.constructor.getAccountBalance();
+      totalEq = parseFloat(bal?.totalEq ?? 0);
+    } catch {
+      totalEq = 0;
     }
+    if (!isFinite(totalEq) || totalEq <= 0) return PositionRiskLevel.NORMAL;
 
-    // 单个止损
-    if (Math.abs(position_count) > this._survival_lots) {
-      return PositionRiskLevel.EMERGENCY;
-    }
+    const impact = notional / totalEq;
 
-    // 单个抑制
-    if (Math.abs(position_count) > this._suppress_lots) {
-      return PositionRiskLevel.HIGHT;
-    }
-
+    if (impact >= 2.5) return PositionRiskLevel.EMERGENCY;
+    if (impact >= 1.5) return PositionRiskLevel.HIGHT;
+    if (impact >= 0.5) return PositionRiskLevel.NOTICE;
     return PositionRiskLevel.NORMAL;
   }
 
