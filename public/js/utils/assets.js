@@ -450,9 +450,9 @@ window.TradingApp.Assets = {
       html += `<div class="threshold-bar-mark" style="left: ${finalPercent}%;" data-key="final-mark"></div>`;
       // 三个 label 都放进 labels 容器，JS 挤开
       html += '<div class="threshold-bar-labels">';
-      html += `<span class="threshold-bar-labels-left" data-key="labels-current" style="left:0;">当前回撤 ${current.toFixed(2)}%</span>`;
-      html += `<span class="threshold-bar-final-label" data-key="final-label" style="left:${finalPercent}%;">最终阈值 ${final.toFixed(2)}%</span>`;
-      html += `<span class="threshold-bar-labels-right" data-key="labels-initial" style="left:100%; transform:translateX(-100%);">初始阈值 ${initial.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-labels-left" data-key="labels-current" style="left:0;">回撤 ${current.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-final-label" data-key="final-label" style="left:${finalPercent}%;">修正 ${final.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-labels-right" data-key="labels-initial" style="left:100%; transform:translateX(-100%);">基线 ${initial.toFixed(2)}%</span>`;
       html += '</div>';
       html += '</div>';
     }
@@ -572,13 +572,13 @@ window.TradingApp.Assets = {
       const currentLabel = card.querySelector('[data-key="labels-current"]');
       const finalLabel = card.querySelector('[data-key="final-label"]');
       const initialLabel = card.querySelector('[data-key="labels-initial"]');
-      if (currentLabel) currentLabel.textContent = `当前回撤 ${current.toFixed(2)}%`;
+      if (currentLabel) currentLabel.textContent = `回撤 ${current.toFixed(2)}%`;
       if (finalLabel) {
-        finalLabel.textContent = `最终阈值 ${final.toFixed(2)}%`;
+        finalLabel.textContent = `修正 ${final.toFixed(2)}%`;
         finalLabel.style.left = finalPercent + '%';
         finalLabel.style.transform = '';
       }
-      if (initialLabel) initialLabel.textContent = `初始阈值 ${initial.toFixed(2)}%`;
+      if (initialLabel) initialLabel.textContent = `基线 ${initial.toFixed(2)}%`;
 
       // 统一挤开（复用 app.js 的 _resolveLabelCollisions）
       const labelsRow = card.querySelector('.threshold-bar-labels');
