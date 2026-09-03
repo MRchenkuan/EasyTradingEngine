@@ -241,6 +241,21 @@ function renderAssets() {
     });
     container.innerHTML = html;
 
+    // 阈值进度条的三个 label 初始渲染后也要挤开一次
+    if (window._resolveLabelCollisions) {
+      container.querySelectorAll('.threshold-bar-labels').forEach(row => {
+        const current = row.querySelector('[data-key="labels-current"]');
+        const final = row.querySelector('[data-key="final-label"]');
+        const initial = row.querySelector('[data-key="labels-initial"]');
+        const finalPct = final ? parseFloat(final.style.left || '0') : 0;
+        const entries = [];
+        if (current) entries.push({ el: current, targetPct: 0 });
+        if (final) entries.push({ el: final, targetPct: finalPct });
+        if (initial) entries.push({ el: initial, targetPct: 100 });
+        window._resolveLabelCollisions(row, entries, 6, 3);
+      });
+    }
+
     assetNames.forEach(assetName => {
       const assetData = assets[assetName];
       if (assetData && assetData.chartData) {
@@ -736,6 +751,10 @@ document.addEventListener(
 );
 
 TradingApp.Time.startTimeUpdater();
+
+// 暴露给其他模块（如 assets.js 的阈值进度条）使用
+window._resolveLabelCollisions = _resolveLabelCollisions;
+
 TradingApp.WebSocket.connect(
   onIndicatorsUpdate,
   onChartUpdate,

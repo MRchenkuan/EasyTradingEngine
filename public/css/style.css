@@ -1120,30 +1120,31 @@ body {
   border-radius: 1px;
 }
 
-/* 最终阈值标签（跟随刻度线位置） */
+/* 最终阈值标签（原来 absolute 悬浮在 bar 上，现在挪进 labels 容器统一挤开） */
 .threshold-bar-final-label {
-  position: absolute;
-  top: 12px;
+  white-space: nowrap;
   font-size: 10px;
   color: var(--tag-yellow);
-  white-space: nowrap;
-  transition: left 0.3s ease;
-  z-index: 2;
 }
 
+/* 三个标签统一 absolute 定位在这一行，JS 挤开 */
 .threshold-bar-labels {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  min-height: 14px;
   font-size: 10px;
-  margin-top: 4px;
   color: var(--txt-3);
+  margin-top: 2px;
+}
+.threshold-bar-labels > * {
+  position: absolute;
+  top: 0;
+  white-space: nowrap;
 }
 
-.threshold-bar-labels span:nth-child(1) {
+.threshold-bar-labels .threshold-bar-labels-left {
   color: var(--accent-blue);
 }
-
-.threshold-bar-labels span:nth-child(2) {
+.threshold-bar-labels .threshold-bar-labels-right {
   color: var(--txt-3);
 }
 

@@ -78,7 +78,7 @@
       "assetId": "TRUMP-USDT-SWAP",
       "theme": "#03fe07",
       "params": {
-        "_upper_drawdown": 0.0075,
+        "_upper_drawdown": 0.0055,
         "_lower_drawdown": 0.0075,
         "_grid_width": 0.01,
         "_min_price": 0.5,

@@ -443,23 +443,16 @@ window.TradingApp.Assets = {
       const finalPercent = final >= initial ? 100 : (final / initial) * 100;
       const currentPercent = Math.min((current / initial) * 100, 100);
 
-      // 刻度线在两端时调整标签对齐，避免溢出卡片
-      const finalLabelTransform =
-        finalPercent > 85
-          ? 'translateX(-100%)'
-          : finalPercent < 15
-            ? 'translateX(0)'
-            : 'translateX(-50%)';
-
       html += '<div class="threshold-bar">';
       html += '<div class="threshold-bar-track">';
       html += `<div class="threshold-bar-fill threshold-bar-current" style="width: ${currentPercent}%;" data-key="current-fill"></div>`;
       html += '</div>';
       html += `<div class="threshold-bar-mark" style="left: ${finalPercent}%;" data-key="final-mark"></div>`;
-      html += `<div class="threshold-bar-final-label" style="left: ${finalPercent}%; transform: ${finalLabelTransform};" data-key="final-label">最终阈值 ${final.toFixed(2)}%</div>`;
+      // 三个 label 都放进 labels 容器，JS 挤开
       html += '<div class="threshold-bar-labels">';
-      html += `<span>当前回撤 ${current.toFixed(2)}%</span>`;
-      html += `<span>初始阈值 ${initial.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-labels-left" data-key="labels-current" style="left:0;">当前回撤 ${current.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-final-label" data-key="final-label" style="left:${finalPercent}%;">最终阈值 ${final.toFixed(2)}%</span>`;
+      html += `<span class="threshold-bar-labels-right" data-key="labels-initial" style="left:100%; transform:translateX(-100%);">初始阈值 ${initial.toFixed(2)}%</span>`;
       html += '</div>';
       html += '</div>';
     }
@@ -575,23 +568,27 @@ window.TradingApp.Assets = {
       if (finalMark) finalMark.style.left = finalPercent + '%';
       if (currentFill) currentFill.style.width = currentPercent + '%';
 
-      // 更新标签值
-      const labels = card.querySelector('.threshold-bar-labels');
-      if (labels) {
-        const spans = labels.querySelectorAll('span');
-        if (spans[0]) spans[0].textContent = `当前回撤 ${current.toFixed(2)}%`;
-        if (spans[1]) spans[1].textContent = `初始阈值 ${initial.toFixed(2)}%`;
-      }
+      // 更新三个 label 的文本 + 目标位置
+      const currentLabel = card.querySelector('[data-key="labels-current"]');
       const finalLabel = card.querySelector('[data-key="final-label"]');
+      const initialLabel = card.querySelector('[data-key="labels-initial"]');
+      if (currentLabel) currentLabel.textContent = `当前回撤 ${current.toFixed(2)}%`;
       if (finalLabel) {
-        finalLabel.style.left = finalPercent + '%';
-        finalLabel.style.transform =
-          finalPercent > 85
-            ? 'translateX(-100%)'
-            : finalPercent < 15
-              ? 'translateX(0)'
-              : 'translateX(-50%)';
         finalLabel.textContent = `最终阈值 ${final.toFixed(2)}%`;
+        finalLabel.style.left = finalPercent + '%';
+        finalLabel.style.transform = '';
+      }
+      if (initialLabel) initialLabel.textContent = `初始阈值 ${initial.toFixed(2)}%`;
+
+      // 统一挤开（复用 app.js 的 _resolveLabelCollisions）
+      const labelsRow = card.querySelector('.threshold-bar-labels');
+      if (labelsRow && window._resolveLabelCollisions) {
+        // 先给固定端设置目标 % （current 目标 0，initial 目标 100）
+        const entries = [];
+        if (currentLabel) entries.push({ el: currentLabel, targetPct: 0 });
+        if (finalLabel) entries.push({ el: finalLabel, targetPct: finalPercent });
+        if (initialLabel) entries.push({ el: initialLabel, targetPct: 100 });
+        window._resolveLabelCollisions(labelsRow, entries, 6, 3);
       }
     }
   },
