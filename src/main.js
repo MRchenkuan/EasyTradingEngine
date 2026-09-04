@@ -399,29 +399,29 @@ function initBusinessWebSocket() {
 
     const { arg = {}, data } = JSON.parse(raw);
     const { channel, instId } = arg;
-    if (channel.indexOf('candle') === 0) {
-      if (data) {
-        const { open, close, ts } = parseCandleData(data[0]);
-        TradeEngine.updateCandleData(instId, bar_type, data[0]);
-        TradeEngine.updatePrice(instId, close, ts, bar_type);
+    // channel 可能 undefined（OKX 偶尔推无 channel 的系统消息），跳过
+    if (typeof channel !== 'string' || !channel.startsWith('candle')) return;
+    if (data) {
+      const { open, close, ts } = parseCandleData(data[0]);
+      TradeEngine.updateCandleData(instId, bar_type, data[0]);
+      TradeEngine.updatePrice(instId, close, ts, bar_type);
 
-        // 实时跑 processor tick()：让交易信号计算和 indicators/tick/chart 三通道推送走秒级 cadence
-        if (TradeEngine._status === 2) {
-          TradeEngine.runAllProcessors();
-        }
-
-        // 运行期活着日志：每资产首条 K 线 + 每 100 条汇总
-        if (!klineFirstAck.has(instId)) {
-          klineFirstAck.add(instId);
-          console.log(
-            `[KLINE] 📊 ${instId} 已收到首根 K 线推送 (close=${close}) · ${klineFirstAck.size}/${assets.length} 资产活跃`
-          );
-          if (klineFirstAck.size === assets.length) {
-            console.log(`[KLINE] 🎉 全部 ${assets.length} 资产 K 线通道活跃！`);
-          }
-        }
-        klineTickCounter++;
+      // 实时跑 processor tick()：让交易信号计算和 indicators/tick/chart 三通道推送走秒级 cadence
+      if (TradeEngine._status === 2) {
+        TradeEngine.runAllProcessors();
       }
+
+      // 运行期活着日志：每资产首条 K 线 + 每 100 条汇总
+      if (!klineFirstAck.has(instId)) {
+        klineFirstAck.add(instId);
+        console.log(
+          `[KLINE] 📊 ${instId} 已收到首根 K 线推送 (close=${close}) · ${klineFirstAck.size}/${assets.length} 资产活跃`
+        );
+        if (klineFirstAck.size === assets.length) {
+          console.log(`[KLINE] 🎉 全部 ${assets.length} 资产 K 线通道活跃！`);
+        }
+      }
+      klineTickCounter++;
     }
   });
 
