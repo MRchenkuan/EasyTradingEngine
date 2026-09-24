@@ -278,7 +278,7 @@ export class TradeEngine {
     if (bar_type) this._bar_type = bar_type;
     if (main_asset) this._main_asset = main_asset;
     if (once_limit) this._once_limit = once_limit;
-    if (candle_limit) this._candle_limit = once_limit;
+    if (candle_limit) this._candle_limit = candle_limit;
     if (assets) {
       this._asset_names = assets.map(it => it.id);
     }

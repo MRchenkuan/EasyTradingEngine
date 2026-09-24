@@ -19,7 +19,6 @@ import {
 import { base_url } from '../config.security.js';
 import { subscribeKlineChanel, getMarketCallCount } from './api.js';
 import { TradeEngine } from './TradeEngine/TradeEngine.js';
-import { VisualEngine } from './TradeEngine/VisualEngine.js';
 import { startAutoFlush, stopAutoFlush, loadMarketData } from './TradeEngine/KlineLogger.js';
 import { KLine, MainGraph, Strategies, server_host } from '../config.js';
 
@@ -73,15 +72,6 @@ TradeEngine.setMetaInfo({
 Strategies.forEach(strategy => {
   TradeEngine.createGridTrading(strategy.params.assetId, strategy.params);
 });
-
-/**
- * 启动图像引擎
- */
-VisualEngine.setTradeEngine(TradeEngine);
-VisualEngine.setMetaInfo({
-  assets,
-  show_order_his: MainGraph.order_his_show,
-}).start();
 
 const assetIds = assets.map(it => it.id);
 
@@ -459,7 +449,6 @@ async function handleWebSocketClose(code, reason) {
 
   // 停止引擎
   TradeEngine.stop();
-  VisualEngine.stop();
 
   reconnectAttempts++;
 
@@ -491,7 +480,6 @@ async function handleWebSocketClose(code, reason) {
 
     // 重启引擎（状态机从 IDLE 重新走 BOOT → RUN）
     TradeEngine.start();
-    VisualEngine.start();
 
     // 重置重连尝试计数器
     reconnectAttempts = 0;

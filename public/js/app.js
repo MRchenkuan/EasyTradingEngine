@@ -76,11 +76,13 @@ function _calcWindowYield(history, gran, currentEq) {
   return (currentEq - startEq) / startEq;
 }
 
-/** 渲染收益率 pill（按当前 miniGran 窗口） */
+/** 渲染收益率 pill（按当前 miniGran 窗口；窗口数据不足时与走势图同样降级） */
 function _renderYield(currentEq) {
   const yEl = document.getElementById('totalEquityYield');
   if (!yEl) return;
-  const yr = _calcWindowYield(equityHistory, miniGran, currentEq);
+  // 用与走势图一致的降级窗口，避免走势图显示了但收益率空白
+  const renderGran = _resolveRenderGran(miniGran) || miniGran;
+  const yr = _calcWindowYield(equityHistory, renderGran, currentEq);
   if (yr != null && isFinite(yr)) {
     yEl.style.display = '';
     yEl.textContent = (yr >= 0 ? '+' : '') + (yr * 100).toFixed(2) + '%';
@@ -90,16 +92,31 @@ function _renderYield(currentEq) {
   }
 }
 
+/**
+ * 选一个能渲染出 ≥2 个点的时间窗口。
+ * 优先用用户选的 gran；若该窗口数据不足（如服务停摆后的缺口），
+ * 自动降级到更大的窗口（day→week→month→year→all）兜底，保证走势图始终可见。
+ */
+function _resolveRenderGran(gran) {
+  const order = ['day', 'week', 'month', 'year', 'all'];
+  const startIdx = Math.max(0, order.indexOf(gran));
+  for (let i = startIdx; i < order.length; i++) {
+    if (_filterHistoryByWindow(equityHistory, order[i]).length >= 2) return order[i];
+  }
+  return null; // 全部窗口都不足 2 点
+}
+
 /** 销毁并重建迷你 Chart.js 线图 */
 function _renderMiniEqChart(gran) {
   const canvas = document.getElementById('equityMiniCanvas');
   if (!canvas || !window.Chart) return;
-  const aggregated = _filterHistoryByWindow(equityHistory, gran);
   const container = document.getElementById('miniEqChart');
   if (!container) return;
 
-  // 历史点 < 2 不画图
-  if (aggregated.length < 2) {
+  // 自动降级：当前窗口数据不足 → 用更大窗口兜底
+  const renderGran = _resolveRenderGran(gran);
+  if (!renderGran) {
+    // 全部窗口都不足 2 点 → 不画图
     container.style.display = 'none';
     if (miniEqChart) {
       miniEqChart.destroy();
@@ -107,6 +124,7 @@ function _renderMiniEqChart(gran) {
     }
     return;
   }
+  const aggregated = _filterHistoryByWindow(equityHistory, renderGran);
   container.style.display = '';
 
   const labels = aggregated.map(p => p.label);

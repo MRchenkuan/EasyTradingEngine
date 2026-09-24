@@ -150,7 +150,13 @@ export async function getHistoryPrices(
       try {
         process.stdout.write(`  ⏳ ${assetId}(HIS) 历史K线 ${cur}/${page} 请求中...\r`);
         const { data } = await marketCandlesHistory(assetId, bar, last_ts, to_when, once_limit);
-        console.log(assetId + '(HIS)', formatTimestamp(last_ts), bar, data.length, `(第 ${cur}/${page} 页)`);
+        console.log(
+          assetId + '(HIS)',
+          formatTimestamp(last_ts),
+          bar,
+          data.length,
+          `(第 ${cur}/${page} 页)`
+        );
         if (!(data && data.length > 0)) break;
         last_ts = parseCandleData(data[data.length - 1])['ts'];
         collections = collections.concat(data);

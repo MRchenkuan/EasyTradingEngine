@@ -241,7 +241,7 @@ export function trendReversalThreshold(
 
   const volatility = getVolatility(recent_prices, 30);
   const atr_6 = getATR(candles, 6);
-  const atr_22 = getATR(candles, 25);
+  const atr_22 = getATR(candles, 22);
   const atr_120 = getATR(candles, 120);
   const rsi_fast = getFastRSI(recent_prices, 60);
   const rsi_slow = getFastRSI(recent_prices, 300);
@@ -250,7 +250,10 @@ export function trendReversalThreshold(
   const vol_power = vol_avg_fast / vol_avg_slow;
   const { ceil: grid_ceil_line, floor: grid_floor_line } = grid_box;
 
-  const initial_threshold = (threshold = Math.min(atr_120 * 3, threshold));
+  // ATR 数据不足时返回 -1（哨兵值），此时不做 ATR 封顶，退回默认阈值，
+  // 避免冷启动初期阈值被压到 0.1% 最小值导致过度交易
+  const initial_threshold = (threshold =
+    atr_120 >= 0 ? Math.min(atr_120 * 3, threshold) : threshold);
   threshold = Math.max(min_threshold, Math.min(threshold, max_threshold));
 
   const {
