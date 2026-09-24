@@ -31,14 +31,14 @@ export function TradeFreqController(params) {
   // 节流距离计算：开仓和平仓分开
   // 开仓：高风险高节流（需要更大跨度才放行）
   const openThrottleSpan = {
-    emergency: 1 + lastTradeGridSpan * 2,
-    high: 1 + lastTradeGridSpan * 1.5,
-    low: 1 + lastTradeGridSpan * 1.25,
+    emergency: 1 + lastTradeGridSpan * 1.5,
+    high: 1 + lastTradeGridSpan * 1.25,
+    low: 1 + lastTradeGridSpan * 0.85,
   };
   // 平仓：高风险低节流（更容易平仓以减少风险暴露）
   const closeThrottleSpan = {
-    high: 1 + lastTradeGridSpan,
-    low: 1 + lastTradeGridSpan * 1.25,
+    high: 1 + lastTradeGridSpan * 0.5,
+    low: 1 + lastTradeGridSpan * 0.85,
   };
 
   // 风险等级分组
