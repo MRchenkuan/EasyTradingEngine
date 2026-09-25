@@ -69,6 +69,9 @@ export function TradeFreqController(params) {
   const passOpenLowRiskSpan = isOpen && grid_span_abs >= openThrottleSpan.low;
 
   const args = {
+    // 元信息：供前端展示实际需要的格数（1 + 跨度 × 系数）
+    lastTradeGridSpan,
+
     // 通用条件
     passNotSerialTrade,
     passOverThrottleResetTime,

@@ -39,6 +39,11 @@ window.TradingApp.Assets = {
       return `<div class="tooltip-row"><span class="tooltip-label">${label}</span><span class="${statusClass}">${statusText}</span></div>`;
     };
 
+    // 实际需要的格数 = 1 + 上次跨度 × 系数；跨度无效时返回空串
+    const span = Number(frq_rest.lastTradeGridSpan);
+    const need = coef =>
+      isFinite(span) && span >= 0 ? `（需${(1 + span * coef).toFixed(2)}格）` : '';
+
     let html = '<div class="trade-forbid-tooltip">';
     html += '<div class="tooltip-title">交易条件</div>';
 
@@ -62,9 +67,9 @@ window.TradingApp.Assets = {
         html += '<div class="tooltip-section">';
         html +=
           '<div class="tooltip-section-title">开仓节流 <span class="tooltip-hint">(按风险等级递进)</span></div>';
-        html += renderRow('紧急风险 · 距离≥1+2倍', frq_rest.passOpenEmergencySpan);
-        html += renderRow('高风险 · 距离≥1+1.5倍', frq_rest.passOpenHighRiskSpan);
-        html += renderRow('低风险 · 距离≥1+1.25倍', frq_rest.passOpenLowRiskSpan);
+        html += renderRow(`紧急风险 · 距离≥1+跨度×1.5${need(1.5)}`, frq_rest.passOpenEmergencySpan);
+        html += renderRow(`高风险 · 距离≥1+跨度×1.25${need(1.25)}`, frq_rest.passOpenHighRiskSpan);
+        html += renderRow(`低风险 · 距离≥1+跨度×0.85${need(0.85)}`, frq_rest.passOpenLowRiskSpan);
         html += '</div>';
       }
 
@@ -73,8 +78,8 @@ window.TradingApp.Assets = {
         html +=
           '<div class="tooltip-section-title">平仓节流 <span class="tooltip-hint">(紧急避险优先)</span></div>';
         html += renderRow('紧急避险放行', frq_rest.passCloseEmergencyNoThrottle);
-        html += renderRow('高风险 · 距离≥1+1倍', frq_rest.passCloseHighRiskSpan);
-        html += renderRow('低风险 · 距离≥1+1.25倍', frq_rest.passCloseLowRiskSpan);
+        html += renderRow(`高风险 · 距离≥1+跨度×0.5${need(0.5)}`, frq_rest.passCloseHighRiskSpan);
+        html += renderRow(`低风险 · 距离≥1+跨度×0.85${need(0.85)}`, frq_rest.passCloseLowRiskSpan);
         html += '</div>';
       }
     }

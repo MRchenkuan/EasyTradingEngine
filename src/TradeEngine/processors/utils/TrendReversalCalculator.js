@@ -199,8 +199,7 @@ function getBOLL(candles, p = 20) {
 }
 
 function getVolumeStandard(candles, slow_window = 30, fast_window = 3) {
-  const volumeArray = candles
-    .map(candle => parseFloat(candle.vol));
+  const volumeArray = candles.map(candle => parseFloat(candle.vol));
 
   const { vol: lastVol, ts } = candles.at(-1);
 
